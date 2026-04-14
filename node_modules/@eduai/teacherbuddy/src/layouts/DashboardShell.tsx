@@ -30,6 +30,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard",   href: "/",          end: true  },
   { icon: Wrench,          label: "Teacher Tools", href: "/tools"               },
   { icon: Gamepad2,        label: "Game Studio",   href: "/games"               },
+  { icon: BookOpen,        label: "Classrooms",    href: "/classrooms"          },
   { icon: CheckSquare,     label: "Bulk Evaluation", href: "/evaluation"        },
   { icon: FileSpreadsheet, label: "Reports",     href: "/reports"               },
   { icon: FileSignature,   label: "Form Automation", href: "/forms"             },
