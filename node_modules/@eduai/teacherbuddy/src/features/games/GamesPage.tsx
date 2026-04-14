@@ -1,44 +1,85 @@
 import React, { useState } from "react";
-import { Gamepad2, Brain, Users, BarChart, FlaskConical, Target, HardHat } from "lucide-react";
+import { 
+  BookOpen, UploadCloud, CalendarDays, Link, Cloud, Trophy, 
+  Puzzle, BarChart3, Layout, Kanban, HardHat 
+} from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../shared/hooks/useTheme";
 
 const gameCategories = [
+  // Core Academic
   {
-    id: "competitive",
-    title: "Competitive Live Quizzes",
-    description: "High-energy classroom engagement with leaderboards (Kahoot!, Blooket style).",
-    icon: Target,
-    color: "from-orange-400 to-red-500",
+    id: "classroom",
+    title: "Classroom",
+    description: "Students can access content posted by the teacher.",
+    icon: BookOpen,
+    color: "from-blue-400 to-blue-600",
   },
   {
-    id: "strategic",
-    title: "Strategic Quizzes",
-    description: "Strategy-based quizzes with in-game currency and upgrades (Gimkit style).",
-    icon: Gamepad2,
-    color: "from-blue-400 to-indigo-500",
+    id: "resource-management",
+    title: "Resource Management",
+    description: "Students can upload their answers securely.",
+    icon: UploadCloud,
+    color: "from-indigo-400 to-indigo-600",
   },
   {
-    id: "participatory",
-    title: "Real-time Participation",
-    description: "Polls, word clouds, and Q&A for real-time engagement (Mentimeter, Slido style).",
-    icon: BarChart,
-    color: "from-emerald-400 to-teal-500",
+    id: "office-hours",
+    title: "Office Hours Scheduler",
+    description: "Students book slots to avoid chaos and manage time.",
+    icon: CalendarDays,
+    color: "from-violet-400 to-violet-600",
+  },
+  // Custom Games
+  {
+    id: "chain-answer",
+    title: "Chain Answer Game",
+    description: "One student starts an answer, the next continues it.",
+    icon: Link,
+    color: "from-fuchsia-400 to-fuchsia-600",
   },
   {
-    id: "collaborative",
-    title: "Collaborative Workspaces",
-    description: "Infinite canvas for brainstorming and co-creation (Miro, Padlet style).",
-    icon: Users,
-    color: "from-pink-400 to-rose-500",
+    id: "word-cloud",
+    title: "Live Word Cloud Battle",
+    description: "Ask open-ended questions, words appear live (Mentimeter style).",
+    icon: Cloud,
+    color: "from-sky-400 to-sky-600",
   },
   {
-    id: "experiential",
-    title: "Experiential Simulations",
-    description: "Hands-on virtual experiments and lab simulations (PhET, Labster style).",
-    icon: FlaskConical,
-    color: "from-purple-400 to-violet-500",
+    id: "quiz-royale",
+    title: "Quiz Battle Royale",
+    description: "Real-time MCQs. Points = speed + accuracy. Live leaderboard.",
+    icon: Trophy,
+    color: "from-yellow-400 to-amber-500",
+  },
+  {
+    id: "team-puzzle",
+    title: "Team Puzzle Challenge",
+    description: "Split into teams. Each member gets partial info to collaborate.",
+    icon: Puzzle,
+    color: "from-orange-400 to-orange-600",
+  },
+  // Third-Party Inspired Tools
+  {
+    id: "slido",
+    title: "Slido",
+    description: "Live polling and Q&A integrated into presentations.",
+    icon: BarChart3,
+    color: "from-teal-400 to-teal-600",
+  },
+  {
+    id: "padlet",
+    title: "Padlet",
+    description: "Students post ideas, media, and responses on a shared visual board.",
+    icon: Layout,
+    color: "from-amber-400 to-amber-600",
+  },
+  {
+    id: "trello",
+    title: "Trello",
+    description: "Kanban-style boards for managing group projects and tasks.",
+    icon: Kanban,
+    color: "from-blue-500 to-blue-700",
   },
 ];
 
@@ -51,15 +92,15 @@ export const GamesPage: React.FC = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>
-          EduGames Hub
+          Games & Activities Studio
         </h1>
         <p className="mt-1" style={{ color: "var(--color-text-secondary)" }}>
-          Interactive learning modules, live quizzes, and collaborative spaces.
+          Manage interactive learning modules, live quizzes, and collaborative spaces.
         </p>
       </div>
 
       {/* Grid of game types */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-6">
         {gameCategories.map((category) => (
           <motion.div
             key={category.id}
