@@ -3,3 +3,13 @@ sdd_extracted.txt
 edu.db
 /backend/venv/
 /implementation_plan.md
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+backend/venv/
+
+# Database (optional)
+*.db
