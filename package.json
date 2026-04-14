@@ -1,0 +1,13 @@
+{
+  "name": "eduai_suite",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev -w @eduai/teacherbuddy",
+    "dev:interactive": "npm run dev -w @eduai/edugames",
+    "dev": "npx concurrently \"npm run dev:admin\" \"npm run dev:interactive\""
+  }
+}
