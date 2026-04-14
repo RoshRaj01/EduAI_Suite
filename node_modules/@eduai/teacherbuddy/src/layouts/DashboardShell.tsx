@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -27,15 +27,17 @@ import logo from "../assets/logo (5).png";
 import { useTheme } from "../shared/hooks/useTheme";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard",   href: "/",          end: true  },
-  { icon: Wrench,          label: "Teacher Tools", href: "/tools"               },
-  { icon: Gamepad2,        label: "Game Studio",   href: "/games"               },
-  { icon: CheckSquare,     label: "Bulk Evaluation", href: "/evaluation"        },
-  { icon: FileSpreadsheet, label: "Reports",     href: "/reports"               },
-  { icon: FileSignature,   label: "Form Automation", href: "/forms"             },
-  { icon: Activity,        label: "Analytics & Risk", href: "/analytics"        },
-  { icon: HeartPulse,      label: "Wellbeing Zone", href: "/wellbeing"          },
-  { icon: MessageSquare,   label: "AI Assistant",href: "/chat"                  },
+  { icon: LayoutDashboard, label: "Dashboard",   href: "/",          end: true,  keywords: "home overview summary stats"      },
+  { icon: Wrench,          label: "Teacher Tools", href: "/tools",              keywords: "question paper generator quiz"    },
+  { icon: Gamepad2,        label: "Game Studio",   href: "/games",              keywords: "gamify create play interactive"   },
+  { icon: BookOpen,        label: "Classrooms",    href: "/classrooms",         keywords: "courses students assignments"     },
+  { icon: CheckSquare,     label: "Bulk Evaluation", href: "/evaluation",       keywords: "grade answers ai score"           },
+  { icon: FileSpreadsheet, label: "Reports",     href: "/reports",              keywords: "export download pdf analytics"    },
+  { icon: FileSignature,   label: "Form Automation", href: "/forms",            keywords: "template auto-fill document"      },
+  { icon: Activity,        label: "Analytics & Risk", href: "/analytics",       keywords: "risk alert attendance prediction" },
+  { icon: HeartPulse,      label: "Wellbeing Zone", href: "/wellbeing",         keywords: "mental health mood wellness"      },
+  { icon: MessageSquare,   label: "AI Assistant",href: "/chat",                 keywords: "chat ask help bot"                },
+  { icon: Settings,        label: "Settings",       href: "/settings",          keywords: "preferences config account"       },
 ];
 
 const notifications = [
@@ -48,8 +50,45 @@ export const DashboardShell: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
+
+  // Filter nav items based on search query
+  const searchResults = searchQuery.trim()
+    ? navItems.filter(item =>
+        item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.keywords && item.keywords.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : [];
+
+  // Navigate to a search result and clear
+  const handleSearchSelect = useCallback((href: string) => {
+    navigate(href);
+    setSearchQuery("");
+    setSearchFocused(false);
+    searchRef.current?.blur();
+  }, [navigate]);
+
+  // Ctrl+K to focus search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+        setSearchFocused(true);
+      }
+      if (e.key === "Escape") {
+        setSearchFocused(false);
+        setSearchQuery("");
+        searchRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div className="flex min-h-screen" style={{ background: "var(--color-surface-base)" }}>
@@ -145,12 +184,85 @@ export const DashboardShell: React.FC = () => {
               <Menu size={20} />
             </button>
             <div className="relative hidden md:flex items-center">
-              <Search size={15} className="absolute left-3 text-slate-400" />
+              <Search size={15} className="absolute left-3 text-slate-400 z-10" />
               <input
-                className="form-input pl-9 pr-4 py-2 text-sm w-56"
+                ref={searchRef}
+                className="form-input pl-9 pr-16 py-2 text-sm w-64 transition-all"
                 placeholder="Search anything..."
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); setSearchFocused(true); }}
+                onFocus={() => setSearchFocused(true)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && searchResults.length > 0) {
+                    handleSearchSelect(searchResults[0].href);
+                  }
+                  if (e.key === "Escape") {
+                    setSearchFocused(false);
+                    setSearchQuery("");
+                    searchRef.current?.blur();
+                  }
+                }}
                 style={{ borderRadius: "10px" }}
               />
+              <kbd
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold px-1.5 py-0.5 rounded border pointer-events-none"
+                style={{ color: "var(--color-text-muted)", borderColor: "var(--color-border)", background: "var(--color-bg-grad1)" }}
+              >
+                Ctrl K
+              </kbd>
+
+              {/* Search Results Dropdown */}
+              {searchFocused && searchQuery.trim() && (
+                <div
+                  className="absolute top-full left-0 mt-2 w-80 glass-card overflow-hidden animate-fade-in z-50"
+                  style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }}
+                >
+                  {searchResults.length > 0 ? (
+                    <div className="py-1">
+                      <p className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
+                        Pages — {searchResults.length} result{searchResults.length > 1 ? "s" : ""}
+                      </p>
+                      {searchResults.map((item, i) => (
+                        <button
+                          key={item.href}
+                          onClick={() => handleSearchSelect(item.href)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
+                          style={{}}
+                          onMouseEnter={e => { e.currentTarget.style.background = "var(--color-border)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                        >
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ background: "var(--color-bg-grad1)" }}
+                          >
+                            <item.icon size={16} style={{ color: "var(--color-brand-blue)" }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.label}</p>
+                            <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+                              Navigate to {item.href === "/" ? "home" : item.href}
+                            </p>
+                          </div>
+                          {i === 0 && (
+                            <kbd
+                              className="text-[9px] px-1.5 py-0.5 rounded border shrink-0"
+                              style={{ color: "var(--color-text-muted)", borderColor: "var(--color-border)" }}
+                            >
+                              Enter ↵
+                            </kbd>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="px-4 py-8 text-center">
+                      <Search size={24} className="mx-auto mb-2" style={{ color: "var(--color-text-muted)" }} />
+                      <p className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>No results found</p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>Try searching for pages like "classrooms" or "analytics"</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -268,8 +380,8 @@ export const DashboardShell: React.FC = () => {
       </main>
 
       {/* Overlay to close dropdowns */}
-      {(notifOpen || profileOpen) && (
-        <div className="fixed inset-0 z-30" onClick={() => { setNotifOpen(false); setProfileOpen(false); }} />
+      {(notifOpen || profileOpen || searchFocused) && (
+        <div className="fixed inset-0 z-30" onClick={() => { setNotifOpen(false); setProfileOpen(false); setSearchFocused(false); setSearchQuery(""); }} />
       )}
     </div>
   );
