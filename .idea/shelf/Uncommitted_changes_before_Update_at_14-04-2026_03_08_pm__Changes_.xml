@@ -1,0 +1,85 @@
+<changelist name="Uncommitted_changes_before_Update_at_14-04-2026_03_08_pm_[Changes]" date="1776159505822" recycled="false" toDelete="true">
+  <option name="PATH" value="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_14-04-2026_03_08_pm_[Changes]/shelved.patch" />
+  <option name="DESCRIPTION" value="Uncommitted changes before Update at 14-04-2026 03:08 pm [Changes]" />
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Scripts/pythonw.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip/_vendor/distlib/w64-arm.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Scripts/python.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip-22.3.dist-info/RECORD" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/setuptools/gui-arm64.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip/_vendor/distlib/t32.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pydantic_core/_pydantic_core.cp311-win_amd64.pyd" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Scripts/pip3.11.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip-22.3.dist-info/INSTALLER" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Scripts/pip.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip/_vendor/distlib/w32.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip/_vendor/distlib/w64.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/setuptools/gui-64.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip/_vendor/distlib/t64.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Scripts/fastapi.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip/_vendor/distlib/t64-arm.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/setuptools/cli-64.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Scripts/pip3.10.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Scripts/uvicorn.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/setuptools/cli-32.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/setuptools/gui.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/setuptools/gui-32.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip-22.3.dist-info/METADATA" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/setuptools/cli-arm64.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/setuptools/cli.exe" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Lib/site-packages/pip-22.3.dist-info/WHEEL" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="backend/venv/Scripts/pip3.exe" />
+  </binary>
+</changelist>

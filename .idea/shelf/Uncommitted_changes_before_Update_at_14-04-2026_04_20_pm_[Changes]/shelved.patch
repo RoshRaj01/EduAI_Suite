@@ -1,0 +1,1906 @@
+Index: apps/teacherbuddy/src/features/classroom/ClassroomsPage.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import React, { useState, useEffect } from \"react\";\r\nimport {\r\n  Users, Clock, Plus, Search, ChevronRight,\r\n  Bell, Paperclip, FileText, Video, Link as LinkIcon,\r\n  Star, MoreHorizontal, Calendar,\r\n} from \"lucide-react\";\r\nimport { GlassCard } from \"../../shared/components/GlassCard\";\r\n\r\nconst typeIcon: Record<string, React.ReactNode> = {\r\n  pdf:   <FileText size={16} className=\"text-red-500\" />,\r\n  video: <Video size={16} className=\"text-blue-500\" />,\r\n  doc:   <FileText size={16} className=\"text-indigo-500\" />,\r\n  link:  <LinkIcon size={16} className=\"text-green-500\" />,\r\n};\r\n\r\nexport const ClassroomsPage: React.FC = () => {\r\n  const [courses, setCourses] = useState<any[]>([]);\r\n  const [selectedCourse, setSelectedCourse] = useState<any>(null);\r\n  const [announcements, setAnnouncements] = useState<any[]>([]);\r\n  const [resources, setResources] = useState<any[]>([]);\r\n  const [students, setStudents] = useState<any[]>([]);\r\n  const [activeTab, setActiveTab] = useState<\"announcements\" | \"resources\" | \"students\">(\"announcements\");\r\n  const [search, setSearch] = useState(\"\");\r\n\r\n  // \uD83D\uDD39 Fetch courses\r\n  useEffect(() => {\r\n    fetch(\"http://localhost:8000/courses\")\r\n      .then(res => res.json())\r\n      .then(data => {\r\n        setCourses(data);\r\n        if (data.length > 0) setSelectedCourse(data[0]);\r\n      });\r\n  }, []);\r\n\r\n  // \uD83D\uDD39 Fetch related data when course changes\r\n  useEffect(() => {\r\n    if (!selectedCourse) return;\r\n\r\n    fetch(`http://localhost:8000/announcements/${selectedCourse.id}`)\r\n      .then(res => res.json())\r\n      .then(setAnnouncements);\r\n\r\n    fetch(`http://localhost:8000/resources/${selectedCourse.id}`)\r\n      .then(res => res.json())\r\n      .then(setResources);\r\n\r\n    fetch(`http://localhost:8000/students/${selectedCourse.id}`)\r\n      .then(res => res.json())\r\n      .then(setStudents);\r\n\r\n  }, [selectedCourse]);\r\n\r\n  const filtered = courses.filter(c =>\r\n    c.name.toLowerCase().includes(search.toLowerCase()) ||\r\n    c.code.toLowerCase().includes(search.toLowerCase())\r\n  );\r\n\r\n  // \uD83D\uDD39 Prevent crash before data loads\r\n  if (!selectedCourse) return <div>Loading...</div>;\r\n\r\n  return (\r\n    <div className=\"space-y-6 animate-fade-in\">\r\n      <div className=\"flex items-center justify-between\">\r\n        <div>\r\n          <h1 className=\"text-2xl font-bold\" style={{ fontFamily: \"var(--font-display)\", color: \"var(--color-text-primary)\" }}>\r\n            Classrooms\r\n          </h1>\r\n          <p className=\"text-sm mt-1\" style={{ color: \"var(--color-text-muted)\" }}>\r\n            Manage your courses, resources, and student announcements.\r\n          </p>\r\n        </div>\r\n        <button className=\"btn btn-primary text-sm\">\r\n          <Plus size={15} /> New Classroom\r\n        </button>\r\n      </div>\r\n\r\n      <div className=\"grid grid-cols-1 xl:grid-cols-3 gap-6\">\r\n\r\n        {/* Course List */}\r\n        <div className=\"space-y-3\">\r\n          <div className=\"relative\">\r\n            <Search size={14} className=\"absolute left-3 top-1/2 -translate-y-1/2 text-slate-400\" />\r\n            <input\r\n              className=\"form-input pl-9 text-sm\"\r\n              placeholder=\"Search courses…\"\r\n              value={search}\r\n              onChange={e => setSearch(e.target.value)}\r\n            />\r\n          </div>\r\n\r\n          {filtered.map(c => (\r\n            <div\r\n              key={c.id}\r\n              onClick={() => setSelectedCourse(c)}\r\n              className={`glass-card p-4 cursor-pointer transition-all duration-200 border-l-4 ${\r\n                selectedCourse.id === c.id ? \"border-l-[#264796] shadow-lg shadow-blue-100\" : \"border-l-transparent hover:shadow-md\"\r\n              }`}\r\n            >\r\n              <div className=\"flex items-start justify-between gap-2\">\r\n                <div className=\"min-w-0\">\r\n                  <span className=\"text-[10px] font-bold uppercase\" style={{ color: \"var(--color-text-muted)\" }}>{c.code}</span>\r\n                  <p className=\"font-semibold text-sm mt-0.5\">{c.name}</p>\r\n                  <p className=\"text-[11px] mt-1\" style={{ color: \"var(--color-text-muted)\" }}>\r\n                    Batch {c.batch} · {c.students} students\r\n                  </p>\r\n                </div>\r\n                <ChevronRight size={16} className={`mt-1 ${selectedCourse.id === c.id ? \"text-blue-600 rotate-90\" : \"text-slate-300\"}`} />\r\n              </div>\r\n\r\n              <div className=\"mt-3 space-y-1.5\">\r\n                <div className=\"progress-bar\">\r\n                  <div\r\n                    className=\"progress-fill\"\r\n                    style={{\r\n                      width: `${c.progress}%`,\r\n                      background: `linear-gradient(90deg,${c.color},${c.color}bb)`\r\n                    }}\r\n                  />\r\n                </div>\r\n\r\n                <div className=\"flex justify-between text-[10px]\" style={{ color: \"var(--color-text-muted)\" }}>\r\n                  <span className=\"flex items-center gap-1\">\r\n                    <Clock size={10} /> {c.next_class}\r\n                  </span>\r\n                  <span className=\"font-semibold\" style={{ color: c.color }}>\r\n                    {c.progress}% complete\r\n                  </span>\r\n                </div>\r\n              </div>\r\n            </div>\r\n          ))}\r\n        </div>\r\n\r\n        {/* Course Detail */}\r\n        <div className=\"xl:col-span-2 space-y-4\">\r\n\r\n          {/* Header */}\r\n          <div className=\"rounded-2xl overflow-hidden\" style={{ background: `linear-gradient(135deg, ${selectedCourse.color} 0%, ${selectedCourse.color}cc 100%)` }}>\r\n            <div className=\"p-6 text-white\">\r\n              <div className=\"flex justify-between\">\r\n                <div>\r\n                  <h2 className=\"text-xl font-bold\">{selectedCourse.name}</h2>\r\n                  <p className=\"text-sm\">{selectedCourse.description}</p>\r\n                </div>\r\n                <MoreHorizontal size={18} />\r\n              </div>\r\n\r\n              <div className=\"flex gap-6 mt-4 text-xs\">\r\n                <div><Users size={13} /> {selectedCourse.students} Students</div>\r\n                <div><Bell size={13} /> {announcements.length} Announcements</div>\r\n                <div><Paperclip size={13} /> {resources.length} Resources</div>\r\n                <div><Calendar size={13} /> {selectedCourse.next_class}</div>\r\n              </div>\r\n            </div>\r\n          </div>\r\n\r\n          {/* Tabs */}\r\n          <GlassCard padding=\"none\">\r\n            <div className=\"flex border-b\">\r\n              {([\"announcements\", \"resources\", \"students\"] as const).map(tab => (\r\n                <button\r\n                  key={tab}\r\n                  onClick={() => setActiveTab(tab)}\r\n                  className={`px-5 py-3 text-sm font-semibold ${\r\n                    activeTab === tab ? \"border-b-2 border-blue-600\" : \"text-slate-400\"\r\n                  }`}\r\n                >\r\n                  {tab}\r\n                </button>\r\n              ))}\r\n            </div>\r\n\r\n            <div className=\"p-5\">\r\n\r\n              {/* Announcements */}\r\n              {activeTab === \"announcements\" && (\r\n                <div className=\"space-y-3\">\r\n                  {announcements.map(a => (\r\n                    <div key={a.id} className=\"p-4 border rounded-xl\">\r\n                      <p className=\"font-semibold text-sm\">{a.title}</p>\r\n                      <p className=\"text-xs\">{a.body}</p>\r\n                      <span className=\"text-[10px]\">{a.time}</span>\r\n                    </div>\r\n                  ))}\r\n                </div>\r\n              )}\r\n\r\n              {/* Resources */}\r\n              {activeTab === \"resources\" && (\r\n                <div className=\"space-y-3\">\r\n                  {resources.map(r => (\r\n                    <div key={r.id} className=\"flex items-center gap-3 p-3 border rounded-xl\">\r\n                      {typeIcon[r.type]}\r\n                      <div>\r\n                        <p className=\"text-sm\">{r.name}</p>\r\n                        <p className=\"text-xs\">{r.size} {r.date}</p>\r\n                      </div>\r\n                    </div>\r\n                  ))}\r\n                </div>\r\n              )}\r\n\r\n              {/* Students */}\r\n              {activeTab === \"students\" && (\r\n                <div className=\"space-y-2\">\r\n                  {students.map(s => (\r\n                    <div key={s.roll} className=\"p-3 border rounded-xl\">\r\n                      <p className=\"text-sm font-semibold\">{s.name}</p>\r\n                      <p className=\"text-xs\">{s.roll}</p>\r\n                      <p className=\"text-xs\">Attendance: {s.attendance}%</p>\r\n                      <p className=\"text-xs\">Score: {s.avg_score}%</p>\r\n                    </div>\r\n                  ))}\r\n                </div>\r\n              )}\r\n\r\n            </div>\r\n          </GlassCard>\r\n        </div>\r\n      </div>\r\n    </div>\r\n  );\r\n};
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/apps/teacherbuddy/src/features/classroom/ClassroomsPage.tsx b/apps/teacherbuddy/src/features/classroom/ClassroomsPage.tsx
+--- a/apps/teacherbuddy/src/features/classroom/ClassroomsPage.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/apps/teacherbuddy/src/features/classroom/ClassroomsPage.tsx	(date 1776163827258)
+@@ -1,82 +1,154 @@
+-import React, { useState, useEffect } from "react";
++import React, { useState } from "react";
+ import {
+-  Users, Clock, Plus, Search, ChevronRight,
+-  Bell, Paperclip, FileText, Video, Link as LinkIcon,
+-  Star, MoreHorizontal, Calendar,
++  Users, Clock, Plus, Search, ChevronRight, BookOpen,
++  FileText, BarChart2, CheckCircle2, AlertCircle,
++  Calendar, MoreVertical, TrendingUp, X, ClipboardList,
+ } from "lucide-react";
+ import { GlassCard } from "../../shared/components/GlassCard";
+ 
+-const typeIcon: Record<string, React.ReactNode> = {
+-  pdf:   <FileText size={16} className="text-red-500" />,
+-  video: <Video size={16} className="text-blue-500" />,
+-  doc:   <FileText size={16} className="text-indigo-500" />,
+-  link:  <LinkIcon size={16} className="text-green-500" />,
+-};
++/* ─── Mock Data (mirrors edugames StudentClassrooms) ─────────────────── */
++
++const classrooms = [
++  {
++    id: "csc401",
++    code: "CSC401",
++    name: "Advanced Neural Networks",
++    batch: "Batch 2026-A",
++    students: 42,
++    nextClass: "Today, 2:00 PM",
++    progress: 68,
++    color: "#264796",
++    description: "Deep learning architectures, backpropagation, CNNs, RNNs, and transformer models.",
++  },
++  {
++    id: "csc312",
++    code: "CSC312",
++    name: "Data Structures & Algorithms",
++    batch: "Batch 2025-B",
++    students: 38,
++    nextClass: "Tomorrow, 10:00 AM",
++    progress: 82,
++    color: "#d0ae61",
++    description: "Fundamental and advanced data structures, algorithm design, and complexity analysis.",
++  },
++  {
++    id: "csc501",
++    code: "CSC501",
++    name: "Cloud Computing & DevOps",
++    batch: "Batch 2026-A",
++    students: 35,
++    nextClass: "Wed, 3:30 PM",
++    progress: 45,
++    color: "#16a34a",
++    description: "Cloud service models, containerization, CI/CD pipelines, and infrastructure as code.",
++  },
++  {
++    id: "csc220",
++    code: "CSC220",
++    name: "Database Management Systems",
++    batch: "Batch 2025-C",
++    students: 50,
++    nextClass: "Thu, 8:00 AM",
++    progress: 91,
++    color: "#7c3aed",
++    description: "Relational databases, SQL, normalization, indexing, and distributed databases.",
++  },
++];
++
++const assignments = [
++  { id: 1, classCode: "CSC401", name: "Lab 4: Backpropagation",            due: "Tonight, 11:59 PM", submitted: 28, total: 42, status: "active"   },
++  { id: 2, classCode: "CSC312", name: "Assignment 2: AVL Trees",           due: "Tomorrow",          submitted: 38, total: 38, status: "completed"},
++  { id: 3, classCode: "CSC501", name: "Docker Compose Lab",                due: "Apr 18, 2026",      submitted: 12, total: 35, status: "active"   },
++  { id: 4, classCode: "CSC401", name: "Mid-Term: Neural Networks",         due: "Apr 10, 2026",      submitted: 42, total: 42, status: "graded"   },
++  { id: 5, classCode: "CSC220", name: "Normalization Exercise",            due: "Apr 20, 2026",      submitted: 0,  total: 50, status: "upcoming" },
++];
++
++const topStudents = [
++  { name: "Arjun Mehta",   roll: "S4121", avg: 94, attendance: 97, trend: "up"   },
++  { name: "Sneha Patil",   roll: "S4135", avg: 91, attendance: 95, trend: "up"   },
++  { name: "Priya Sharma",  roll: "S4122", avg: 88, attendance: 89, trend: "down" },
++  { name: "Rohan Verma",   roll: "S4109", avg: 85, attendance: 78, trend: "up"   },
++  { name: "Kavya Nair",    roll: "S4140", avg: 82, attendance: 92, trend: "up"   },
++];
++
++/* ─── Component ──────────────────────────────────────────────────────── */
+ 
+ export const ClassroomsPage: React.FC = () => {
+-  const [courses, setCourses] = useState<any[]>([]);
+-  const [selectedCourse, setSelectedCourse] = useState<any>(null);
+-  const [announcements, setAnnouncements] = useState<any[]>([]);
+-  const [resources, setResources] = useState<any[]>([]);
+-  const [students, setStudents] = useState<any[]>([]);
+-  const [activeTab, setActiveTab] = useState<"announcements" | "resources" | "students">("announcements");
++  const [selectedId, setSelectedId] = useState(classrooms[0].id);
+   const [search, setSearch] = useState("");
+-
+-  // 🔹 Fetch courses
+-  useEffect(() => {
+-    fetch("http://localhost:8000/courses")
+-      .then(res => res.json())
+-      .then(data => {
+-        setCourses(data);
+-        if (data.length > 0) setSelectedCourse(data[0]);
+-      });
+-  }, []);
+-
+-  // 🔹 Fetch related data when course changes
+-  useEffect(() => {
+-    if (!selectedCourse) return;
+-
+-    fetch(`http://localhost:8000/announcements/${selectedCourse.id}`)
+-      .then(res => res.json())
+-      .then(setAnnouncements);
+-
+-    fetch(`http://localhost:8000/resources/${selectedCourse.id}`)
+-      .then(res => res.json())
+-      .then(setResources);
++  const [showNewClassroom, setShowNewClassroom] = useState(false);
++  const [showNewAssignment, setShowNewAssignment] = useState(false);
++  const [activeTab, setActiveTab] = useState<"assignments" | "students" | "analytics">("assignments");
+ 
+-    fetch(`http://localhost:8000/students/${selectedCourse.id}`)
+-      .then(res => res.json())
+-      .then(setStudents);
+-
+-  }, [selectedCourse]);
+-
+-  const filtered = courses.filter(c =>
+-    c.name.toLowerCase().includes(search.toLowerCase()) ||
+-    c.code.toLowerCase().includes(search.toLowerCase())
++  const selected = classrooms.find(c => c.id === selectedId)!;
++  const filtered = classrooms.filter(
++    c => c.name.toLowerCase().includes(search.toLowerCase()) ||
++         c.code.toLowerCase().includes(search.toLowerCase()),
+   );
++  const classAssignments = assignments.filter(a => a.classCode === selected.code);
+ 
+-  // 🔹 Prevent crash before data loads
+-  if (!selectedCourse) return <div>Loading...</div>;
++  const statusColors: Record<string, { bg: string; text: string; label: string }> = {
++    active:    { bg: "rgba(37,99,235,0.1)",  text: "#2563eb", label: "Active"    },
++    completed: { bg: "rgba(22,163,74,0.1)",  text: "#16a34a", label: "Completed" },
++    graded:    { bg: "rgba(124,58,237,0.1)", text: "#7c3aed", label: "Graded"    },
++    upcoming:  { bg: "rgba(208,174,97,0.12)", text: "#d0ae61", label: "Upcoming"  },
++  };
+ 
+   return (
+     <div className="space-y-6 animate-fade-in">
+-      <div className="flex items-center justify-between">
++      {/* ── Page Header ──────────────────────────────────────── */}
++      <div className="flex items-start justify-between flex-wrap gap-3">
+         <div>
+-          <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
+-            Classrooms
++          <h1
++            className="text-2xl font-bold"
++            style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}
++          >
++            Classroom Management
+           </h1>
+           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
+-            Manage your courses, resources, and student announcements.
++            Manage courses, assignments, and monitor student progress across all your classrooms.
+           </p>
+         </div>
+-        <button className="btn btn-primary text-sm">
+-          <Plus size={15} /> New Classroom
+-        </button>
++        <div className="flex gap-2">
++          <button
++            className="btn btn-outline text-xs"
++            onClick={() => setShowNewAssignment(true)}
++          >
++            <ClipboardList size={14} /> Add Assignment
++          </button>
++          <button
++            className="btn btn-primary text-xs"
++            onClick={() => setShowNewClassroom(true)}
++          >
++            <Plus size={14} /> Create Classroom
++          </button>
++        </div>
+       </div>
+ 
++      {/* ── Summary Stats ────────────────────────────────────── */}
++      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
++        {[
++          { label: "Total Classrooms", value: classrooms.length, icon: BookOpen, color: "#264796", bg: "rgba(38,71,150,0.1)" },
++          { label: "Total Students",   value: classrooms.reduce((s, c) => s + c.students, 0), icon: Users, color: "#d0ae61", bg: "rgba(208,174,97,0.12)" },
++          { label: "Active Assignments", value: assignments.filter(a => a.status === "active").length, icon: ClipboardList, color: "#2563eb", bg: "rgba(37,99,235,0.1)" },
++          { label: "Avg. Progress",    value: `${Math.round(classrooms.reduce((s, c) => s + c.progress, 0) / classrooms.length)}%`, icon: TrendingUp, color: "#16a34a", bg: "rgba(22,163,74,0.1)" },
++        ].map(stat => (
++          <GlassCard key={stat.label} className="p-4">
++            <div className="flex items-center justify-between mb-2">
++              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: stat.bg }}>
++                <stat.icon size={18} style={{ color: stat.color }} />
++              </div>
++            </div>
++            <p className="stat-number text-xl">{stat.value}</p>
++            <p className="text-[11px] font-medium mt-0.5" style={{ color: "var(--color-text-muted)" }}>{stat.label}</p>
++          </GlassCard>
++        ))}
++      </div>
++
++      {/* ── Main Content Grid ────────────────────────────────── */}
+       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+ 
+-        {/* Course List */}
++        {/* Left — Course List */}
+         <div className="space-y-3">
+           <div className="relative">
+             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+@@ -91,20 +163,29 @@
+           {filtered.map(c => (
+             <div
+               key={c.id}
+-              onClick={() => setSelectedCourse(c)}
++              onClick={() => setSelectedId(c.id)}
+               className={`glass-card p-4 cursor-pointer transition-all duration-200 border-l-4 ${
+-                selectedCourse.id === c.id ? "border-l-[#264796] shadow-lg shadow-blue-100" : "border-l-transparent hover:shadow-md"
++                selectedId === c.id
++                  ? "shadow-lg"
++                  : "border-l-transparent hover:shadow-md"
+               }`}
++              style={{
++                borderLeftColor: selectedId === c.id ? c.color : undefined,
++              }}
+             >
+               <div className="flex items-start justify-between gap-2">
+                 <div className="min-w-0">
+-                  <span className="text-[10px] font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>{c.code}</span>
+-                  <p className="font-semibold text-sm mt-0.5">{c.name}</p>
++                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: c.color }}>{c.code}</span>
++                  <p className="font-semibold text-sm mt-0.5" style={{ color: "var(--color-text-primary)" }}>{c.name}</p>
+                   <p className="text-[11px] mt-1" style={{ color: "var(--color-text-muted)" }}>
+-                    Batch {c.batch} · {c.students} students
++                    {c.batch} · {c.students} students
+                   </p>
+                 </div>
+-                <ChevronRight size={16} className={`mt-1 ${selectedCourse.id === c.id ? "text-blue-600 rotate-90" : "text-slate-300"}`} />
++                <ChevronRight
++                  size={16}
++                  className={`mt-1 transition-transform ${selectedId === c.id ? "rotate-90" : ""}`}
++                  style={{ color: selectedId === c.id ? c.color : "var(--color-text-muted)" }}
++                />
+               </div>
+ 
+               <div className="mt-3 space-y-1.5">
+@@ -113,57 +194,65 @@
+                     className="progress-fill"
+                     style={{
+                       width: `${c.progress}%`,
+-                      background: `linear-gradient(90deg,${c.color},${c.color}bb)`
++                      background: `linear-gradient(90deg,${c.color},${c.color}bb)`,
+                     }}
+                   />
+                 </div>
+-
+                 <div className="flex justify-between text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+-                  <span className="flex items-center gap-1">
+-                    <Clock size={10} /> {c.next_class}
+-                  </span>
+-                  <span className="font-semibold" style={{ color: c.color }}>
+-                    {c.progress}% complete
+-                  </span>
++                  <span className="flex items-center gap-1"><Clock size={10} /> {c.nextClass}</span>
++                  <span className="font-semibold" style={{ color: c.color }}>{c.progress}% complete</span>
+                 </div>
+               </div>
+             </div>
+           ))}
+         </div>
+ 
+-        {/* Course Detail */}
++        {/* Right — Course Detail */}
+         <div className="xl:col-span-2 space-y-4">
+ 
+-          {/* Header */}
+-          <div className="rounded-2xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${selectedCourse.color} 0%, ${selectedCourse.color}cc 100%)` }}>
+-            <div className="p-6 text-white">
+-              <div className="flex justify-between">
++          {/* Detail Header */}
++          <div
++            className="rounded-2xl overflow-hidden relative"
++            style={{ background: `linear-gradient(135deg, ${selected.color} 0%, ${selected.color}cc 100%)` }}
++          >
++            <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/10" />
++            <div className="absolute -right-4 -bottom-10 w-28 h-28 rounded-full bg-white/5" />
++            <div className="p-6 text-white relative z-10">
++              <div className="flex justify-between items-start">
+                 <div>
+-                  <h2 className="text-xl font-bold">{selectedCourse.name}</h2>
+-                  <p className="text-sm">{selectedCourse.description}</p>
++                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">{selected.code}</span>
++                  <h2 className="text-xl font-bold mt-0.5">{selected.name}</h2>
++                  <p className="text-sm opacity-80 mt-1 max-w-lg">{selected.description}</p>
+                 </div>
+-                <MoreHorizontal size={18} />
++                <button className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
++                  <MoreVertical size={16} />
++                </button>
+               </div>
+-
+-              <div className="flex gap-6 mt-4 text-xs">
+-                <div><Users size={13} /> {selectedCourse.students} Students</div>
+-                <div><Bell size={13} /> {announcements.length} Announcements</div>
+-                <div><Paperclip size={13} /> {resources.length} Resources</div>
+-                <div><Calendar size={13} /> {selectedCourse.next_class}</div>
++              <div className="flex flex-wrap gap-5 mt-5 text-xs">
++                <div className="flex items-center gap-1.5"><Users size={14} /> {selected.students} Students</div>
++                <div className="flex items-center gap-1.5"><ClipboardList size={14} /> {classAssignments.length} Assignments</div>
++                <div className="flex items-center gap-1.5"><Calendar size={14} /> {selected.nextClass}</div>
++                <div className="flex items-center gap-1.5"><BarChart2 size={14} /> {selected.progress}% Progress</div>
+               </div>
+             </div>
+           </div>
+ 
+           {/* Tabs */}
+           <GlassCard padding="none">
+-            <div className="flex border-b">
+-              {(["announcements", "resources", "students"] as const).map(tab => (
++            <div className="flex border-b" style={{ borderColor: "var(--color-border)" }}>
++              {(["assignments", "students", "analytics"] as const).map(tab => (
+                 <button
+                   key={tab}
+                   onClick={() => setActiveTab(tab)}
+-                  className={`px-5 py-3 text-sm font-semibold ${
+-                    activeTab === tab ? "border-b-2 border-blue-600" : "text-slate-400"
++                  className={`px-5 py-3 text-sm font-semibold capitalize transition-colors ${
++                    activeTab === tab
++                      ? "border-b-2"
++                      : ""
+                   }`}
++                  style={{
++                    borderColor: activeTab === tab ? selected.color : "transparent",
++                    color: activeTab === tab ? "var(--color-text-primary)" : "var(--color-text-muted)",
++                  }}
+                 >
+                   {tab}
+                 </button>
+@@ -172,52 +261,261 @@
+ 
+             <div className="p-5">
+ 
+-              {/* Announcements */}
+-              {activeTab === "announcements" && (
++              {/* Assignments Tab */}
++              {activeTab === "assignments" && (
+                 <div className="space-y-3">
+-                  {announcements.map(a => (
+-                    <div key={a.id} className="p-4 border rounded-xl">
+-                      <p className="font-semibold text-sm">{a.title}</p>
+-                      <p className="text-xs">{a.body}</p>
+-                      <span className="text-[10px]">{a.time}</span>
++                  {classAssignments.length === 0 ? (
++                    <div className="text-center py-12">
++                      <ClipboardList size={40} className="mx-auto mb-3" style={{ color: "var(--color-text-muted)" }} />
++                      <p className="font-semibold" style={{ color: "var(--color-text-secondary)" }}>No assignments yet</p>
++                      <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
++                        Click "Add Assignment" to create one for this class.
++                      </p>
+                     </div>
+-                  ))}
++                  ) : (
++                    classAssignments.map(a => {
++                      const sc = statusColors[a.status];
++                      const pct = Math.round((a.submitted / a.total) * 100);
++                      return (
++                        <div
++                          key={a.id}
++                          className="flex items-center gap-4 p-4 rounded-xl border transition-colors cursor-pointer"
++                          style={{ borderColor: "var(--color-border)" }}
++                          onMouseEnter={e => (e.currentTarget.style.background = "var(--color-bg-grad1)")}
++                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
++                        >
++                          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: sc.bg }}>
++                            {a.status === "completed" || a.status === "graded"
++                              ? <CheckCircle2 size={18} style={{ color: sc.text }} />
++                              : a.status === "upcoming"
++                                ? <Calendar size={18} style={{ color: sc.text }} />
++                                : <FileText size={18} style={{ color: sc.text }} />}
++                          </div>
++                          <div className="flex-1 min-w-0">
++                            <p className="font-semibold text-sm" style={{ color: "var(--color-text-primary)" }}>{a.name}</p>
++                            <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
++                              Due: {a.due} · {a.submitted}/{a.total} submitted ({pct}%)
++                            </p>
++                            <div className="progress-bar mt-2">
++                              <div className="progress-fill" style={{ width: `${pct}%`, background: sc.text }} />
++                            </div>
++                          </div>
++                          <span
++                            className="badge text-[10px] px-2.5 py-1 rounded-full font-bold shrink-0"
++                            style={{ background: sc.bg, color: sc.text }}
++                          >
++                            {sc.label}
++                          </span>
++                        </div>
++                      );
++                    })
++                  )}
+                 </div>
+               )}
+ 
+-              {/* Resources */}
+-              {activeTab === "resources" && (
++              {/* Students Tab */}
++              {activeTab === "students" && (
+                 <div className="space-y-3">
+-                  {resources.map(r => (
+-                    <div key={r.id} className="flex items-center gap-3 p-3 border rounded-xl">
+-                      {typeIcon[r.type]}
+-                      <div>
+-                        <p className="text-sm">{r.name}</p>
+-                        <p className="text-xs">{r.size} {r.date}</p>
+-                      </div>
+-                    </div>
+-                  ))}
+-                </div>
+-              )}
++                  <div className="flex items-center justify-between mb-2">
++                    <p className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
++                      Showing top performers in {selected.code}
++                    </p>
++                    <span className="badge badge-blue text-[10px]">{selected.students} enrolled</span>
++                  </div>
++                  {topStudents.map((s, i) => (
++                    <div
++                      key={s.roll}
++                      className="flex items-center gap-3 p-3 rounded-xl border transition-colors"
++                      style={{ borderColor: "var(--color-border)" }}
++                      onMouseEnter={e => (e.currentTarget.style.background = "var(--color-bg-grad1)")}
++                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
++                    >
++                      <div
++                        className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
++                        style={{ background: `linear-gradient(135deg,${selected.color},${selected.color}bb)` }}
++                      >
++                        {i + 1}
++                      </div>
++                      <div className="flex-1 min-w-0">
++                        <p className="font-semibold text-sm" style={{ color: "var(--color-text-primary)" }}>{s.name}</p>
++                        <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{s.roll} · Attendance: {s.attendance}%</p>
++                      </div>
++                      <div className="text-right shrink-0">
++                        <p className="font-bold text-sm" style={{ color: selected.color }}>{s.avg}%</p>
++                        <div className="flex items-center gap-0.5 justify-end">
++                          <TrendingUp
++                            size={11}
++                            style={{
++                              color: s.trend === "up" ? "#16a34a" : "#dc2626",
++                              transform: s.trend === "down" ? "scaleY(-1)" : undefined,
++                            }}
++                          />
++                          <span className="text-[9px] font-semibold" style={{ color: s.trend === "up" ? "#16a34a" : "#dc2626" }}>
++                            {s.trend === "up" ? "Rising" : "Falling"}
++                          </span>
++                        </div>
++                      </div>
++                    </div>
++                  ))}
++                </div>
++              )}
++
++              {/* Analytics Tab */}
++              {activeTab === "analytics" && (
++                <div className="space-y-5">
++                  {/* Progress overview */}
++                  <div>
++                    <p className="text-xs font-semibold mb-3" style={{ color: "var(--color-text-muted)" }}>Course Completion by Section</p>
++                    <div className="space-y-3">
++                      {[
++                        { section: "Lectures Delivered",      pct: selected.progress, color: selected.color },
++                        { section: "Assignments Completed",   pct: Math.min(selected.progress + 10, 100), color: "#2563eb" },
++                        { section: "Lab Sessions Completed",  pct: Math.max(selected.progress - 15, 20), color: "#d0ae61" },
++                        { section: "Students Above 75%",      pct: 72, color: "#16a34a" },
++                      ].map(row => (
++                        <div key={row.section}>
++                          <div className="flex justify-between text-xs mb-1">
++                            <span style={{ color: "var(--color-text-secondary)" }}>{row.section}</span>
++                            <span className="font-bold" style={{ color: row.color }}>{row.pct}%</span>
++                          </div>
++                          <div className="progress-bar">
++                            <div className="progress-fill" style={{ width: `${row.pct}%`, background: row.color }} />
++                          </div>
++                        </div>
++                      ))}
++                    </div>
++                  </div>
+ 
+-              {/* Students */}
+-              {activeTab === "students" && (
+-                <div className="space-y-2">
+-                  {students.map(s => (
+-                    <div key={s.roll} className="p-3 border rounded-xl">
+-                      <p className="text-sm font-semibold">{s.name}</p>
+-                      <p className="text-xs">{s.roll}</p>
+-                      <p className="text-xs">Attendance: {s.attendance}%</p>
+-                      <p className="text-xs">Score: {s.avg_score}%</p>
+-                    </div>
+-                  ))}
++                  {/* Quick Stats */}
++                  <div className="grid grid-cols-3 gap-3">
++                    {[
++                      { label: "Avg. Score", value: "78%", icon: BarChart2, color: selected.color },
++                      { label: "At-Risk",    value: "4",   icon: AlertCircle, color: "#dc2626" },
++                      { label: "Attendance", value: "89%", icon: Users, color: "#16a34a" },
++                    ].map(q => (
++                      <div
++                        key={q.label}
++                        className="p-3 rounded-xl border text-center"
++                        style={{ borderColor: "var(--color-border)" }}
++                      >
++                        <q.icon size={18} className="mx-auto mb-1.5" style={{ color: q.color }} />
++                        <p className="font-bold text-lg" style={{ color: "var(--color-text-primary)" }}>{q.value}</p>
++                        <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{q.label}</p>
++                      </div>
++                    ))}
++                  </div>
+                 </div>
+               )}
+-
+             </div>
+           </GlassCard>
+         </div>
+       </div>
++
++      {/* ── Create Classroom Modal ───────────────────────────── */}
++      {showNewClassroom && (
++        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 animate-fade-in">
++          <GlassCard className="w-full max-w-md p-6 relative">
++            <button
++              onClick={() => setShowNewClassroom(false)}
++              className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 transition-colors"
++              style={{ color: "var(--color-text-muted)" }}
++            >
++              <X size={18} />
++            </button>
++            <h3 className="text-lg font-bold mb-1" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>
++              Create New Classroom
++            </h3>
++            <p className="text-xs mb-5" style={{ color: "var(--color-text-muted)" }}>
++              Fill in the details to set up a new course.
++            </p>
++            <div className="space-y-3">
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Course Code</label>
++                <input className="form-input text-sm" placeholder="e.g. CSC601" />
++              </div>
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Course Name</label>
++                <input className="form-input text-sm" placeholder="e.g. Machine Learning Fundamentals" />
++              </div>
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Batch</label>
++                  <input className="form-input text-sm" placeholder="e.g. 2026-A" />
++                </div>
++                <div>
++                  <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Max Students</label>
++                  <input className="form-input text-sm" type="number" placeholder="50" />
++                </div>
++              </div>
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Description</label>
++                <textarea className="form-input text-sm" rows={3} placeholder="Brief course description..." />
++              </div>
++            </div>
++            <div className="flex gap-2 mt-5 justify-end">
++              <button className="btn btn-outline text-xs" onClick={() => setShowNewClassroom(false)}>Cancel</button>
++              <button className="btn btn-primary text-xs" onClick={() => setShowNewClassroom(false)}>
++                <Plus size={14} /> Create Classroom
++              </button>
++            </div>
++          </GlassCard>
++        </div>
++      )}
++
++      {/* ── Add Assignment Modal ─────────────────────────────── */}
++      {showNewAssignment && (
++        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 animate-fade-in">
++          <GlassCard className="w-full max-w-md p-6 relative">
++            <button
++              onClick={() => setShowNewAssignment(false)}
++              className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 transition-colors"
++              style={{ color: "var(--color-text-muted)" }}
++            >
++              <X size={18} />
++            </button>
++            <h3 className="text-lg font-bold mb-1" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>
++              Add New Assignment
++            </h3>
++            <p className="text-xs mb-5" style={{ color: "var(--color-text-muted)" }}>
++              Create and assign work to a specific classroom.
++            </p>
++            <div className="space-y-3">
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Classroom</label>
++                <select className="form-input text-sm">
++                  {classrooms.map(c => (
++                    <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
++                  ))}
++                </select>
++              </div>
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Assignment Title</label>
++                <input className="form-input text-sm" placeholder="e.g. Lab 5: Convolutional Networks" />
++              </div>
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Due Date</label>
++                  <input className="form-input text-sm" type="date" />
++                </div>
++                <div>
++                  <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Max Marks</label>
++                  <input className="form-input text-sm" type="number" placeholder="100" />
++                </div>
++              </div>
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Instructions</label>
++                <textarea className="form-input text-sm" rows={3} placeholder="Assignment instructions and guidelines..." />
++              </div>
++            </div>
++            <div className="flex gap-2 mt-5 justify-end">
++              <button className="btn btn-outline text-xs" onClick={() => setShowNewAssignment(false)}>Cancel</button>
++              <button className="btn btn-primary text-xs" onClick={() => setShowNewAssignment(false)}>
++                <ClipboardList size={14} /> Create Assignment
++              </button>
++            </div>
++          </GlassCard>
++        </div>
++      )}
+     </div>
+   );
+ };
+\ No newline at end of file
+Index: node_modules/@eduai/teacherbuddy/src/layouts/DashboardShell.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import React, { useState } from \"react\";\r\nimport { NavLink, Outlet, useNavigate } from \"react-router-dom\";\r\nimport {\r\n  LayoutDashboard,\r\n  BookOpen,\r\n  FileText,\r\n  BarChart3,\r\n  HeartPulse,\r\n  MessageSquare,\r\n  Bell,\r\n  Settings,\r\n  LogOut,\r\n  ChevronRight,\r\n  Search,\r\n  CheckSquare,\r\n  FileSpreadsheet,\r\n  FileSignature,\r\n  Activity,\r\n  X,\r\n  Menu,\r\n  Moon,\r\n  Sun,\r\n  Gamepad2,\r\n  Wrench,\r\n} from \"lucide-react\";\r\nimport logo from \"../assets/logo (5).png\";\r\nimport { useTheme } from \"../shared/hooks/useTheme\";\r\n\r\nconst navItems = [\r\n  { icon: LayoutDashboard, label: \"Dashboard\",   href: \"/\",          end: true  },\r\n  { icon: Wrench,          label: \"Teacher Tools\", href: \"/tools\"               },\r\n  { icon: Gamepad2,        label: \"Game Studio\",   href: \"/games\"               },\r\n  { icon: CheckSquare,     label: \"Bulk Evaluation\", href: \"/evaluation\"        },\r\n  { icon: FileSpreadsheet, label: \"Reports\",     href: \"/reports\"               },\r\n  { icon: FileSignature,   label: \"Form Automation\", href: \"/forms\"             },\r\n  { icon: Activity,        label: \"Analytics & Risk\", href: \"/analytics\"        },\r\n  { icon: HeartPulse,      label: \"Wellbeing Zone\", href: \"/wellbeing\"          },\r\n  { icon: MessageSquare,   label: \"AI Assistant\",href: \"/chat\"                  },\r\n];\r\n\r\nconst notifications = [\r\n  { id: 1, title: \"Exam submitted\", desc: \"John S. submitted Neural Networks Mid-Term\", time: \"2m ago\", unread: true },\r\n  { id: 2, title: \"Risk Alert\",     desc: \"Student #4122 flagged — high absenteeism\",   time: \"18m ago\",unread: true },\r\n  { id: 3, title: \"AI Evaluation\",  desc: \"55 answers evaluated by AI — ready for review\", time: \"1h ago\", unread: false },\r\n];\r\n\r\nexport const DashboardShell: React.FC = () => {\r\n  const [sidebarOpen, setSidebarOpen] = useState(true);\r\n  const [notifOpen,   setNotifOpen]   = useState(false);\r\n  const [profileOpen, setProfileOpen] = useState(false);\r\n  const navigate = useNavigate();\r\n  const { isDark, toggleTheme } = useTheme();\r\n\r\n  return (\r\n    <div className=\"flex min-h-screen\" style={{ background: \"var(--color-surface-base)\" }}>\r\n\r\n      {/* ── Sidebar ──────────────────────────────────────────── */}\r\n      <aside\r\n        className={`glass-sidebar flex flex-col fixed h-full z-50 transition-all duration-300 ${\r\n          sidebarOpen ? \"w-64\" : \"w-[72px]\"\r\n        }`}\r\n      >\r\n        {/* Logo Area */}\r\n        <div className=\"flex items-center gap-3 px-4 py-5 border-b border-white/8\">\r\n          <div\r\n            className=\"shrink-0 w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-lg cursor-pointer\"\r\n            onClick={() => setSidebarOpen(s => !s)}\r\n          >\r\n            <img src={logo} alt=\"Christ University\" className=\"w-full h-full object-contain p-0.5\" />\r\n          </div>\r\n          {sidebarOpen && (\r\n            <div className=\"overflow-hidden\">\r\n              <p className=\"text-white font-bold text-[13px] leading-tight whitespace-nowrap font-display\">EduAI Suite</p>\r\n              <p className=\"text-[9.5px] font-semibold uppercase tracking-widest whitespace-nowrap\" style={{ color: \"var(--color-brand-gold)\" }}>\r\n                Christ University\r\n              </p>\r\n            </div>\r\n          )}\r\n        </div>\r\n\r\n        {/* Navigation */}\r\n        <nav className=\"flex-1 px-3 py-4 space-y-1 overflow-y-auto\">\r\n          {navItems.map((item) => (\r\n            <NavLink\r\n              key={item.href}\r\n              to={item.href}\r\n              end={item.end}\r\n              className={({ isActive }) =>\r\n                `nav-item ${isActive ? \"nav-item-active\" : \"\"}`\r\n              }\r\n            >\r\n              {({ isActive }) => (\r\n                <>\r\n                  <span className={`shrink-0 transition-all ${isActive ? \"text-white\" : \"text-white/55\"}`}>\r\n                    <item.icon size={19} />\r\n                  </span>\r\n                  {sidebarOpen && (\r\n                    <span className=\"truncate\">{item.label}</span>\r\n                  )}\r\n                  {sidebarOpen && isActive && (\r\n                    <ChevronRight size={14} className=\"ml-auto opacity-60\" />\r\n                  )}\r\n                </>\r\n              )}\r\n            </NavLink>\r\n          ))}\r\n        </nav>\r\n\r\n        {/* Promo Banner (only when expanded) */}\r\n        {sidebarOpen && (\r\n          <div className=\"mx-3 mb-4 rounded-xl p-3 text-white text-xs\"\r\n            style={{ background: \"linear-gradient(135deg,rgba(208,174,97,0.22) 0%,rgba(208,174,97,0.08) 100%)\", border: \"1px solid rgba(208,174,97,0.25)\" }}>\r\n            <p className=\"font-bold text-[11px] mb-1\" style={{ color: \"var(--color-brand-gold)\" }}>AI Analysis Ready</p>\r\n            <p className=\"opacity-70 leading-relaxed\">Daily risk scoring completed. 3 new alerts.</p>\r\n          </div>\r\n        )}\r\n\r\n        {/* Bottom Links */}\r\n        <div className=\"px-3 pb-4 border-t border-white/8 pt-3 space-y-1\">\r\n          <NavLink to=\"/settings\" className={({ isActive }) => `nav-item ${isActive ? \"nav-item-active\" : \"\"}`}>\r\n            <Settings size={19} className=\"text-white/55 shrink-0\" />\r\n            {sidebarOpen && <span>Settings</span>}\r\n          </NavLink>\r\n          <button\r\n            onClick={() => navigate(\"/login\")}\r\n            className=\"nav-item text-red-300/80 hover:text-red-200 hover:bg-red-500/10 w-full\"\r\n          >\r\n            <LogOut size={19} className=\"shrink-0\" />\r\n            {sidebarOpen && <span>Logout</span>}\r\n          </button>\r\n        </div>\r\n      </aside>\r\n\r\n      {/* ── Main Content ─────────────────────────────────────── */}\r\n      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? \"ml-64\" : \"ml-[72px]\"}`}>\r\n\r\n        {/* Top Header */}\r\n        <header className=\"sticky top-0 z-40 h-[70px] flex items-center justify-between px-6 gap-4\"\r\n          style={{ background: \"var(--color-header-bg)\", backdropFilter: \"blur(20px)\", borderBottom: \"1px solid var(--color-border)\" }}>\r\n\r\n          {/* Left: Toggle + Search */}\r\n          <div className=\"flex items-center gap-3\">\r\n            <button onClick={() => setSidebarOpen(s => !s)}\r\n              className=\"p-2 rounded-lg transition-colors text-slate-400 hover:text-blue-700 hover:bg-blue-50\">\r\n              <Menu size={20} />\r\n            </button>\r\n            <div className=\"relative hidden md:flex items-center\">\r\n              <Search size={15} className=\"absolute left-3 text-slate-400\" />\r\n              <input\r\n                className=\"form-input pl-9 pr-4 py-2 text-sm w-56\"\r\n                placeholder=\"Search anything...\"\r\n                style={{ borderRadius: \"10px\" }}\r\n              />\r\n            </div>\r\n          </div>\r\n\r\n          {/* Right: Notif + Profile */}\r\n          <div className=\"flex items-center gap-3\">\r\n            {/* Theme Toggle */}\r\n            <button\r\n              onClick={toggleTheme}\r\n              className=\"p-2 rounded-xl transition-all hover:bg-blue-50 border border-transparent mr-1\"\r\n              style={{ color: \"var(--color-text-muted)\" }}\r\n            >\r\n              {isDark ? <Sun size={20} /> : <Moon size={20} />}\r\n            </button>\r\n\r\n            {/* Notification Bell */}\r\n            <div className=\"relative\">\r\n              <button\r\n                onClick={() => { setNotifOpen(o => !o); setProfileOpen(false); }}\r\n                className=\"p-2 rounded-xl transition-all hover:bg-blue-50 relative\"\r\n                style={{ color: notifOpen ? \"var(--color-brand-blue)\" : \"#64748b\" }}\r\n              >\r\n                <Bell size={20} />\r\n                <span className=\"absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-white\"\r\n                  style={{ background: \"var(--color-brand-gold)\" }} />\r\n              </button>\r\n\r\n              {notifOpen && (\r\n                <div className=\"glass-card absolute right-0 top-12 w-80 z-50 overflow-hidden animate-fade-in\">\r\n                  <div className=\"flex items-center justify-between px-4 py-3 border-b\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    <p className=\"font-bold text-sm\" style={{ color: 'var(--color-text-primary)' }}>Notifications</p>\r\n                    <button onClick={() => setNotifOpen(false)} style={{ color: 'var(--color-text-muted)' }}>\r\n                      <X size={16} />\r\n                    </button>\r\n                  </div>\r\n                  <div className=\"divide-y\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    {notifications.map(n => (\r\n                      <div key={n.id} className={`px-4 py-3 flex gap-3 cursor-pointer transition-colors ${n.unread ? \"bg-opacity-10\" : \"\"}`}\r\n                           style={{ backgroundColor: n.unread ? 'var(--color-bg-grad1)' : 'transparent' }}\r\n                           onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-border)'}\r\n                           onMouseLeave={e => e.currentTarget.style.backgroundColor = n.unread ? 'var(--color-bg-grad1)' : 'transparent'}>\r\n                        <div className=\"w-2 h-2 rounded-full mt-1.5 shrink-0\"\r\n                          style={{ background: n.unread ? \"var(--color-brand-blue)\" : \"transparent\", border: n.unread ? \"none\" : \"1.5px solid var(--color-text-muted)\" }} />\r\n                        <div className=\"flex-1 min-w-0\">\r\n                          <p className=\"text-xs font-semibold\" style={{ color: 'var(--color-text-primary)' }}>{n.title}</p>\r\n                          <p className=\"text-[11px] leading-relaxed mt-0.5 line-clamp-2\" style={{ color: 'var(--color-text-secondary)' }}>{n.desc}</p>\r\n                          <p className=\"text-[10px] mt-1\" style={{ color: 'var(--color-text-muted)' }}>{n.time}</p>\r\n                        </div>\r\n                      </div>\r\n                    ))}\r\n                  </div>\r\n                  <div className=\"px-4 py-2.5 border-t text-center\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    <button className=\"text-xs font-semibold\" style={{ color: \"var(--color-brand-blue)\" }}>\r\n                      View all notifications\r\n                    </button>\r\n                  </div>\r\n                </div>\r\n              )}\r\n            </div>\r\n\r\n            {/* Divider */}\r\n            <div className=\"h-7 w-px bg-slate-200\" />\r\n\r\n            {/* Profile */}\r\n            <div className=\"relative\">\r\n              <button\r\n                onClick={() => { setProfileOpen(o => !o); setNotifOpen(false); }}\r\n                className=\"flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full transition-all hover:bg-slate-100 border border-slate-200/80\"\r\n              >\r\n                <div className=\"w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow\"\r\n                  style={{ background: \"linear-gradient(135deg,#264796,#3460c4)\" }}>\r\n                  JD\r\n                </div>\r\n                <div className=\"hidden md:block text-left\">\r\n                  <p className=\"text-xs font-semibold leading-tight\" style={{ color: 'var(--color-text-primary)' }}>Prof. John Doe</p>\r\n                  <p className=\"text-[10px]\" style={{ color: 'var(--color-text-secondary)' }}>Computer Science</p>\r\n                </div>\r\n              </button>\r\n\r\n              {profileOpen && (\r\n                <div className=\"glass-card absolute right-0 top-12 w-52 z-50 overflow-hidden animate-fade-in py-1\">\r\n                  <div className=\"px-4 py-3 border-b\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    <p className=\"text-sm font-bold\" style={{ color: 'var(--color-text-primary)' }}>Prof. John Doe</p>\r\n                    <p className=\"text-[11px] mt-0.5\" style={{ color: 'var(--color-text-secondary)' }}>john.doe@christuniversity.in</p>\r\n                    <span className=\"badge badge-blue mt-2\">Teacher</span>\r\n                  </div>\r\n                  {[\"View Profile\", \"Preferences\", \"Help & Support\"].map(item => (\r\n                    <button key={item} \r\n                      className=\"w-full text-left px-4 py-2.5 text-sm transition-colors\"\r\n                      style={{ color: 'var(--color-text-secondary)' }}\r\n                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-brand-blue)'; e.currentTarget.style.backgroundColor = 'var(--color-border)' }}\r\n                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.backgroundColor = 'transparent' }}\r\n                    >\r\n                      {item}\r\n                    </button>\r\n                  ))}\r\n                  <div className=\"border-t mt-1\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    <button onClick={() => navigate(\"/login\")}\r\n                      className=\"w-full text-left px-4 py-2.5 text-sm text-red-500 transition-colors\"\r\n                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}\r\n                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}\r\n                    >\r\n                      Sign Out\r\n                    </button>\r\n                  </div>\r\n                </div>\r\n              )}\r\n            </div>\r\n          </div>\r\n        </header>\r\n\r\n        {/* Page Content */}\r\n        <div className=\"p-6 min-h-[calc(100vh-70px)]\">\r\n          <Outlet />\r\n        </div>\r\n      </main>\r\n\r\n      {/* Overlay to close dropdowns */}\r\n      {(notifOpen || profileOpen) && (\r\n        <div className=\"fixed inset-0 z-30\" onClick={() => { setNotifOpen(false); setProfileOpen(false); }} />\r\n      )}\r\n    </div>\r\n  );\r\n};\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/node_modules/@eduai/teacherbuddy/src/layouts/DashboardShell.tsx b/node_modules/@eduai/teacherbuddy/src/layouts/DashboardShell.tsx
+--- a/node_modules/@eduai/teacherbuddy/src/layouts/DashboardShell.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/node_modules/@eduai/teacherbuddy/src/layouts/DashboardShell.tsx	(date 1776163827537)
+@@ -1,4 +1,4 @@
+-import React, { useState } from "react";
++import React, { useState, useRef, useEffect, useCallback } from "react";
+ import { NavLink, Outlet, useNavigate } from "react-router-dom";
+ import {
+   LayoutDashboard,
+@@ -27,15 +27,17 @@
+ import { useTheme } from "../shared/hooks/useTheme";
+ 
+ const navItems = [
+-  { icon: LayoutDashboard, label: "Dashboard",   href: "/",          end: true  },
+-  { icon: Wrench,          label: "Teacher Tools", href: "/tools"               },
+-  { icon: Gamepad2,        label: "Game Studio",   href: "/games"               },
+-  { icon: CheckSquare,     label: "Bulk Evaluation", href: "/evaluation"        },
+-  { icon: FileSpreadsheet, label: "Reports",     href: "/reports"               },
+-  { icon: FileSignature,   label: "Form Automation", href: "/forms"             },
+-  { icon: Activity,        label: "Analytics & Risk", href: "/analytics"        },
+-  { icon: HeartPulse,      label: "Wellbeing Zone", href: "/wellbeing"          },
+-  { icon: MessageSquare,   label: "AI Assistant",href: "/chat"                  },
++  { icon: LayoutDashboard, label: "Dashboard",   href: "/",          end: true,  keywords: "home overview summary stats"      },
++  { icon: Wrench,          label: "Teacher Tools", href: "/tools",              keywords: "question paper generator quiz"    },
++  { icon: Gamepad2,        label: "Game Studio",   href: "/games",              keywords: "gamify create play interactive"   },
++  { icon: BookOpen,        label: "Classrooms",    href: "/classrooms",         keywords: "courses students assignments"     },
++  { icon: CheckSquare,     label: "Bulk Evaluation", href: "/evaluation",       keywords: "grade answers ai score"           },
++  { icon: FileSpreadsheet, label: "Reports",     href: "/reports",              keywords: "export download pdf analytics"    },
++  { icon: FileSignature,   label: "Form Automation", href: "/forms",            keywords: "template auto-fill document"      },
++  { icon: Activity,        label: "Analytics & Risk", href: "/analytics",       keywords: "risk alert attendance prediction" },
++  { icon: HeartPulse,      label: "Wellbeing Zone", href: "/wellbeing",         keywords: "mental health mood wellness"      },
++  { icon: MessageSquare,   label: "AI Assistant",href: "/chat",                 keywords: "chat ask help bot"                },
++  { icon: Settings,        label: "Settings",       href: "/settings",          keywords: "preferences config account"       },
+ ];
+ 
+ const notifications = [
+@@ -48,9 +50,46 @@
+   const [sidebarOpen, setSidebarOpen] = useState(true);
+   const [notifOpen,   setNotifOpen]   = useState(false);
+   const [profileOpen, setProfileOpen] = useState(false);
++  const [searchQuery, setSearchQuery] = useState("");
++  const [searchFocused, setSearchFocused] = useState(false);
++  const searchRef = useRef<HTMLInputElement>(null);
+   const navigate = useNavigate();
+   const { isDark, toggleTheme } = useTheme();
+ 
++  // Filter nav items based on search query
++  const searchResults = searchQuery.trim()
++    ? navItems.filter(item =>
++        item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
++        (item.keywords && item.keywords.toLowerCase().includes(searchQuery.toLowerCase()))
++      )
++    : [];
++
++  // Navigate to a search result and clear
++  const handleSearchSelect = useCallback((href: string) => {
++    navigate(href);
++    setSearchQuery("");
++    setSearchFocused(false);
++    searchRef.current?.blur();
++  }, [navigate]);
++
++  // Ctrl+K to focus search
++  useEffect(() => {
++    const handleKeyDown = (e: KeyboardEvent) => {
++      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
++        e.preventDefault();
++        searchRef.current?.focus();
++        setSearchFocused(true);
++      }
++      if (e.key === "Escape") {
++        setSearchFocused(false);
++        setSearchQuery("");
++        searchRef.current?.blur();
++      }
++    };
++    window.addEventListener("keydown", handleKeyDown);
++    return () => window.removeEventListener("keydown", handleKeyDown);
++  }, []);
++
+   return (
+     <div className="flex min-h-screen" style={{ background: "var(--color-surface-base)" }}>
+ 
+@@ -145,12 +184,85 @@
+               <Menu size={20} />
+             </button>
+             <div className="relative hidden md:flex items-center">
+-              <Search size={15} className="absolute left-3 text-slate-400" />
++              <Search size={15} className="absolute left-3 text-slate-400 z-10" />
+               <input
+-                className="form-input pl-9 pr-4 py-2 text-sm w-56"
++                ref={searchRef}
++                className="form-input pl-9 pr-16 py-2 text-sm w-64 transition-all"
+                 placeholder="Search anything..."
++                value={searchQuery}
++                onChange={e => { setSearchQuery(e.target.value); setSearchFocused(true); }}
++                onFocus={() => setSearchFocused(true)}
++                onKeyDown={e => {
++                  if (e.key === "Enter" && searchResults.length > 0) {
++                    handleSearchSelect(searchResults[0].href);
++                  }
++                  if (e.key === "Escape") {
++                    setSearchFocused(false);
++                    setSearchQuery("");
++                    searchRef.current?.blur();
++                  }
++                }}
+                 style={{ borderRadius: "10px" }}
+               />
++              <kbd
++                className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold px-1.5 py-0.5 rounded border pointer-events-none"
++                style={{ color: "var(--color-text-muted)", borderColor: "var(--color-border)", background: "var(--color-bg-grad1)" }}
++              >
++                Ctrl K
++              </kbd>
++
++              {/* Search Results Dropdown */}
++              {searchFocused && searchQuery.trim() && (
++                <div
++                  className="absolute top-full left-0 mt-2 w-80 glass-card overflow-hidden animate-fade-in z-50"
++                  style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }}
++                >
++                  {searchResults.length > 0 ? (
++                    <div className="py-1">
++                      <p className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
++                        Pages — {searchResults.length} result{searchResults.length > 1 ? "s" : ""}
++                      </p>
++                      {searchResults.map((item, i) => (
++                        <button
++                          key={item.href}
++                          onClick={() => handleSearchSelect(item.href)}
++                          className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
++                          style={{}}
++                          onMouseEnter={e => { e.currentTarget.style.background = "var(--color-border)"; }}
++                          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
++                        >
++                          <div
++                            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
++                            style={{ background: "var(--color-bg-grad1)" }}
++                          >
++                            <item.icon size={16} style={{ color: "var(--color-brand-blue)" }} />
++                          </div>
++                          <div className="flex-1 min-w-0">
++                            <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.label}</p>
++                            <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
++                              Navigate to {item.href === "/" ? "home" : item.href}
++                            </p>
++                          </div>
++                          {i === 0 && (
++                            <kbd
++                              className="text-[9px] px-1.5 py-0.5 rounded border shrink-0"
++                              style={{ color: "var(--color-text-muted)", borderColor: "var(--color-border)" }}
++                            >
++                              Enter ↵
++                            </kbd>
++                          )}
++                        </button>
++                      ))}
++                    </div>
++                  ) : (
++                    <div className="px-4 py-8 text-center">
++                      <Search size={24} className="mx-auto mb-2" style={{ color: "var(--color-text-muted)" }} />
++                      <p className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>No results found</p>
++                      <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>Try searching for pages like "classrooms" or "analytics"</p>
++                    </div>
++                  )}
++                </div>
++              )}
+             </div>
+           </div>
+ 
+@@ -268,8 +380,8 @@
+       </main>
+ 
+       {/* Overlay to close dropdowns */}
+-      {(notifOpen || profileOpen) && (
+-        <div className="fixed inset-0 z-30" onClick={() => { setNotifOpen(false); setProfileOpen(false); }} />
++      {(notifOpen || profileOpen || searchFocused) && (
++        <div className="fixed inset-0 z-30" onClick={() => { setNotifOpen(false); setProfileOpen(false); setSearchFocused(false); setSearchQuery(""); }} />
+       )}
+     </div>
+   );
+Index: apps/teacherbuddy/src/layouts/DashboardShell.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import React, { useState } from \"react\";\r\nimport { NavLink, Outlet, useNavigate } from \"react-router-dom\";\r\nimport {\r\n  LayoutDashboard,\r\n  BookOpen,\r\n  FileText,\r\n  BarChart3,\r\n  HeartPulse,\r\n  MessageSquare,\r\n  Bell,\r\n  Settings,\r\n  LogOut,\r\n  ChevronRight,\r\n  Search,\r\n  CheckSquare,\r\n  FileSpreadsheet,\r\n  FileSignature,\r\n  Activity,\r\n  X,\r\n  Menu,\r\n  Moon,\r\n  Sun,\r\n  Gamepad2,\r\n  Wrench,\r\n} from \"lucide-react\";\r\nimport logo from \"../assets/logo (5).png\";\r\nimport { useTheme } from \"../shared/hooks/useTheme\";\r\n\r\nconst navItems = [\r\n  { icon: LayoutDashboard, label: \"Dashboard\",   href: \"/\",          end: true  },\r\n  { icon: Wrench,          label: \"Teacher Tools\", href: \"/tools\"               },\r\n  { icon: Gamepad2,        label: \"Game Studio\",   href: \"/games\"               },\r\n  { icon: CheckSquare,     label: \"Bulk Evaluation\", href: \"/evaluation\"        },\r\n  { icon: FileSpreadsheet, label: \"Reports\",     href: \"/reports\"               },\r\n  { icon: FileSignature,   label: \"Form Automation\", href: \"/forms\"             },\r\n  { icon: Activity,        label: \"Analytics & Risk\", href: \"/analytics\"        },\r\n  { icon: HeartPulse,      label: \"Wellbeing Zone\", href: \"/wellbeing\"          },\r\n  { icon: MessageSquare,   label: \"AI Assistant\",href: \"/chat\"                  },\r\n];\r\n\r\nconst notifications = [\r\n  { id: 1, title: \"Exam submitted\", desc: \"John S. submitted Neural Networks Mid-Term\", time: \"2m ago\", unread: true },\r\n  { id: 2, title: \"Risk Alert\",     desc: \"Student #4122 flagged — high absenteeism\",   time: \"18m ago\",unread: true },\r\n  { id: 3, title: \"AI Evaluation\",  desc: \"55 answers evaluated by AI — ready for review\", time: \"1h ago\", unread: false },\r\n];\r\n\r\nexport const DashboardShell: React.FC = () => {\r\n  const [sidebarOpen, setSidebarOpen] = useState(true);\r\n  const [notifOpen,   setNotifOpen]   = useState(false);\r\n  const [profileOpen, setProfileOpen] = useState(false);\r\n  const navigate = useNavigate();\r\n  const { isDark, toggleTheme } = useTheme();\r\n\r\n  return (\r\n    <div className=\"flex min-h-screen\" style={{ background: \"var(--color-surface-base)\" }}>\r\n\r\n      {/* ── Sidebar ──────────────────────────────────────────── */}\r\n      <aside\r\n        className={`glass-sidebar flex flex-col fixed h-full z-50 transition-all duration-300 ${\r\n          sidebarOpen ? \"w-64\" : \"w-[72px]\"\r\n        }`}\r\n      >\r\n        {/* Logo Area */}\r\n        <div className=\"flex items-center gap-3 px-4 py-5 border-b border-white/8\">\r\n          <div\r\n            className=\"shrink-0 w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-lg cursor-pointer\"\r\n            onClick={() => setSidebarOpen(s => !s)}\r\n          >\r\n            <img src={logo} alt=\"Christ University\" className=\"w-full h-full object-contain p-0.5\" />\r\n          </div>\r\n          {sidebarOpen && (\r\n            <div className=\"overflow-hidden\">\r\n              <p className=\"text-white font-bold text-[13px] leading-tight whitespace-nowrap font-display\">EduAI Suite</p>\r\n              <p className=\"text-[9.5px] font-semibold uppercase tracking-widest whitespace-nowrap\" style={{ color: \"var(--color-brand-gold)\" }}>\r\n                Christ University\r\n              </p>\r\n            </div>\r\n          )}\r\n        </div>\r\n\r\n        {/* Navigation */}\r\n        <nav className=\"flex-1 px-3 py-4 space-y-1 overflow-y-auto\">\r\n          {navItems.map((item) => (\r\n            <NavLink\r\n              key={item.href}\r\n              to={item.href}\r\n              end={item.end}\r\n              className={({ isActive }) =>\r\n                `nav-item ${isActive ? \"nav-item-active\" : \"\"}`\r\n              }\r\n            >\r\n              {({ isActive }) => (\r\n                <>\r\n                  <span className={`shrink-0 transition-all ${isActive ? \"text-white\" : \"text-white/55\"}`}>\r\n                    <item.icon size={19} />\r\n                  </span>\r\n                  {sidebarOpen && (\r\n                    <span className=\"truncate\">{item.label}</span>\r\n                  )}\r\n                  {sidebarOpen && isActive && (\r\n                    <ChevronRight size={14} className=\"ml-auto opacity-60\" />\r\n                  )}\r\n                </>\r\n              )}\r\n            </NavLink>\r\n          ))}\r\n        </nav>\r\n\r\n        {/* Promo Banner (only when expanded) */}\r\n        {sidebarOpen && (\r\n          <div className=\"mx-3 mb-4 rounded-xl p-3 text-white text-xs\"\r\n            style={{ background: \"linear-gradient(135deg,rgba(208,174,97,0.22) 0%,rgba(208,174,97,0.08) 100%)\", border: \"1px solid rgba(208,174,97,0.25)\" }}>\r\n            <p className=\"font-bold text-[11px] mb-1\" style={{ color: \"var(--color-brand-gold)\" }}>AI Analysis Ready</p>\r\n            <p className=\"opacity-70 leading-relaxed\">Daily risk scoring completed. 3 new alerts.</p>\r\n          </div>\r\n        )}\r\n\r\n        {/* Bottom Links */}\r\n        <div className=\"px-3 pb-4 border-t border-white/8 pt-3 space-y-1\">\r\n          <NavLink to=\"/settings\" className={({ isActive }) => `nav-item ${isActive ? \"nav-item-active\" : \"\"}`}>\r\n            <Settings size={19} className=\"text-white/55 shrink-0\" />\r\n            {sidebarOpen && <span>Settings</span>}\r\n          </NavLink>\r\n          <button\r\n            onClick={() => navigate(\"/login\")}\r\n            className=\"nav-item text-red-300/80 hover:text-red-200 hover:bg-red-500/10 w-full\"\r\n          >\r\n            <LogOut size={19} className=\"shrink-0\" />\r\n            {sidebarOpen && <span>Logout</span>}\r\n          </button>\r\n        </div>\r\n      </aside>\r\n\r\n      {/* ── Main Content ─────────────────────────────────────── */}\r\n      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? \"ml-64\" : \"ml-[72px]\"}`}>\r\n\r\n        {/* Top Header */}\r\n        <header className=\"sticky top-0 z-40 h-[70px] flex items-center justify-between px-6 gap-4\"\r\n          style={{ background: \"var(--color-header-bg)\", backdropFilter: \"blur(20px)\", borderBottom: \"1px solid var(--color-border)\" }}>\r\n\r\n          {/* Left: Toggle + Search */}\r\n          <div className=\"flex items-center gap-3\">\r\n            <button onClick={() => setSidebarOpen(s => !s)}\r\n              className=\"p-2 rounded-lg transition-colors text-slate-400 hover:text-blue-700 hover:bg-blue-50\">\r\n              <Menu size={20} />\r\n            </button>\r\n            <div className=\"relative hidden md:flex items-center\">\r\n              <Search size={15} className=\"absolute left-3 text-slate-400\" />\r\n              <input\r\n                className=\"form-input pl-9 pr-4 py-2 text-sm w-56\"\r\n                placeholder=\"Search anything...\"\r\n                style={{ borderRadius: \"10px\" }}\r\n              />\r\n            </div>\r\n          </div>\r\n\r\n          {/* Right: Notif + Profile */}\r\n          <div className=\"flex items-center gap-3\">\r\n            {/* Theme Toggle */}\r\n            <button\r\n              onClick={toggleTheme}\r\n              className=\"p-2 rounded-xl transition-all hover:bg-blue-50 border border-transparent mr-1\"\r\n              style={{ color: \"var(--color-text-muted)\" }}\r\n            >\r\n              {isDark ? <Sun size={20} /> : <Moon size={20} />}\r\n            </button>\r\n\r\n            {/* Notification Bell */}\r\n            <div className=\"relative\">\r\n              <button\r\n                onClick={() => { setNotifOpen(o => !o); setProfileOpen(false); }}\r\n                className=\"p-2 rounded-xl transition-all hover:bg-blue-50 relative\"\r\n                style={{ color: notifOpen ? \"var(--color-brand-blue)\" : \"#64748b\" }}\r\n              >\r\n                <Bell size={20} />\r\n                <span className=\"absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-white\"\r\n                  style={{ background: \"var(--color-brand-gold)\" }} />\r\n              </button>\r\n\r\n              {notifOpen && (\r\n                <div className=\"glass-card absolute right-0 top-12 w-80 z-50 overflow-hidden animate-fade-in\">\r\n                  <div className=\"flex items-center justify-between px-4 py-3 border-b\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    <p className=\"font-bold text-sm\" style={{ color: 'var(--color-text-primary)' }}>Notifications</p>\r\n                    <button onClick={() => setNotifOpen(false)} style={{ color: 'var(--color-text-muted)' }}>\r\n                      <X size={16} />\r\n                    </button>\r\n                  </div>\r\n                  <div className=\"divide-y\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    {notifications.map(n => (\r\n                      <div key={n.id} className={`px-4 py-3 flex gap-3 cursor-pointer transition-colors ${n.unread ? \"bg-opacity-10\" : \"\"}`}\r\n                           style={{ backgroundColor: n.unread ? 'var(--color-bg-grad1)' : 'transparent' }}\r\n                           onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-border)'}\r\n                           onMouseLeave={e => e.currentTarget.style.backgroundColor = n.unread ? 'var(--color-bg-grad1)' : 'transparent'}>\r\n                        <div className=\"w-2 h-2 rounded-full mt-1.5 shrink-0\"\r\n                          style={{ background: n.unread ? \"var(--color-brand-blue)\" : \"transparent\", border: n.unread ? \"none\" : \"1.5px solid var(--color-text-muted)\" }} />\r\n                        <div className=\"flex-1 min-w-0\">\r\n                          <p className=\"text-xs font-semibold\" style={{ color: 'var(--color-text-primary)' }}>{n.title}</p>\r\n                          <p className=\"text-[11px] leading-relaxed mt-0.5 line-clamp-2\" style={{ color: 'var(--color-text-secondary)' }}>{n.desc}</p>\r\n                          <p className=\"text-[10px] mt-1\" style={{ color: 'var(--color-text-muted)' }}>{n.time}</p>\r\n                        </div>\r\n                      </div>\r\n                    ))}\r\n                  </div>\r\n                  <div className=\"px-4 py-2.5 border-t text-center\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    <button className=\"text-xs font-semibold\" style={{ color: \"var(--color-brand-blue)\" }}>\r\n                      View all notifications\r\n                    </button>\r\n                  </div>\r\n                </div>\r\n              )}\r\n            </div>\r\n\r\n            {/* Divider */}\r\n            <div className=\"h-7 w-px bg-slate-200\" />\r\n\r\n            {/* Profile */}\r\n            <div className=\"relative\">\r\n              <button\r\n                onClick={() => { setProfileOpen(o => !o); setNotifOpen(false); }}\r\n                className=\"flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full transition-all hover:bg-slate-100 border border-slate-200/80\"\r\n              >\r\n                <div className=\"w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow\"\r\n                  style={{ background: \"linear-gradient(135deg,#264796,#3460c4)\" }}>\r\n                  JD\r\n                </div>\r\n                <div className=\"hidden md:block text-left\">\r\n                  <p className=\"text-xs font-semibold leading-tight\" style={{ color: 'var(--color-text-primary)' }}>Prof. John Doe</p>\r\n                  <p className=\"text-[10px]\" style={{ color: 'var(--color-text-secondary)' }}>Computer Science</p>\r\n                </div>\r\n              </button>\r\n\r\n              {profileOpen && (\r\n                <div className=\"glass-card absolute right-0 top-12 w-52 z-50 overflow-hidden animate-fade-in py-1\">\r\n                  <div className=\"px-4 py-3 border-b\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    <p className=\"text-sm font-bold\" style={{ color: 'var(--color-text-primary)' }}>Prof. John Doe</p>\r\n                    <p className=\"text-[11px] mt-0.5\" style={{ color: 'var(--color-text-secondary)' }}>john.doe@christuniversity.in</p>\r\n                    <span className=\"badge badge-blue mt-2\">Teacher</span>\r\n                  </div>\r\n                  {[\"View Profile\", \"Preferences\", \"Help & Support\"].map(item => (\r\n                    <button key={item} \r\n                      className=\"w-full text-left px-4 py-2.5 text-sm transition-colors\"\r\n                      style={{ color: 'var(--color-text-secondary)' }}\r\n                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-brand-blue)'; e.currentTarget.style.backgroundColor = 'var(--color-border)' }}\r\n                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.backgroundColor = 'transparent' }}\r\n                    >\r\n                      {item}\r\n                    </button>\r\n                  ))}\r\n                  <div className=\"border-t mt-1\" style={{ borderColor: 'var(--color-border)' }}>\r\n                    <button onClick={() => navigate(\"/login\")}\r\n                      className=\"w-full text-left px-4 py-2.5 text-sm text-red-500 transition-colors\"\r\n                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}\r\n                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}\r\n                    >\r\n                      Sign Out\r\n                    </button>\r\n                  </div>\r\n                </div>\r\n              )}\r\n            </div>\r\n          </div>\r\n        </header>\r\n\r\n        {/* Page Content */}\r\n        <div className=\"p-6 min-h-[calc(100vh-70px)]\">\r\n          <Outlet />\r\n        </div>\r\n      </main>\r\n\r\n      {/* Overlay to close dropdowns */}\r\n      {(notifOpen || profileOpen) && (\r\n        <div className=\"fixed inset-0 z-30\" onClick={() => { setNotifOpen(false); setProfileOpen(false); }} />\r\n      )}\r\n    </div>\r\n  );\r\n};\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/apps/teacherbuddy/src/layouts/DashboardShell.tsx b/apps/teacherbuddy/src/layouts/DashboardShell.tsx
+--- a/apps/teacherbuddy/src/layouts/DashboardShell.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/apps/teacherbuddy/src/layouts/DashboardShell.tsx	(date 1776163827259)
+@@ -1,4 +1,4 @@
+-import React, { useState } from "react";
++import React, { useState, useRef, useEffect, useCallback } from "react";
+ import { NavLink, Outlet, useNavigate } from "react-router-dom";
+ import {
+   LayoutDashboard,
+@@ -27,15 +27,17 @@
+ import { useTheme } from "../shared/hooks/useTheme";
+ 
+ const navItems = [
+-  { icon: LayoutDashboard, label: "Dashboard",   href: "/",          end: true  },
+-  { icon: Wrench,          label: "Teacher Tools", href: "/tools"               },
+-  { icon: Gamepad2,        label: "Game Studio",   href: "/games"               },
+-  { icon: CheckSquare,     label: "Bulk Evaluation", href: "/evaluation"        },
+-  { icon: FileSpreadsheet, label: "Reports",     href: "/reports"               },
+-  { icon: FileSignature,   label: "Form Automation", href: "/forms"             },
+-  { icon: Activity,        label: "Analytics & Risk", href: "/analytics"        },
+-  { icon: HeartPulse,      label: "Wellbeing Zone", href: "/wellbeing"          },
+-  { icon: MessageSquare,   label: "AI Assistant",href: "/chat"                  },
++  { icon: LayoutDashboard, label: "Dashboard",   href: "/",          end: true,  keywords: "home overview summary stats"      },
++  { icon: Wrench,          label: "Teacher Tools", href: "/tools",              keywords: "question paper generator quiz"    },
++  { icon: Gamepad2,        label: "Game Studio",   href: "/games",              keywords: "gamify create play interactive"   },
++  { icon: BookOpen,        label: "Classrooms",    href: "/classrooms",         keywords: "courses students assignments"     },
++  { icon: CheckSquare,     label: "Bulk Evaluation", href: "/evaluation",       keywords: "grade answers ai score"           },
++  { icon: FileSpreadsheet, label: "Reports",     href: "/reports",              keywords: "export download pdf analytics"    },
++  { icon: FileSignature,   label: "Form Automation", href: "/forms",            keywords: "template auto-fill document"      },
++  { icon: Activity,        label: "Analytics & Risk", href: "/analytics",       keywords: "risk alert attendance prediction" },
++  { icon: HeartPulse,      label: "Wellbeing Zone", href: "/wellbeing",         keywords: "mental health mood wellness"      },
++  { icon: MessageSquare,   label: "AI Assistant",href: "/chat",                 keywords: "chat ask help bot"                },
++  { icon: Settings,        label: "Settings",       href: "/settings",          keywords: "preferences config account"       },
+ ];
+ 
+ const notifications = [
+@@ -48,9 +50,46 @@
+   const [sidebarOpen, setSidebarOpen] = useState(true);
+   const [notifOpen,   setNotifOpen]   = useState(false);
+   const [profileOpen, setProfileOpen] = useState(false);
++  const [searchQuery, setSearchQuery] = useState("");
++  const [searchFocused, setSearchFocused] = useState(false);
++  const searchRef = useRef<HTMLInputElement>(null);
+   const navigate = useNavigate();
+   const { isDark, toggleTheme } = useTheme();
+ 
++  // Filter nav items based on search query
++  const searchResults = searchQuery.trim()
++    ? navItems.filter(item =>
++        item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
++        (item.keywords && item.keywords.toLowerCase().includes(searchQuery.toLowerCase()))
++      )
++    : [];
++
++  // Navigate to a search result and clear
++  const handleSearchSelect = useCallback((href: string) => {
++    navigate(href);
++    setSearchQuery("");
++    setSearchFocused(false);
++    searchRef.current?.blur();
++  }, [navigate]);
++
++  // Ctrl+K to focus search
++  useEffect(() => {
++    const handleKeyDown = (e: KeyboardEvent) => {
++      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
++        e.preventDefault();
++        searchRef.current?.focus();
++        setSearchFocused(true);
++      }
++      if (e.key === "Escape") {
++        setSearchFocused(false);
++        setSearchQuery("");
++        searchRef.current?.blur();
++      }
++    };
++    window.addEventListener("keydown", handleKeyDown);
++    return () => window.removeEventListener("keydown", handleKeyDown);
++  }, []);
++
+   return (
+     <div className="flex min-h-screen" style={{ background: "var(--color-surface-base)" }}>
+ 
+@@ -145,12 +184,85 @@
+               <Menu size={20} />
+             </button>
+             <div className="relative hidden md:flex items-center">
+-              <Search size={15} className="absolute left-3 text-slate-400" />
++              <Search size={15} className="absolute left-3 text-slate-400 z-10" />
+               <input
+-                className="form-input pl-9 pr-4 py-2 text-sm w-56"
++                ref={searchRef}
++                className="form-input pl-9 pr-16 py-2 text-sm w-64 transition-all"
+                 placeholder="Search anything..."
++                value={searchQuery}
++                onChange={e => { setSearchQuery(e.target.value); setSearchFocused(true); }}
++                onFocus={() => setSearchFocused(true)}
++                onKeyDown={e => {
++                  if (e.key === "Enter" && searchResults.length > 0) {
++                    handleSearchSelect(searchResults[0].href);
++                  }
++                  if (e.key === "Escape") {
++                    setSearchFocused(false);
++                    setSearchQuery("");
++                    searchRef.current?.blur();
++                  }
++                }}
+                 style={{ borderRadius: "10px" }}
+               />
++              <kbd
++                className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold px-1.5 py-0.5 rounded border pointer-events-none"
++                style={{ color: "var(--color-text-muted)", borderColor: "var(--color-border)", background: "var(--color-bg-grad1)" }}
++              >
++                Ctrl K
++              </kbd>
++
++              {/* Search Results Dropdown */}
++              {searchFocused && searchQuery.trim() && (
++                <div
++                  className="absolute top-full left-0 mt-2 w-80 glass-card overflow-hidden animate-fade-in z-50"
++                  style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.15)" }}
++                >
++                  {searchResults.length > 0 ? (
++                    <div className="py-1">
++                      <p className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
++                        Pages — {searchResults.length} result{searchResults.length > 1 ? "s" : ""}
++                      </p>
++                      {searchResults.map((item, i) => (
++                        <button
++                          key={item.href}
++                          onClick={() => handleSearchSelect(item.href)}
++                          className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
++                          style={{}}
++                          onMouseEnter={e => { e.currentTarget.style.background = "var(--color-border)"; }}
++                          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
++                        >
++                          <div
++                            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
++                            style={{ background: "var(--color-bg-grad1)" }}
++                          >
++                            <item.icon size={16} style={{ color: "var(--color-brand-blue)" }} />
++                          </div>
++                          <div className="flex-1 min-w-0">
++                            <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.label}</p>
++                            <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
++                              Navigate to {item.href === "/" ? "home" : item.href}
++                            </p>
++                          </div>
++                          {i === 0 && (
++                            <kbd
++                              className="text-[9px] px-1.5 py-0.5 rounded border shrink-0"
++                              style={{ color: "var(--color-text-muted)", borderColor: "var(--color-border)" }}
++                            >
++                              Enter ↵
++                            </kbd>
++                          )}
++                        </button>
++                      ))}
++                    </div>
++                  ) : (
++                    <div className="px-4 py-8 text-center">
++                      <Search size={24} className="mx-auto mb-2" style={{ color: "var(--color-text-muted)" }} />
++                      <p className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>No results found</p>
++                      <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>Try searching for pages like "classrooms" or "analytics"</p>
++                    </div>
++                  )}
++                </div>
++              )}
+             </div>
+           </div>
+ 
+@@ -268,8 +380,8 @@
+       </main>
+ 
+       {/* Overlay to close dropdowns */}
+-      {(notifOpen || profileOpen) && (
+-        <div className="fixed inset-0 z-30" onClick={() => { setNotifOpen(false); setProfileOpen(false); }} />
++      {(notifOpen || profileOpen || searchFocused) && (
++        <div className="fixed inset-0 z-30" onClick={() => { setNotifOpen(false); setProfileOpen(false); setSearchFocused(false); setSearchQuery(""); }} />
+       )}
+     </div>
+   );
+Index: apps/edugames/src/router/index.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import React from \"react\";\r\nimport { createBrowserRouter } from \"react-router-dom\";\r\nimport { StudentShell } from \"../layouts/StudentShell\";\r\nimport { StudentDashboard } from \"../features/dashboard/StudentDashboard\";\r\nimport { StudentClassrooms } from \"../features/classroom/StudentClassrooms\";\r\nimport { StudentExams } from \"../features/exam/StudentExams\";\r\nimport { AuthPage } from \"../features/auth/AuthPage\";\r\nimport { GamesPage } from \"../features/games/GamesPage\";\r\n\r\nexport const router = createBrowserRouter([\r\n  {\r\n    path: \"/login\",\r\n    element: <AuthPage />,\r\n  },\r\n  {\r\n    path: \"/\",\r\n    element: <StudentShell />,\r\n    children: [\r\n      { index: true,            element: <StudentDashboard /> },\r\n      { path: \"classroom\",      element: <StudentClassrooms />},\r\n      { path: \"exams\",          element: <StudentExams />     },\r\n      { path: \"games\",          element: <GamesPage />        },\r\n    ],\r\n  },\r\n]);\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/apps/edugames/src/router/index.tsx b/apps/edugames/src/router/index.tsx
+--- a/apps/edugames/src/router/index.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/apps/edugames/src/router/index.tsx	(date 1776163827257)
+@@ -6,6 +6,7 @@
+ import { StudentExams } from "../features/exam/StudentExams";
+ import { AuthPage } from "../features/auth/AuthPage";
+ import { GamesPage } from "../features/games/GamesPage";
++import { ConstructionPage } from "../shared/components/ConstructionPage";
+ 
+ export const router = createBrowserRouter([
+   {
+@@ -20,6 +21,11 @@
+       { path: "classroom",      element: <StudentClassrooms />},
+       { path: "exams",          element: <StudentExams />     },
+       { path: "games",          element: <GamesPage />        },
++      { path: "*",              element: <ConstructionPage /> },
+     ],
+   },
++  {
++    path: "*",
++    element: <ConstructionPage />
++  }
+ ]);
+Index: apps/teacherbuddy/src/features/dashboard/DashboardPage.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import React from \"react\";\r\nimport {\r\n  Users, BrainCircuit, AlertTriangle, TrendingUp, BookOpen,\r\n  Clock, ArrowRight, Activity, Star, Calendar, CheckCircle2,\r\n  Zap, BarChart2,\r\n} from \"lucide-react\";\r\nimport { GlassCard } from \"../../shared/components/GlassCard\";\r\nimport { Link } from \"react-router-dom\";\r\n\r\nconst stats = [\r\n  { label: \"Active Students\",       value: \"1,284\", delta: \"+12%\",  icon: Users,        color: \"#264796\", bg: \"rgba(38,71,150,0.1)\",  accent: \"border-l-[#264796]\"  },\r\n  { label: \"AI Evaluations Done\",   value: \"452\",   delta: \"+28%\",  icon: BrainCircuit, color: \"#d0ae61\", bg: \"rgba(208,174,97,0.12)\", accent: \"border-l-[#d0ae61]\"  },\r\n  { label: \"Risk Alerts\",           value: \"12\",    delta: \"−3\",    icon: AlertTriangle, color: \"#dc2626\",bg: \"rgba(220,38,38,0.1)\",  accent: \"border-l-red-500\"     },\r\n  { label: \"Avg. Score Improvement\",value: \"+14%\",  delta: \"vs last month\", icon: TrendingUp, color: \"#16a34a\", bg: \"rgba(22,163,74,0.1)\",accent: \"border-l-green-500\" },\r\n];\r\n\r\nconst classrooms = [\r\n  { code: \"CSC401\", name: \"Advanced Neural Networks\", batch: \"Batch 2026-A\", students: 42, time: \"2:00 PM\", progress: 68 },\r\n  { code: \"CSC312\", name: \"Data Structures & Algorithms\", batch: \"Batch 2025-B\", students: 38, time: \"10:00 AM\", progress: 82 },\r\n  { code: \"CSC501\", name: \"Cloud Computing & DevOps\", batch: \"Batch 2026-A\", students: 35, time: \"3:30 PM\", progress: 45 },\r\n  { code: \"CSC220\", name: \"Database Management Systems\", batch: \"Batch 2025-C\", students: 50, time: \"8:00 AM\", progress: 91 },\r\n];\r\n\r\nconst riskAlerts = [\r\n  { id: \"S4121\", name: \"Arjun Mehta\",   level: \"high\",     reason: \"Attendance dropped to 42%\",         score: 78 },\r\n  { id: \"S4122\", name: \"Priya Sharma\",  level: \"high\",     reason: \"3 consecutive exams below 40%\",     score: 82 },\r\n  { id: \"S4109\", name: \"Rohan Verma\",   level: \"moderate\", reason: \"2 missing assignment submissions\",  score: 61 },\r\n  { id: \"S4135\", name: \"Sneha Patil\",   level: \"moderate\", reason: \"Irregular attendance pattern\",      score: 55 },\r\n];\r\n\r\nconst recentActivity = [\r\n  { text: \"AI evaluated 55 subjective answers in CSC401\",          time: \"1h ago\",  icon: BrainCircuit, color: \"#264796\" },\r\n  { text: \"Priya Sharma submitted Neural Networks Mid-Term\",        time: \"2h ago\",  icon: CheckCircle2, color: \"#16a34a\" },\r\n  { text: \"Risk score updated for Batch 2026-A\",                    time: \"4h ago\",  icon: Activity,     color: \"#d0ae61\" },\r\n  { text: \"New course material uploaded to CSC501\",                 time: \"Yesterday\",icon: BookOpen,    color: \"#264796\" },\r\n];\r\n\r\nexport const DashboardPage: React.FC = () => {\r\n  return (\r\n    <div className=\"space-y-7 animate-fade-in\">\r\n      {/* Page Header */}\r\n      <div className=\"flex items-start justify-between\">\r\n        <div>\r\n          <h1 className=\"text-2xl font-bold\" style={{ color: \"var(--color-text-primary)\", fontFamily: \"var(--font-display)\" }}>\r\n            Good afternoon, Professor \uD83D\uDC4B\r\n          </h1>\r\n          <p className=\"text-sm mt-1\" style={{ color: \"var(--color-text-muted)\" }}>\r\n            Monday, 13 April 2026 — Here's your academic overview for today.\r\n          </p>\r\n        </div>\r\n        <div className=\"flex gap-2\">\r\n          <Link to=\"/exams\" className=\"btn btn-outline text-xs\">\r\n            <FileTextIcon size={13} /> Schedule Exam\r\n          </Link>\r\n          <Link to=\"/analytics\" className=\"btn btn-primary text-xs\">\r\n            <BarChart2 size={13} /> View Analytics\r\n          </Link>\r\n        </div>\r\n      </div>\r\n\r\n      {/* Stats Grid */}\r\n      <div className=\"grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4\">\r\n        {stats.map((stat, i) => (\r\n          <div\r\n            key={stat.label}\r\n            className={`glass-card p-5 border-l-4 ${stat.accent} animate-fade-in-up delay-${i}00`}\r\n          >\r\n            <div className=\"flex items-center justify-between mb-3\">\r\n              <div className=\"w-10 h-10 rounded-xl flex items-center justify-center\" style={{ background: stat.bg }}>\r\n                <stat.icon size={20} style={{ color: stat.color }} />\r\n              </div>\r\n              <span className=\"badge text-[10px] font-bold px-2 py-0.5 rounded-full\"\r\n                style={{\r\n                  background: stat.color === \"#dc2626\" ? \"rgba(220,38,38,0.1)\" : \"rgba(22,163,74,0.12)\",\r\n                  color: stat.color === \"#dc2626\" ? \"#dc2626\" : \"#16a34a\"\r\n                }}>\r\n                {stat.delta}\r\n              </span>\r\n            </div>\r\n            <p className=\"stat-number\">{stat.value}</p>\r\n            <p className=\"text-xs mt-1 font-medium\" style={{ color: \"var(--color-text-muted)\" }}>{stat.label}</p>\r\n          </div>\r\n        ))}\r\n      </div>\r\n\r\n      {/* Main Grid */}\r\n      <div className=\"grid grid-cols-1 xl:grid-cols-3 gap-6\">\r\n        {/* Classrooms */}\r\n        <div className=\"xl:col-span-2 space-y-4\">\r\n          <div className=\"flex items-center justify-between\">\r\n            <h2 className=\"section-title\">Ongoing Classrooms</h2>\r\n            <Link to=\"/classroom\" className=\"btn btn-ghost text-xs gap-1\">\r\n              View all <ArrowRight size={13} />\r\n            </Link>\r\n          </div>\r\n          <div className=\"grid sm:grid-cols-2 gap-4\">\r\n            {classrooms.map((cls, i) => (\r\n              <Link to=\"/classroom\" key={cls.code}>\r\n                <GlassCard interactive className={`animate-fade-in-up delay-${i % 3}00`}>\r\n                  <div className=\"gradient-blue rounded-xl mb-4 p-4 h-28 flex flex-col justify-between relative overflow-hidden\">\r\n                    <div className=\"absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-10 bg-white\" />\r\n                    <div className=\"absolute -right-2 -bottom-6 w-20 h-20 rounded-full opacity-8 bg-white\" />\r\n                    <div>\r\n                      <span className=\"badge text-[9px] px-2 py-0.5 rounded-full font-bold\"\r\n                        style={{ background: \"rgba(255,255,255,0.2)\", color: \"rgba(255,255,255,0.9)\" }}>\r\n                        {cls.batch}\r\n                      </span>\r\n                    </div>\r\n                    <div>\r\n                      <p className=\"text-white text-[10px] font-semibold uppercase tracking-widest opacity-70\">{cls.code}</p>\r\n                      <h3 className=\"text-white font-bold text-sm leading-snug mt-0.5\">{cls.name}</h3>\r\n                    </div>\r\n                  </div>\r\n                  <div className=\"space-y-3\">\r\n                    <div className=\"progress-bar\">\r\n                      <div className=\"progress-fill\" style={{ width: `${cls.progress}%` }} />\r\n                    </div>\r\n                    <div className=\"flex items-center justify-between text-xs\" style={{ color: \"var(--color-text-muted)\" }}>\r\n                      <div className=\"flex items-center gap-1.5\">\r\n                        <Users size={13} /> {cls.students} Students\r\n                      </div>\r\n                      <div className=\"flex items-center gap-1.5\">\r\n                        <Clock size={13} /> {cls.time}\r\n                      </div>\r\n                      <span className=\"font-semibold\" style={{ color: \"var(--color-brand-blue)\" }}>{cls.progress}%</span>\r\n                    </div>\r\n                  </div>\r\n                </GlassCard>\r\n              </Link>\r\n            ))}\r\n          </div>\r\n        </div>\r\n\r\n        {/* Right Column */}\r\n        <div className=\"space-y-4\">\r\n          {/* Upcoming */}\r\n          <GlassCard padding=\"sm\">\r\n            <div className=\"flex items-center gap-2 mb-3\">\r\n              <Calendar size={15} style={{ color: \"var(--color-brand-blue)\" }} />\r\n              <h3 className=\"section-title text-sm\">Today's Schedule</h3>\r\n            </div>\r\n            <div className=\"space-y-2.5\">\r\n              {[\r\n                { name: \"Neural Networks\", code: \"CSC401\", time: \"10:00 AM\", room: \"CS-Lab 3\",   status: \"upcoming\" },\r\n                { name: \"DSA Lecture\",     code: \"CSC312\", time: \"12:00 PM\", room: \"Seminar Hall\",status: \"live\"     },\r\n                { name: \"Cloud DevOps\",    code: \"CSC501\", time: \"3:30 PM\",  room: \"Online\",      status: \"upcoming\" },\r\n              ].map(s => (\r\n                <div key={s.name} className=\"flex items-center gap-3 p-2.5 rounded-lg border\"\r\n                  style={{ borderColor: \"var(--color-border)\", background: \"var(--color-bg-grad1)\" }}>\r\n                  <div className=\"flex flex-col items-center w-12 shrink-0\">\r\n                    <p className=\"text-[10px] font-bold\" style={{ color: \"var(--color-brand-blue)\" }}>{s.time.split(\" \")[0]}</p>\r\n                    <p className=\"text-[9px] opacity-60\">{s.time.split(\" \")[1]}</p>\r\n                  </div>\r\n                  <div className=\"flex-1 min-w-0\">\r\n                    <p className=\"text-xs font-semibold truncate\" style={{ color: \"var(--color-text-primary)\" }}>{s.name}</p>\r\n                    <p className=\"text-[10px]\" style={{ color: \"var(--color-text-muted)\" }}>{s.room}</p>\r\n                  </div>\r\n                  <span className={`badge text-[9px] px-1.5 py-0.5 ${s.status === \"live\" ? \"badge-green\" : \"badge-blue\"}`}>\r\n                    {s.status === \"live\" ? \"● Live\" : \"Soon\"}\r\n                  </span>\r\n                </div>\r\n              ))}\r\n            </div>\r\n          </GlassCard>\r\n\r\n          {/* Risk Alerts */}\r\n          <GlassCard padding=\"sm\">\r\n            <div className=\"flex items-center justify-between mb-3\">\r\n              <div className=\"flex items-center gap-2\">\r\n                <AlertTriangle size={15} className=\"text-red-500\" />\r\n                <h3 className=\"section-title text-sm\">AI Risk Alerts</h3>\r\n              </div>\r\n              <Link to=\"/analytics\" className=\"text-[10px] font-semibold\" style={{ color: \"var(--color-brand-blue)\" }}>\r\n                View all\r\n              </Link>\r\n            </div>\r\n            <div className=\"space-y-2\">\r\n              {riskAlerts.map(alert => (\r\n                <div key={alert.id} className=\"flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition-colors\"\r\n                  style={{}}\r\n                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-border)'}\r\n                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}\r\n                >\r\n                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${\r\n                    alert.level === \"high\" ? \"bg-red-100 text-red-700\" : \"bg-orange-100 text-orange-700\"\r\n                  }`}>\r\n                    {alert.name.charAt(0)}\r\n                  </div>\r\n                  <div className=\"flex-1 min-w-0\">\r\n                    <p className=\"text-xs font-semibold truncate\" style={{ color: \"var(--color-text-primary)\" }}>{alert.name}</p>\r\n                    <p className=\"text-[10px] leading-tight mt-0.5\" style={{ color: \"var(--color-text-muted)\" }}>{alert.reason}</p>\r\n                  </div>\r\n                  <div className=\"text-right shrink-0\">\r\n                    <span className={`badge text-[9px] px-1.5 py-0.5 ${alert.level === \"high\" ? \"badge-red\" : \"badge-orange\"}`}>\r\n                      {alert.score}\r\n                    </span>\r\n                  </div>\r\n                </div>\r\n              ))}\r\n            </div>\r\n            <Link to=\"/analytics\" className=\"btn btn-primary w-full mt-3 text-xs py-2\">\r\n              <Zap size={13} /> Run Global AI Analysis\r\n            </Link>\r\n          </GlassCard>\r\n\r\n          {/* Recent Activity */}\r\n          <GlassCard padding=\"sm\">\r\n            <div className=\"flex items-center gap-2 mb-3\">\r\n              <Activity size={15} style={{ color: \"var(--color-brand-blue)\" }} />\r\n              <h3 className=\"section-title text-sm\">Recent Activity</h3>\r\n            </div>\r\n            <div className=\"space-y-3\">\r\n              {recentActivity.map((act, i) => (\r\n                <div key={i} className=\"flex gap-2.5\">\r\n                  <div className=\"w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5\"\r\n                    style={{ background: `${act.color}15` }}>\r\n                    <act.icon size={13} style={{ color: act.color }} />\r\n                  </div>\r\n                  <div>\r\n                    <p className=\"text-[11px] leading-relaxed\" style={{ color: \"var(--color-text-secondary)\" }}>{act.text}</p>\r\n                    <p className=\"text-[10px] mt-0.5\" style={{ color: \"var(--color-text-muted)\" }}>{act.time}</p>\r\n                  </div>\r\n                </div>\r\n              ))}\r\n            </div>\r\n          </GlassCard>\r\n        </div>\r\n      </div>\r\n    </div>\r\n  );\r\n};\r\n\r\n// inline icon to avoid import mess\r\nconst FileTextIcon = ({ size }: { size: number }) => (\r\n  <svg width={size} height={size} viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\r\n    <path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\" />\r\n    <polyline points=\"14 2 14 8 20 8\" />\r\n    <line x1=\"16\" y1=\"13\" x2=\"8\" y2=\"13\" />\r\n    <line x1=\"16\" y1=\"17\" x2=\"8\" y2=\"17\" />\r\n    <polyline points=\"10 9 9 9 8 9\" />\r\n  </svg>\r\n);\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/apps/teacherbuddy/src/features/dashboard/DashboardPage.tsx b/apps/teacherbuddy/src/features/dashboard/DashboardPage.tsx
+--- a/apps/teacherbuddy/src/features/dashboard/DashboardPage.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/apps/teacherbuddy/src/features/dashboard/DashboardPage.tsx	(date 1776163827258)
+@@ -89,13 +89,13 @@
+         <div className="xl:col-span-2 space-y-4">
+           <div className="flex items-center justify-between">
+             <h2 className="section-title">Ongoing Classrooms</h2>
+-            <Link to="/classroom" className="btn btn-ghost text-xs gap-1">
++            <Link to="/classrooms" className="btn btn-ghost text-xs gap-1">
+               View all <ArrowRight size={13} />
+             </Link>
+           </div>
+           <div className="grid sm:grid-cols-2 gap-4">
+             {classrooms.map((cls, i) => (
+-              <Link to="/classroom" key={cls.code}>
++              <Link to="/classrooms" key={cls.code}>
+                 <GlassCard interactive className={`animate-fade-in-up delay-${i % 3}00`}>
+                   <div className="gradient-blue rounded-xl mb-4 p-4 h-28 flex flex-col justify-between relative overflow-hidden">
+                     <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-10 bg-white" />
+Index: node_modules/@eduai/teacherbuddy/src/router/index.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import { createBrowserRouter } from \"react-router-dom\";\r\nimport { DashboardShell } from \"../layouts/DashboardShell\";\r\nimport { DashboardPage } from \"../features/dashboard/DashboardPage\";\r\nimport { EvaluationPage } from \"../features/evaluation/EvaluationPage\";\r\nimport { ReportsPage } from \"../features/reports/ReportsPage\";\r\nimport { FormsPage } from \"../features/forms/FormsPage\";\r\nimport { AnalyticsPage } from \"../features/analytics/AnalyticsPage\";\r\nimport { WellbeingPage } from \"../features/wellbeing/WellbeingPage\";\r\nimport { AIChatPage } from \"../features/ai-chat/AIChatPage\";\r\nimport { AuthPage } from \"../features/auth/AuthPage\";\r\nimport { GamesPage } from \"../features/games/GamesPage\";\r\nimport { TeacherToolsPage } from \"../features/tools/TeacherToolsPage\";\r\n\r\nexport const router = createBrowserRouter([\r\n  {\r\n    path: \"/login\",\r\n    element: <AuthPage />,\r\n  },\r\n  {\r\n    path: \"/\",\r\n    element: <DashboardShell />,\r\n    children: [\r\n      { index: true,            element: <DashboardPage />   },\r\n      { path: \"evaluation\",     element: <EvaluationPage />  },\r\n      { path: \"reports\",        element: <ReportsPage />     },\r\n      { path: \"forms\",          element: <FormsPage />       },\r\n      { path: \"games\",          element: <GamesPage />       },\r\n      { path: \"tools\",          element: <TeacherToolsPage />},\r\n      { path: \"analytics\",      element: <AnalyticsPage />   },\r\n      { path: \"wellbeing\",      element: <WellbeingPage />   },\r\n      { path: \"chat\",           element: <AIChatPage />      },\r\n    ],\r\n  },\r\n]);\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/node_modules/@eduai/teacherbuddy/src/router/index.tsx b/node_modules/@eduai/teacherbuddy/src/router/index.tsx
+--- a/node_modules/@eduai/teacherbuddy/src/router/index.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/node_modules/@eduai/teacherbuddy/src/router/index.tsx	(date 1776163827537)
+@@ -10,6 +10,8 @@
+ import { AuthPage } from "../features/auth/AuthPage";
+ import { GamesPage } from "../features/games/GamesPage";
+ import { TeacherToolsPage } from "../features/tools/TeacherToolsPage";
++import { ClassroomsPage } from "../features/classroom/ClassroomsPage";
++import { ConstructionPage } from "../shared/components/ConstructionPage";
+ 
+ export const router = createBrowserRouter([
+   {
+@@ -26,9 +28,17 @@
+       { path: "forms",          element: <FormsPage />       },
+       { path: "games",          element: <GamesPage />       },
+       { path: "tools",          element: <TeacherToolsPage />},
++      { path: "classrooms",     element: <ClassroomsPage />  },
+       { path: "analytics",      element: <AnalyticsPage />   },
+       { path: "wellbeing",      element: <WellbeingPage />   },
+       { path: "chat",           element: <AIChatPage />      },
++      { path: "settings",       element: <ConstructionPage />},
++      { path: "exams",          element: <ConstructionPage />},
++      { path: "*",              element: <ConstructionPage />},
+     ],
+   },
++  {
++    path: "*",
++    element: <ConstructionPage />
++  }
+ ]);
+Index: apps/teacherbuddy/src/router/index.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import { createBrowserRouter } from \"react-router-dom\";\r\nimport { DashboardShell } from \"../layouts/DashboardShell\";\r\nimport { DashboardPage } from \"../features/dashboard/DashboardPage\";\r\nimport { EvaluationPage } from \"../features/evaluation/EvaluationPage\";\r\nimport { ReportsPage } from \"../features/reports/ReportsPage\";\r\nimport { FormsPage } from \"../features/forms/FormsPage\";\r\nimport { AnalyticsPage } from \"../features/analytics/AnalyticsPage\";\r\nimport { WellbeingPage } from \"../features/wellbeing/WellbeingPage\";\r\nimport { AIChatPage } from \"../features/ai-chat/AIChatPage\";\r\nimport { AuthPage } from \"../features/auth/AuthPage\";\r\nimport { GamesPage } from \"../features/games/GamesPage\";\r\nimport { TeacherToolsPage } from \"../features/tools/TeacherToolsPage\";\r\n\r\nexport const router = createBrowserRouter([\r\n  {\r\n    path: \"/login\",\r\n    element: <AuthPage />,\r\n  },\r\n  {\r\n    path: \"/\",\r\n    element: <DashboardShell />,\r\n    children: [\r\n      { index: true,            element: <DashboardPage />   },\r\n      { path: \"evaluation\",     element: <EvaluationPage />  },\r\n      { path: \"reports\",        element: <ReportsPage />     },\r\n      { path: \"forms\",          element: <FormsPage />       },\r\n      { path: \"games\",          element: <GamesPage />       },\r\n      { path: \"tools\",          element: <TeacherToolsPage />},\r\n      { path: \"analytics\",      element: <AnalyticsPage />   },\r\n      { path: \"wellbeing\",      element: <WellbeingPage />   },\r\n      { path: \"chat\",           element: <AIChatPage />      },\r\n    ],\r\n  },\r\n]);\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/apps/teacherbuddy/src/router/index.tsx b/apps/teacherbuddy/src/router/index.tsx
+--- a/apps/teacherbuddy/src/router/index.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/apps/teacherbuddy/src/router/index.tsx	(date 1776163827259)
+@@ -10,6 +10,8 @@
+ import { AuthPage } from "../features/auth/AuthPage";
+ import { GamesPage } from "../features/games/GamesPage";
+ import { TeacherToolsPage } from "../features/tools/TeacherToolsPage";
++import { ClassroomsPage } from "../features/classroom/ClassroomsPage";
++import { ConstructionPage } from "../shared/components/ConstructionPage";
+ 
+ export const router = createBrowserRouter([
+   {
+@@ -26,9 +28,17 @@
+       { path: "forms",          element: <FormsPage />       },
+       { path: "games",          element: <GamesPage />       },
+       { path: "tools",          element: <TeacherToolsPage />},
++      { path: "classrooms",     element: <ClassroomsPage />  },
+       { path: "analytics",      element: <AnalyticsPage />   },
+       { path: "wellbeing",      element: <WellbeingPage />   },
+       { path: "chat",           element: <AIChatPage />      },
++      { path: "settings",       element: <ConstructionPage />},
++      { path: "exams",          element: <ConstructionPage />},
++      { path: "*",              element: <ConstructionPage />},
+     ],
+   },
++  {
++    path: "*",
++    element: <ConstructionPage />
++  }
+ ]);
+Index: node_modules/@eduai/teacherbuddy/src/features/classroom/ClassroomsPage.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import React, { useState } from \"react\";\r\nimport {\r\n  BookOpen, Users, Clock, Plus, Search, ChevronRight,\r\n  Bell, Paperclip, FileText, Video, Link as LinkIcon,\r\n  Star, MoreHorizontal, Calendar, CheckSquare,\r\n} from \"lucide-react\";\r\nimport { GlassCard } from \"../../shared/components/GlassCard\";\r\n\r\nconst courses = [\r\n  {\r\n    id: 1, code: \"CSC401\", name: \"Advanced Neural Networks\",   batch: \"2026-A\", students: 42,\r\n    nextClass: \"Today, 2:00 PM\", progress: 68, color: \"#264796\",\r\n    announcements: 3, resources: 12, description: \"Deep learning architectures, training techniques, and real-world applications.\",\r\n  },\r\n  {\r\n    id: 2, code: \"CSC312\", name: \"Data Structures & Algorithms\", batch: \"2025-B\", students: 38,\r\n    nextClass: \"Today, 10:00 AM\", progress: 82, color: \"#d0ae61\",\r\n    announcements: 1, resources: 24, description: \"Fundamental data structures, algorithm analysis, and problem-solving paradigms.\",\r\n  },\r\n  {\r\n    id: 3, code: \"CSC501\", name: \"Cloud Computing & DevOps\",   batch: \"2026-A\", students: 35,\r\n    nextClass: \"Today, 3:30 PM\", progress: 45, color: \"#7c3aed\",\r\n    announcements: 5, resources: 8,  description: \"AWS, GCP, containerization with Docker, Kubernetes, and CI/CD pipelines.\",\r\n  },\r\n  {\r\n    id: 4, code: \"CSC220\", name: \"Database Management Systems\", batch: \"2025-C\", students: 50,\r\n    nextClass: \"Tomorrow, 8:00 AM\", progress: 91, color: \"#059669\",\r\n    announcements: 0, resources: 18, description: \"SQL, NoSQL, normalization, transactions, and query optimization.\",\r\n  },\r\n];\r\n\r\nconst resources = [\r\n  { id: 1, name: \"Module 7 — Backpropagation Slides\",   type: \"pdf\",   size: \"2.4 MB\",  date: \"Apr 12\" },\r\n  { id: 2, name: \"Lecture Recording — Week 11\",         type: \"video\", size: \"310 MB\",  date: \"Apr 10\" },\r\n  { id: 3, name: \"Assignment 4 — Problem Set\",          type: \"doc\",   size: \"420 KB\",  date: \"Apr 8\"  },\r\n  { id: 4, name: \"Reading List — Transformer Papers\",   type: \"link\",  size: \"\",        date: \"Apr 5\"  },\r\n];\r\n\r\nconst announcements = [\r\n  { id: 1, title: \"Mid-Term Exam Rescheduled\",       body: \"The CSC401 mid-term has been moved to April 20th. Venue: CS-Lab 3.\", time: \"2h ago\",   pinned: true  },\r\n  { id: 2, title: \"Assignment 4 Deadline Extended\",  body: \"Deadline extended to April 18 due to lab maintenance. Submit on the portal.\", time: \"Yesterday\", pinned: false },\r\n  { id: 3, title: \"Guest Lecture: Dr. Anand Kumar\",  body: \"Distinguished lecture on LLM architectures this Friday at 2 PM, Seminar Hall.\", time: \"Apr 11\",   pinned: false },\r\n];\r\n\r\nconst typeIcon: Record<string, React.ReactNode> = {\r\n  pdf:   <FileText size={16} className=\"text-red-500\" />,\r\n  video: <Video size={16} className=\"text-blue-500\" />,\r\n  doc:   <FileText size={16} className=\"text-indigo-500\" />,\r\n  link:  <LinkIcon size={16} className=\"text-green-500\" />,\r\n};\r\n\r\nexport const ClassroomsPage: React.FC = () => {\r\n  const [selectedCourse, setSelectedCourse] = useState(courses[0]);\r\n  const [activeTab, setActiveTab] = useState<\"announcements\" | \"resources\" | \"students\">(\"announcements\");\r\n  const [search, setSearch] = useState(\"\");\r\n\r\n  const filtered = courses.filter(c =>\r\n    c.name.toLowerCase().includes(search.toLowerCase()) ||\r\n    c.code.toLowerCase().includes(search.toLowerCase())\r\n  );\r\n\r\n  return (\r\n    <div className=\"space-y-6 animate-fade-in\">\r\n      <div className=\"flex items-center justify-between\">\r\n        <div>\r\n          <h1 className=\"text-2xl font-bold\" style={{ fontFamily: \"var(--font-display)\", color: \"var(--color-text-primary)\" }}>\r\n            Classrooms\r\n          </h1>\r\n          <p className=\"text-sm mt-1\" style={{ color: \"var(--color-text-muted)\" }}>\r\n            Manage your courses, resources, and student announcements.\r\n          </p>\r\n        </div>\r\n        <button className=\"btn btn-primary text-sm\">\r\n          <Plus size={15} /> New Classroom\r\n        </button>\r\n      </div>\r\n\r\n      <div className=\"grid grid-cols-1 xl:grid-cols-3 gap-6\">\r\n        {/* ── Course List ─────────────────────── */}\r\n        <div className=\"space-y-3\">\r\n          <div className=\"relative\">\r\n            <Search size={14} className=\"absolute left-3 top-1/2 -translate-y-1/2 text-slate-400\" />\r\n            <input\r\n              className=\"form-input pl-9 text-sm\"\r\n              placeholder=\"Search courses…\"\r\n              value={search}\r\n              onChange={e => setSearch(e.target.value)}\r\n            />\r\n          </div>\r\n\r\n          {filtered.map(c => (\r\n            <div\r\n              key={c.id}\r\n              onClick={() => setSelectedCourse(c)}\r\n              className={`glass-card p-4 cursor-pointer transition-all duration-200 border-l-4 ${\r\n                selectedCourse.id === c.id ? \"border-l-[#264796] shadow-lg shadow-blue-100\" : \"border-l-transparent hover:shadow-md\"\r\n              }`}\r\n            >\r\n              <div className=\"flex items-start justify-between gap-2\">\r\n                <div className=\"min-w-0\">\r\n                  <span className=\"text-[10px] font-bold tracking-wider uppercase\" style={{ color: \"var(--color-text-muted)\" }}>{c.code}</span>\r\n                  <p className=\"font-semibold text-sm mt-0.5 leading-snug\" style={{ color: \"var(--color-text-primary)\" }}>{c.name}</p>\r\n                  <p className=\"text-[11px] mt-1\" style={{ color: \"var(--color-text-muted)\" }}>\r\n                    Batch {c.batch} · {c.students} students\r\n                  </p>\r\n                </div>\r\n                <ChevronRight size={16} className={`shrink-0 mt-1 transition-transform ${selectedCourse.id === c.id ? \"text-blue-600 rotate-90\" : \"text-slate-300\"}`} />\r\n              </div>\r\n              <div className=\"mt-3 space-y-1.5\">\r\n                <div className=\"progress-bar\">\r\n                  <div className=\"progress-fill\" style={{ width: `${c.progress}%`, background: `linear-gradient(90deg,${c.color},${c.color}bb)` }} />\r\n                </div>\r\n                <div className=\"flex items-center justify-between text-[10px]\" style={{ color: \"var(--color-text-muted)\" }}>\r\n                  <span className=\"flex items-center gap-1\"><Clock size={10} /> {c.nextClass}</span>\r\n                  <span className=\"font-semibold\" style={{ color: c.color }}>{c.progress}% complete</span>\r\n                </div>\r\n              </div>\r\n            </div>\r\n          ))}\r\n        </div>\r\n\r\n        {/* ── Course Detail ───────────────────── */}\r\n        <div className=\"xl:col-span-2 space-y-4\">\r\n          {/* Header Card */}\r\n          <div className=\"rounded-2xl overflow-hidden\" style={{ background: `linear-gradient(135deg, ${selectedCourse.color} 0%, ${selectedCourse.color}cc 100%)` }}>\r\n            <div className=\"p-6 text-white relative overflow-hidden\">\r\n              <div className=\"absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/5\" />\r\n              <div className=\"absolute -right-4 bottom-0 w-24 h-24 rounded-full bg-white/5\" />\r\n              <div className=\"flex items-start justify-between relative\">\r\n                <div>\r\n                  <div className=\"flex items-center gap-2 mb-2\">\r\n                    <span className=\"badge text-[10px] px-2 py-0.5\" style={{ background: \"rgba(255,255,255,0.2)\", color: \"rgba(255,255,255,0.9)\" }}>\r\n                      {selectedCourse.code}\r\n                    </span>\r\n                    <span className=\"badge text-[10px] px-2 py-0.5\" style={{ background: \"rgba(255,255,255,0.2)\", color: \"rgba(255,255,255,0.9)\" }}>\r\n                      Batch {selectedCourse.batch}\r\n                    </span>\r\n                  </div>\r\n                  <h2 className=\"text-xl font-bold mb-1\">{selectedCourse.name}</h2>\r\n                  <p className=\"text-white/70 text-sm\">{selectedCourse.description}</p>\r\n                </div>\r\n                <button className=\"btn text-white/80 hover:text-white hover:bg-white/10 p-2\">\r\n                  <MoreHorizontal size={18} />\r\n                </button>\r\n              </div>\r\n              {/* Stats Row */}\r\n              <div className=\"flex gap-6 mt-5 pt-4 border-t border-white/15\">\r\n                {[\r\n                  { icon: Users, label: `${selectedCourse.students} Students` },\r\n                  { icon: Bell, label: `${selectedCourse.announcements} Announcements` },\r\n                  { icon: Paperclip, label: `${selectedCourse.resources} Resources` },\r\n                  { icon: Calendar, label: selectedCourse.nextClass },\r\n                ].map(item => (\r\n                  <div key={item.label} className=\"flex items-center gap-1.5 text-white/80 text-xs font-medium\">\r\n                    <item.icon size={13} />\r\n                    {item.label}\r\n                  </div>\r\n                ))}\r\n              </div>\r\n            </div>\r\n          </div>\r\n\r\n          {/* Tabs */}\r\n          <GlassCard padding=\"none\">\r\n            <div className=\"flex border-b\" style={{ borderColor: \"rgba(38,71,150,0.1)\" }}>\r\n              {([\"announcements\", \"resources\", \"students\"] as const).map(tab => (\r\n                <button\r\n                  key={tab}\r\n                  onClick={() => setActiveTab(tab)}\r\n                  className={`px-5 py-3.5 text-sm font-semibold capitalize transition-colors ${\r\n                    activeTab === tab\r\n                      ? \"border-b-2 border-[#264796] text-[#264796]\"\r\n                      : \"text-slate-400 hover:text-slate-700\"\r\n                  }`}\r\n                >\r\n                  {tab}\r\n                </button>\r\n              ))}\r\n            </div>\r\n\r\n            <div className=\"p-5\">\r\n              {/* Announcements */}\r\n              {activeTab === \"announcements\" && (\r\n                <div className=\"space-y-3\">\r\n                  <div className=\"flex justify-end\">\r\n                    <button className=\"btn btn-primary text-xs\">\r\n                      <Plus size={13} /> Post Announcement\r\n                    </button>\r\n                  </div>\r\n                  {announcements.map(a => (\r\n                    <div key={a.id} className=\"p-4 rounded-xl border transition-colors hover:shadow-sm\"\r\n                      style={{ borderColor: \"rgba(38,71,150,0.12)\", background: a.pinned ? \"rgba(38,71,150,0.03)\" : \"transparent\" }}>\r\n                      <div className=\"flex items-start justify-between gap-2\">\r\n                        <div className=\"flex items-start gap-2\">\r\n                          {a.pinned && <Star size={13} className=\"text-yellow-500 mt-0.5 shrink-0\" />}\r\n                          <div>\r\n                            <p className=\"font-semibold text-sm\" style={{ color: \"var(--color-text-primary)\" }}>{a.title}</p>\r\n                            <p className=\"text-xs mt-1 leading-relaxed\" style={{ color: \"var(--color-text-secondary)\" }}>{a.body}</p>\r\n                          </div>\r\n                        </div>\r\n                        <span className=\"text-[10px] shrink-0\" style={{ color: \"var(--color-text-muted)\" }}>{a.time}</span>\r\n                      </div>\r\n                    </div>\r\n                  ))}\r\n                </div>\r\n              )}\r\n\r\n              {/* Resources */}\r\n              {activeTab === \"resources\" && (\r\n                <div className=\"space-y-3\">\r\n                  <div className=\"flex justify-end\">\r\n                    <button className=\"btn btn-primary text-xs\">\r\n                      <Plus size={13} /> Upload Resource\r\n                    </button>\r\n                  </div>\r\n                  {resources.map(r => (\r\n                    <div key={r.id} className=\"flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer hover:shadow-sm transition-all group\"\r\n                      style={{ borderColor: \"rgba(38,71,150,0.1)\" }}>\r\n                      <div className=\"w-9 h-9 rounded-lg flex items-center justify-center shrink-0\"\r\n                        style={{ background: \"rgba(38,71,150,0.07)\" }}>\r\n                        {typeIcon[r.type]}\r\n                      </div>\r\n                      <div className=\"flex-1 min-w-0\">\r\n                        <p className=\"text-sm font-medium truncate group-hover:text-blue-700 transition-colors\" style={{ color: \"var(--color-text-primary)\" }}>\r\n                          {r.name}\r\n                        </p>\r\n                        <p className=\"text-[11px] mt-0.5\" style={{ color: \"var(--color-text-muted)\" }}>\r\n                          {r.size && <>{r.size} · </>}{r.date}\r\n                        </p>\r\n                      </div>\r\n                      <ChevronRight size={15} className=\"text-slate-300 group-hover:text-blue-500 shrink-0 transition-colors\" />\r\n                    </div>\r\n                  ))}\r\n                </div>\r\n              )}\r\n\r\n              {/* Students */}\r\n              {activeTab === \"students\" && (\r\n                <div className=\"space-y-2\">\r\n                  {Array.from({ length: 6 }, (_, i) => ({\r\n                    name: [\"Arjun Mehta\", \"Priya Sharma\", \"Rohan Verma\", \"Sneha Patil\", \"Kiran Nair\", \"Anjali Singh\"][i],\r\n                    roll: `2226CSC${100 + i}`,\r\n                    attendance: [42, 88, 76, 91, 65, 95][i],\r\n                    avgScore: [58, 72, 56, 81, 69, 93][i],\r\n                  })).map(s => (\r\n                    <div key={s.roll} className=\"flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors\">\r\n                      <div className=\"w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0\"\r\n                        style={{ background: \"linear-gradient(135deg,#264796,#3460c4)\" }}>\r\n                        {s.name.charAt(0)}\r\n                      </div>\r\n                      <div className=\"flex-1 min-w-0\">\r\n                        <p className=\"text-sm font-semibold\" style={{ color: \"var(--color-text-primary)\" }}>{s.name}</p>\r\n                        <p className=\"text-[11px]\" style={{ color: \"var(--color-text-muted)\" }}>{s.roll}</p>\r\n                      </div>\r\n                      <div className=\"flex items-center gap-4 text-xs\">\r\n                        <div className=\"text-center\">\r\n                          <p className=\"font-bold\" style={{ color: s.attendance < 75 ? \"#dc2626\" : \"#16a34a\" }}>{s.attendance}%</p>\r\n                          <p style={{ color: \"var(--color-text-muted)\" }}>Attendance</p>\r\n                        </div>\r\n                        <div className=\"text-center\">\r\n                          <p className=\"font-bold\" style={{ color: \"var(--color-text-primary)\" }}>{s.avgScore}%</p>\r\n                          <p style={{ color: \"var(--color-text-muted)\" }}>Avg Score</p>\r\n                        </div>\r\n                      </div>\r\n                      <span className={`badge text-[9px] px-2 ${s.attendance < 75 ? \"badge-red\" : \"badge-green\"}`}>\r\n                        {s.attendance < 75 ? \"At Risk\" : \"Good\"}\r\n                      </span>\r\n                    </div>\r\n                  ))}\r\n                </div>\r\n              )}\r\n            </div>\r\n          </GlassCard>\r\n        </div>\r\n      </div>\r\n    </div>\r\n  );\r\n};\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/node_modules/@eduai/teacherbuddy/src/features/classroom/ClassroomsPage.tsx b/node_modules/@eduai/teacherbuddy/src/features/classroom/ClassroomsPage.tsx
+--- a/node_modules/@eduai/teacherbuddy/src/features/classroom/ClassroomsPage.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/node_modules/@eduai/teacherbuddy/src/features/classroom/ClassroomsPage.tsx	(date 1776163827536)
+@@ -1,82 +1,154 @@
+ import React, { useState } from "react";
+ import {
+-  BookOpen, Users, Clock, Plus, Search, ChevronRight,
+-  Bell, Paperclip, FileText, Video, Link as LinkIcon,
+-  Star, MoreHorizontal, Calendar, CheckSquare,
++  Users, Clock, Plus, Search, ChevronRight, BookOpen,
++  FileText, BarChart2, CheckCircle2, AlertCircle,
++  Calendar, MoreVertical, TrendingUp, X, ClipboardList,
+ } from "lucide-react";
+ import { GlassCard } from "../../shared/components/GlassCard";
+ 
+-const courses = [
++/* ─── Mock Data (mirrors edugames StudentClassrooms) ─────────────────── */
++
++const classrooms = [
+   {
+-    id: 1, code: "CSC401", name: "Advanced Neural Networks",   batch: "2026-A", students: 42,
+-    nextClass: "Today, 2:00 PM", progress: 68, color: "#264796",
+-    announcements: 3, resources: 12, description: "Deep learning architectures, training techniques, and real-world applications.",
++    id: "csc401",
++    code: "CSC401",
++    name: "Advanced Neural Networks",
++    batch: "Batch 2026-A",
++    students: 42,
++    nextClass: "Today, 2:00 PM",
++    progress: 68,
++    color: "#264796",
++    description: "Deep learning architectures, backpropagation, CNNs, RNNs, and transformer models.",
+   },
+   {
+-    id: 2, code: "CSC312", name: "Data Structures & Algorithms", batch: "2025-B", students: 38,
+-    nextClass: "Today, 10:00 AM", progress: 82, color: "#d0ae61",
+-    announcements: 1, resources: 24, description: "Fundamental data structures, algorithm analysis, and problem-solving paradigms.",
++    id: "csc312",
++    code: "CSC312",
++    name: "Data Structures & Algorithms",
++    batch: "Batch 2025-B",
++    students: 38,
++    nextClass: "Tomorrow, 10:00 AM",
++    progress: 82,
++    color: "#d0ae61",
++    description: "Fundamental and advanced data structures, algorithm design, and complexity analysis.",
+   },
+   {
+-    id: 3, code: "CSC501", name: "Cloud Computing & DevOps",   batch: "2026-A", students: 35,
+-    nextClass: "Today, 3:30 PM", progress: 45, color: "#7c3aed",
+-    announcements: 5, resources: 8,  description: "AWS, GCP, containerization with Docker, Kubernetes, and CI/CD pipelines.",
++    id: "csc501",
++    code: "CSC501",
++    name: "Cloud Computing & DevOps",
++    batch: "Batch 2026-A",
++    students: 35,
++    nextClass: "Wed, 3:30 PM",
++    progress: 45,
++    color: "#16a34a",
++    description: "Cloud service models, containerization, CI/CD pipelines, and infrastructure as code.",
+   },
+   {
+-    id: 4, code: "CSC220", name: "Database Management Systems", batch: "2025-C", students: 50,
+-    nextClass: "Tomorrow, 8:00 AM", progress: 91, color: "#059669",
+-    announcements: 0, resources: 18, description: "SQL, NoSQL, normalization, transactions, and query optimization.",
++    id: "csc220",
++    code: "CSC220",
++    name: "Database Management Systems",
++    batch: "Batch 2025-C",
++    students: 50,
++    nextClass: "Thu, 8:00 AM",
++    progress: 91,
++    color: "#7c3aed",
++    description: "Relational databases, SQL, normalization, indexing, and distributed databases.",
+   },
+ ];
+ 
+-const resources = [
+-  { id: 1, name: "Module 7 — Backpropagation Slides",   type: "pdf",   size: "2.4 MB",  date: "Apr 12" },
+-  { id: 2, name: "Lecture Recording — Week 11",         type: "video", size: "310 MB",  date: "Apr 10" },
+-  { id: 3, name: "Assignment 4 — Problem Set",          type: "doc",   size: "420 KB",  date: "Apr 8"  },
+-  { id: 4, name: "Reading List — Transformer Papers",   type: "link",  size: "",        date: "Apr 5"  },
++const assignments = [
++  { id: 1, classCode: "CSC401", name: "Lab 4: Backpropagation",            due: "Tonight, 11:59 PM", submitted: 28, total: 42, status: "active"   },
++  { id: 2, classCode: "CSC312", name: "Assignment 2: AVL Trees",           due: "Tomorrow",          submitted: 38, total: 38, status: "completed"},
++  { id: 3, classCode: "CSC501", name: "Docker Compose Lab",                due: "Apr 18, 2026",      submitted: 12, total: 35, status: "active"   },
++  { id: 4, classCode: "CSC401", name: "Mid-Term: Neural Networks",         due: "Apr 10, 2026",      submitted: 42, total: 42, status: "graded"   },
++  { id: 5, classCode: "CSC220", name: "Normalization Exercise",            due: "Apr 20, 2026",      submitted: 0,  total: 50, status: "upcoming" },
+ ];
+ 
+-const announcements = [
+-  { id: 1, title: "Mid-Term Exam Rescheduled",       body: "The CSC401 mid-term has been moved to April 20th. Venue: CS-Lab 3.", time: "2h ago",   pinned: true  },
+-  { id: 2, title: "Assignment 4 Deadline Extended",  body: "Deadline extended to April 18 due to lab maintenance. Submit on the portal.", time: "Yesterday", pinned: false },
+-  { id: 3, title: "Guest Lecture: Dr. Anand Kumar",  body: "Distinguished lecture on LLM architectures this Friday at 2 PM, Seminar Hall.", time: "Apr 11",   pinned: false },
++const topStudents = [
++  { name: "Arjun Mehta",   roll: "S4121", avg: 94, attendance: 97, trend: "up"   },
++  { name: "Sneha Patil",   roll: "S4135", avg: 91, attendance: 95, trend: "up"   },
++  { name: "Priya Sharma",  roll: "S4122", avg: 88, attendance: 89, trend: "down" },
++  { name: "Rohan Verma",   roll: "S4109", avg: 85, attendance: 78, trend: "up"   },
++  { name: "Kavya Nair",    roll: "S4140", avg: 82, attendance: 92, trend: "up"   },
+ ];
+ 
+-const typeIcon: Record<string, React.ReactNode> = {
+-  pdf:   <FileText size={16} className="text-red-500" />,
+-  video: <Video size={16} className="text-blue-500" />,
+-  doc:   <FileText size={16} className="text-indigo-500" />,
+-  link:  <LinkIcon size={16} className="text-green-500" />,
+-};
++/* ─── Component ──────────────────────────────────────────────────────── */
+ 
+ export const ClassroomsPage: React.FC = () => {
+-  const [selectedCourse, setSelectedCourse] = useState(courses[0]);
+-  const [activeTab, setActiveTab] = useState<"announcements" | "resources" | "students">("announcements");
++  const [selectedId, setSelectedId] = useState(classrooms[0].id);
+   const [search, setSearch] = useState("");
++  const [showNewClassroom, setShowNewClassroom] = useState(false);
++  const [showNewAssignment, setShowNewAssignment] = useState(false);
++  const [activeTab, setActiveTab] = useState<"assignments" | "students" | "analytics">("assignments");
+ 
+-  const filtered = courses.filter(c =>
+-    c.name.toLowerCase().includes(search.toLowerCase()) ||
+-    c.code.toLowerCase().includes(search.toLowerCase())
++  const selected = classrooms.find(c => c.id === selectedId)!;
++  const filtered = classrooms.filter(
++    c => c.name.toLowerCase().includes(search.toLowerCase()) ||
++         c.code.toLowerCase().includes(search.toLowerCase()),
+   );
++  const classAssignments = assignments.filter(a => a.classCode === selected.code);
++
++  const statusColors: Record<string, { bg: string; text: string; label: string }> = {
++    active:    { bg: "rgba(37,99,235,0.1)",  text: "#2563eb", label: "Active"    },
++    completed: { bg: "rgba(22,163,74,0.1)",  text: "#16a34a", label: "Completed" },
++    graded:    { bg: "rgba(124,58,237,0.1)", text: "#7c3aed", label: "Graded"    },
++    upcoming:  { bg: "rgba(208,174,97,0.12)", text: "#d0ae61", label: "Upcoming"  },
++  };
+ 
+   return (
+     <div className="space-y-6 animate-fade-in">
+-      <div className="flex items-center justify-between">
++      {/* ── Page Header ──────────────────────────────────────── */}
++      <div className="flex items-start justify-between flex-wrap gap-3">
+         <div>
+-          <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
+-            Classrooms
++          <h1
++            className="text-2xl font-bold"
++            style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}
++          >
++            Classroom Management
+           </h1>
+           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
+-            Manage your courses, resources, and student announcements.
++            Manage courses, assignments, and monitor student progress across all your classrooms.
+           </p>
+         </div>
+-        <button className="btn btn-primary text-sm">
+-          <Plus size={15} /> New Classroom
+-        </button>
++        <div className="flex gap-2">
++          <button
++            className="btn btn-outline text-xs"
++            onClick={() => setShowNewAssignment(true)}
++          >
++            <ClipboardList size={14} /> Add Assignment
++          </button>
++          <button
++            className="btn btn-primary text-xs"
++            onClick={() => setShowNewClassroom(true)}
++          >
++            <Plus size={14} /> Create Classroom
++          </button>
++        </div>
+       </div>
+ 
++      {/* ── Summary Stats ────────────────────────────────────── */}
++      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
++        {[
++          { label: "Total Classrooms", value: classrooms.length, icon: BookOpen, color: "#264796", bg: "rgba(38,71,150,0.1)" },
++          { label: "Total Students",   value: classrooms.reduce((s, c) => s + c.students, 0), icon: Users, color: "#d0ae61", bg: "rgba(208,174,97,0.12)" },
++          { label: "Active Assignments", value: assignments.filter(a => a.status === "active").length, icon: ClipboardList, color: "#2563eb", bg: "rgba(37,99,235,0.1)" },
++          { label: "Avg. Progress",    value: `${Math.round(classrooms.reduce((s, c) => s + c.progress, 0) / classrooms.length)}%`, icon: TrendingUp, color: "#16a34a", bg: "rgba(22,163,74,0.1)" },
++        ].map(stat => (
++          <GlassCard key={stat.label} className="p-4">
++            <div className="flex items-center justify-between mb-2">
++              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: stat.bg }}>
++                <stat.icon size={18} style={{ color: stat.color }} />
++              </div>
++            </div>
++            <p className="stat-number text-xl">{stat.value}</p>
++            <p className="text-[11px] font-medium mt-0.5" style={{ color: "var(--color-text-muted)" }}>{stat.label}</p>
++          </GlassCard>
++        ))}
++      </div>
++
++      {/* ── Main Content Grid ────────────────────────────────── */}
+       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+-        {/* ── Course List ─────────────────────── */}
++
++        {/* Left — Course List */}
+         <div className="space-y-3">
+           <div className="relative">
+             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+@@ -91,26 +163,42 @@
+           {filtered.map(c => (
+             <div
+               key={c.id}
+-              onClick={() => setSelectedCourse(c)}
++              onClick={() => setSelectedId(c.id)}
+               className={`glass-card p-4 cursor-pointer transition-all duration-200 border-l-4 ${
+-                selectedCourse.id === c.id ? "border-l-[#264796] shadow-lg shadow-blue-100" : "border-l-transparent hover:shadow-md"
++                selectedId === c.id
++                  ? "shadow-lg"
++                  : "border-l-transparent hover:shadow-md"
+               }`}
++              style={{
++                borderLeftColor: selectedId === c.id ? c.color : undefined,
++              }}
+             >
+               <div className="flex items-start justify-between gap-2">
+                 <div className="min-w-0">
+-                  <span className="text-[10px] font-bold tracking-wider uppercase" style={{ color: "var(--color-text-muted)" }}>{c.code}</span>
+-                  <p className="font-semibold text-sm mt-0.5 leading-snug" style={{ color: "var(--color-text-primary)" }}>{c.name}</p>
++                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: c.color }}>{c.code}</span>
++                  <p className="font-semibold text-sm mt-0.5" style={{ color: "var(--color-text-primary)" }}>{c.name}</p>
+                   <p className="text-[11px] mt-1" style={{ color: "var(--color-text-muted)" }}>
+-                    Batch {c.batch} · {c.students} students
++                    {c.batch} · {c.students} students
+                   </p>
+                 </div>
+-                <ChevronRight size={16} className={`shrink-0 mt-1 transition-transform ${selectedCourse.id === c.id ? "text-blue-600 rotate-90" : "text-slate-300"}`} />
++                <ChevronRight
++                  size={16}
++                  className={`mt-1 transition-transform ${selectedId === c.id ? "rotate-90" : ""}`}
++                  style={{ color: selectedId === c.id ? c.color : "var(--color-text-muted)" }}
++                />
+               </div>
++
+               <div className="mt-3 space-y-1.5">
+                 <div className="progress-bar">
+-                  <div className="progress-fill" style={{ width: `${c.progress}%`, background: `linear-gradient(90deg,${c.color},${c.color}bb)` }} />
++                  <div
++                    className="progress-fill"
++                    style={{
++                      width: `${c.progress}%`,
++                      background: `linear-gradient(90deg,${c.color},${c.color}bb)`,
++                    }}
++                  />
+                 </div>
+-                <div className="flex items-center justify-between text-[10px]" style={{ color: "var(--color-text-muted)" }}>
++                <div className="flex justify-between text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+                   <span className="flex items-center gap-1"><Clock size={10} /> {c.nextClass}</span>
+                   <span className="font-semibold" style={{ color: c.color }}>{c.progress}% complete</span>
+                 </div>
+@@ -119,59 +207,52 @@
+           ))}
+         </div>
+ 
+-        {/* ── Course Detail ───────────────────── */}
++        {/* Right — Course Detail */}
+         <div className="xl:col-span-2 space-y-4">
+-          {/* Header Card */}
+-          <div className="rounded-2xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${selectedCourse.color} 0%, ${selectedCourse.color}cc 100%)` }}>
+-            <div className="p-6 text-white relative overflow-hidden">
+-              <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/5" />
+-              <div className="absolute -right-4 bottom-0 w-24 h-24 rounded-full bg-white/5" />
+-              <div className="flex items-start justify-between relative">
++
++          {/* Detail Header */}
++          <div
++            className="rounded-2xl overflow-hidden relative"
++            style={{ background: `linear-gradient(135deg, ${selected.color} 0%, ${selected.color}cc 100%)` }}
++          >
++            <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/10" />
++            <div className="absolute -right-4 -bottom-10 w-28 h-28 rounded-full bg-white/5" />
++            <div className="p-6 text-white relative z-10">
++              <div className="flex justify-between items-start">
+                 <div>
+-                  <div className="flex items-center gap-2 mb-2">
+-                    <span className="badge text-[10px] px-2 py-0.5" style={{ background: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.9)" }}>
+-                      {selectedCourse.code}
+-                    </span>
+-                    <span className="badge text-[10px] px-2 py-0.5" style={{ background: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.9)" }}>
+-                      Batch {selectedCourse.batch}
+-                    </span>
+-                  </div>
+-                  <h2 className="text-xl font-bold mb-1">{selectedCourse.name}</h2>
+-                  <p className="text-white/70 text-sm">{selectedCourse.description}</p>
++                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">{selected.code}</span>
++                  <h2 className="text-xl font-bold mt-0.5">{selected.name}</h2>
++                  <p className="text-sm opacity-80 mt-1 max-w-lg">{selected.description}</p>
+                 </div>
+-                <button className="btn text-white/80 hover:text-white hover:bg-white/10 p-2">
+-                  <MoreHorizontal size={18} />
++                <button className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
++                  <MoreVertical size={16} />
+                 </button>
+               </div>
+-              {/* Stats Row */}
+-              <div className="flex gap-6 mt-5 pt-4 border-t border-white/15">
+-                {[
+-                  { icon: Users, label: `${selectedCourse.students} Students` },
+-                  { icon: Bell, label: `${selectedCourse.announcements} Announcements` },
+-                  { icon: Paperclip, label: `${selectedCourse.resources} Resources` },
+-                  { icon: Calendar, label: selectedCourse.nextClass },
+-                ].map(item => (
+-                  <div key={item.label} className="flex items-center gap-1.5 text-white/80 text-xs font-medium">
+-                    <item.icon size={13} />
+-                    {item.label}
+-                  </div>
+-                ))}
++              <div className="flex flex-wrap gap-5 mt-5 text-xs">
++                <div className="flex items-center gap-1.5"><Users size={14} /> {selected.students} Students</div>
++                <div className="flex items-center gap-1.5"><ClipboardList size={14} /> {classAssignments.length} Assignments</div>
++                <div className="flex items-center gap-1.5"><Calendar size={14} /> {selected.nextClass}</div>
++                <div className="flex items-center gap-1.5"><BarChart2 size={14} /> {selected.progress}% Progress</div>
+               </div>
+             </div>
+           </div>
+ 
+           {/* Tabs */}
+           <GlassCard padding="none">
+-            <div className="flex border-b" style={{ borderColor: "rgba(38,71,150,0.1)" }}>
+-              {(["announcements", "resources", "students"] as const).map(tab => (
++            <div className="flex border-b" style={{ borderColor: "var(--color-border)" }}>
++              {(["assignments", "students", "analytics"] as const).map(tab => (
+                 <button
+                   key={tab}
+                   onClick={() => setActiveTab(tab)}
+-                  className={`px-5 py-3.5 text-sm font-semibold capitalize transition-colors ${
++                  className={`px-5 py-3 text-sm font-semibold capitalize transition-colors ${
+                     activeTab === tab
+-                      ? "border-b-2 border-[#264796] text-[#264796]"
+-                      : "text-slate-400 hover:text-slate-700"
++                      ? "border-b-2"
++                      : ""
+                   }`}
++                  style={{
++                    borderColor: activeTab === tab ? selected.color : "transparent",
++                    color: activeTab === tab ? "var(--color-text-primary)" : "var(--color-text-muted)",
++                  }}
+                 >
+                   {tab}
+                 </button>
+@@ -179,100 +260,262 @@
+             </div>
+ 
+             <div className="p-5">
+-              {/* Announcements */}
+-              {activeTab === "announcements" && (
++
++              {/* Assignments Tab */}
++              {activeTab === "assignments" && (
+                 <div className="space-y-3">
+-                  <div className="flex justify-end">
+-                    <button className="btn btn-primary text-xs">
+-                      <Plus size={13} /> Post Announcement
+-                    </button>
+-                  </div>
+-                  {announcements.map(a => (
+-                    <div key={a.id} className="p-4 rounded-xl border transition-colors hover:shadow-sm"
+-                      style={{ borderColor: "rgba(38,71,150,0.12)", background: a.pinned ? "rgba(38,71,150,0.03)" : "transparent" }}>
+-                      <div className="flex items-start justify-between gap-2">
+-                        <div className="flex items-start gap-2">
+-                          {a.pinned && <Star size={13} className="text-yellow-500 mt-0.5 shrink-0" />}
+-                          <div>
+-                            <p className="font-semibold text-sm" style={{ color: "var(--color-text-primary)" }}>{a.title}</p>
+-                            <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{a.body}</p>
++                  {classAssignments.length === 0 ? (
++                    <div className="text-center py-12">
++                      <ClipboardList size={40} className="mx-auto mb-3" style={{ color: "var(--color-text-muted)" }} />
++                      <p className="font-semibold" style={{ color: "var(--color-text-secondary)" }}>No assignments yet</p>
++                      <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
++                        Click "Add Assignment" to create one for this class.
++                      </p>
++                    </div>
++                  ) : (
++                    classAssignments.map(a => {
++                      const sc = statusColors[a.status];
++                      const pct = Math.round((a.submitted / a.total) * 100);
++                      return (
++                        <div
++                          key={a.id}
++                          className="flex items-center gap-4 p-4 rounded-xl border transition-colors cursor-pointer"
++                          style={{ borderColor: "var(--color-border)" }}
++                          onMouseEnter={e => (e.currentTarget.style.background = "var(--color-bg-grad1)")}
++                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
++                        >
++                          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: sc.bg }}>
++                            {a.status === "completed" || a.status === "graded"
++                              ? <CheckCircle2 size={18} style={{ color: sc.text }} />
++                              : a.status === "upcoming"
++                                ? <Calendar size={18} style={{ color: sc.text }} />
++                                : <FileText size={18} style={{ color: sc.text }} />}
+                           </div>
+-                        </div>
+-                        <span className="text-[10px] shrink-0" style={{ color: "var(--color-text-muted)" }}>{a.time}</span>
+-                      </div>
+-                    </div>
+-                  ))}
++                          <div className="flex-1 min-w-0">
++                            <p className="font-semibold text-sm" style={{ color: "var(--color-text-primary)" }}>{a.name}</p>
++                            <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
++                              Due: {a.due} · {a.submitted}/{a.total} submitted ({pct}%)
++                            </p>
++                            <div className="progress-bar mt-2">
++                              <div className="progress-fill" style={{ width: `${pct}%`, background: sc.text }} />
++                            </div>
++                          </div>
++                          <span
++                            className="badge text-[10px] px-2.5 py-1 rounded-full font-bold shrink-0"
++                            style={{ background: sc.bg, color: sc.text }}
++                          >
++                            {sc.label}
++                          </span>
++                        </div>
++                      );
++                    })
++                  )}
+                 </div>
+               )}
+ 
+-              {/* Resources */}
+-              {activeTab === "resources" && (
++              {/* Students Tab */}
++              {activeTab === "students" && (
+                 <div className="space-y-3">
+-                  <div className="flex justify-end">
+-                    <button className="btn btn-primary text-xs">
+-                      <Plus size={13} /> Upload Resource
+-                    </button>
++                  <div className="flex items-center justify-between mb-2">
++                    <p className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
++                      Showing top performers in {selected.code}
++                    </p>
++                    <span className="badge badge-blue text-[10px]">{selected.students} enrolled</span>
+                   </div>
+-                  {resources.map(r => (
+-                    <div key={r.id} className="flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer hover:shadow-sm transition-all group"
+-                      style={{ borderColor: "rgba(38,71,150,0.1)" }}>
+-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+-                        style={{ background: "rgba(38,71,150,0.07)" }}>
+-                        {typeIcon[r.type]}
++                  {topStudents.map((s, i) => (
++                    <div
++                      key={s.roll}
++                      className="flex items-center gap-3 p-3 rounded-xl border transition-colors"
++                      style={{ borderColor: "var(--color-border)" }}
++                      onMouseEnter={e => (e.currentTarget.style.background = "var(--color-bg-grad1)")}
++                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
++                    >
++                      <div
++                        className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
++                        style={{ background: `linear-gradient(135deg,${selected.color},${selected.color}bb)` }}
++                      >
++                        {i + 1}
+                       </div>
+                       <div className="flex-1 min-w-0">
+-                        <p className="text-sm font-medium truncate group-hover:text-blue-700 transition-colors" style={{ color: "var(--color-text-primary)" }}>
+-                          {r.name}
+-                        </p>
+-                        <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+-                          {r.size && <>{r.size} · </>}{r.date}
+-                        </p>
+-                      </div>
+-                      <ChevronRight size={15} className="text-slate-300 group-hover:text-blue-500 shrink-0 transition-colors" />
+-                    </div>
+-                  ))}
++                        <p className="font-semibold text-sm" style={{ color: "var(--color-text-primary)" }}>{s.name}</p>
++                        <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{s.roll} · Attendance: {s.attendance}%</p>
++                      </div>
++                      <div className="text-right shrink-0">
++                        <p className="font-bold text-sm" style={{ color: selected.color }}>{s.avg}%</p>
++                        <div className="flex items-center gap-0.5 justify-end">
++                          <TrendingUp
++                            size={11}
++                            style={{
++                              color: s.trend === "up" ? "#16a34a" : "#dc2626",
++                              transform: s.trend === "down" ? "scaleY(-1)" : undefined,
++                            }}
++                          />
++                          <span className="text-[9px] font-semibold" style={{ color: s.trend === "up" ? "#16a34a" : "#dc2626" }}>
++                            {s.trend === "up" ? "Rising" : "Falling"}
++                          </span>
++                        </div>
++                      </div>
++                    </div>
++                  ))}
++                </div>
++              )}
++
++              {/* Analytics Tab */}
++              {activeTab === "analytics" && (
++                <div className="space-y-5">
++                  {/* Progress overview */}
++                  <div>
++                    <p className="text-xs font-semibold mb-3" style={{ color: "var(--color-text-muted)" }}>Course Completion by Section</p>
++                    <div className="space-y-3">
++                      {[
++                        { section: "Lectures Delivered",      pct: selected.progress, color: selected.color },
++                        { section: "Assignments Completed",   pct: Math.min(selected.progress + 10, 100), color: "#2563eb" },
++                        { section: "Lab Sessions Completed",  pct: Math.max(selected.progress - 15, 20), color: "#d0ae61" },
++                        { section: "Students Above 75%",      pct: 72, color: "#16a34a" },
++                      ].map(row => (
++                        <div key={row.section}>
++                          <div className="flex justify-between text-xs mb-1">
++                            <span style={{ color: "var(--color-text-secondary)" }}>{row.section}</span>
++                            <span className="font-bold" style={{ color: row.color }}>{row.pct}%</span>
++                          </div>
++                          <div className="progress-bar">
++                            <div className="progress-fill" style={{ width: `${row.pct}%`, background: row.color }} />
++                          </div>
++                        </div>
++                      ))}
++                    </div>
++                  </div>
++
++                  {/* Quick Stats */}
++                  <div className="grid grid-cols-3 gap-3">
++                    {[
++                      { label: "Avg. Score", value: "78%", icon: BarChart2, color: selected.color },
++                      { label: "At-Risk",    value: "4",   icon: AlertCircle, color: "#dc2626" },
++                      { label: "Attendance", value: "89%", icon: Users, color: "#16a34a" },
++                    ].map(q => (
++                      <div
++                        key={q.label}
++                        className="p-3 rounded-xl border text-center"
++                        style={{ borderColor: "var(--color-border)" }}
++                      >
++                        <q.icon size={18} className="mx-auto mb-1.5" style={{ color: q.color }} />
++                        <p className="font-bold text-lg" style={{ color: "var(--color-text-primary)" }}>{q.value}</p>
++                        <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{q.label}</p>
++                      </div>
++                    ))}
++                  </div>
++                </div>
++              )}
++            </div>
++          </GlassCard>
++        </div>
++      </div>
++
++      {/* ── Create Classroom Modal ───────────────────────────── */}
++      {showNewClassroom && (
++        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 animate-fade-in">
++          <GlassCard className="w-full max-w-md p-6 relative">
++            <button
++              onClick={() => setShowNewClassroom(false)}
++              className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 transition-colors"
++              style={{ color: "var(--color-text-muted)" }}
++            >
++              <X size={18} />
++            </button>
++            <h3 className="text-lg font-bold mb-1" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>
++              Create New Classroom
++            </h3>
++            <p className="text-xs mb-5" style={{ color: "var(--color-text-muted)" }}>
++              Fill in the details to set up a new course.
++            </p>
++            <div className="space-y-3">
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Course Code</label>
++                <input className="form-input text-sm" placeholder="e.g. CSC601" />
++              </div>
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Course Name</label>
++                <input className="form-input text-sm" placeholder="e.g. Machine Learning Fundamentals" />
++              </div>
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Batch</label>
++                  <input className="form-input text-sm" placeholder="e.g. 2026-A" />
+                 </div>
+-              )}
+-
+-              {/* Students */}
+-              {activeTab === "students" && (
+-                <div className="space-y-2">
+-                  {Array.from({ length: 6 }, (_, i) => ({
+-                    name: ["Arjun Mehta", "Priya Sharma", "Rohan Verma", "Sneha Patil", "Kiran Nair", "Anjali Singh"][i],
+-                    roll: `2226CSC${100 + i}`,
+-                    attendance: [42, 88, 76, 91, 65, 95][i],
+-                    avgScore: [58, 72, 56, 81, 69, 93][i],
+-                  })).map(s => (
+-                    <div key={s.roll} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors">
+-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+-                        style={{ background: "linear-gradient(135deg,#264796,#3460c4)" }}>
+-                        {s.name.charAt(0)}
+-                      </div>
+-                      <div className="flex-1 min-w-0">
+-                        <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{s.name}</p>
+-                        <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{s.roll}</p>
+-                      </div>
+-                      <div className="flex items-center gap-4 text-xs">
+-                        <div className="text-center">
+-                          <p className="font-bold" style={{ color: s.attendance < 75 ? "#dc2626" : "#16a34a" }}>{s.attendance}%</p>
+-                          <p style={{ color: "var(--color-text-muted)" }}>Attendance</p>
+-                        </div>
+-                        <div className="text-center">
+-                          <p className="font-bold" style={{ color: "var(--color-text-primary)" }}>{s.avgScore}%</p>
+-                          <p style={{ color: "var(--color-text-muted)" }}>Avg Score</p>
+-                        </div>
+-                      </div>
+-                      <span className={`badge text-[9px] px-2 ${s.attendance < 75 ? "badge-red" : "badge-green"}`}>
+-                        {s.attendance < 75 ? "At Risk" : "Good"}
+-                      </span>
+-                    </div>
+-                  ))}
+-                </div>
+-              )}
++                <div>
++                  <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Max Students</label>
++                  <input className="form-input text-sm" type="number" placeholder="50" />
++                </div>
++              </div>
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Description</label>
++                <textarea className="form-input text-sm" rows={3} placeholder="Brief course description..." />
++              </div>
++            </div>
++            <div className="flex gap-2 mt-5 justify-end">
++              <button className="btn btn-outline text-xs" onClick={() => setShowNewClassroom(false)}>Cancel</button>
++              <button className="btn btn-primary text-xs" onClick={() => setShowNewClassroom(false)}>
++                <Plus size={14} /> Create Classroom
++              </button>
++            </div>
++          </GlassCard>
++        </div>
++      )}
++
++      {/* ── Add Assignment Modal ─────────────────────────────── */}
++      {showNewAssignment && (
++        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 animate-fade-in">
++          <GlassCard className="w-full max-w-md p-6 relative">
++            <button
++              onClick={() => setShowNewAssignment(false)}
++              className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 transition-colors"
++              style={{ color: "var(--color-text-muted)" }}
++            >
++              <X size={18} />
++            </button>
++            <h3 className="text-lg font-bold mb-1" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>
++              Add New Assignment
++            </h3>
++            <p className="text-xs mb-5" style={{ color: "var(--color-text-muted)" }}>
++              Create and assign work to a specific classroom.
++            </p>
++            <div className="space-y-3">
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Classroom</label>
++                <select className="form-input text-sm">
++                  {classrooms.map(c => (
++                    <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
++                  ))}
++                </select>
++              </div>
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Assignment Title</label>
++                <input className="form-input text-sm" placeholder="e.g. Lab 5: Convolutional Networks" />
++              </div>
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Due Date</label>
++                  <input className="form-input text-sm" type="date" />
++                </div>
++                <div>
++                  <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Max Marks</label>
++                  <input className="form-input text-sm" type="number" placeholder="100" />
++                </div>
++              </div>
++              <div>
++                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--color-text-secondary)" }}>Instructions</label>
++                <textarea className="form-input text-sm" rows={3} placeholder="Assignment instructions and guidelines..." />
++              </div>
++            </div>
++            <div className="flex gap-2 mt-5 justify-end">
++              <button className="btn btn-outline text-xs" onClick={() => setShowNewAssignment(false)}>Cancel</button>
++              <button className="btn btn-primary text-xs" onClick={() => setShowNewAssignment(false)}>
++                <ClipboardList size={14} /> Create Assignment
++              </button>
+             </div>
+           </GlassCard>
+         </div>
+-      </div>
++      )}
+     </div>
+   );
+-};
++};
+\ No newline at end of file
+Index: node_modules/@eduai/edugames/src/router/index.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import React from \"react\";\r\nimport { createBrowserRouter } from \"react-router-dom\";\r\nimport { StudentShell } from \"../layouts/StudentShell\";\r\nimport { StudentDashboard } from \"../features/dashboard/StudentDashboard\";\r\nimport { StudentClassrooms } from \"../features/classroom/StudentClassrooms\";\r\nimport { StudentExams } from \"../features/exam/StudentExams\";\r\nimport { AuthPage } from \"../features/auth/AuthPage\";\r\nimport { GamesPage } from \"../features/games/GamesPage\";\r\n\r\nexport const router = createBrowserRouter([\r\n  {\r\n    path: \"/login\",\r\n    element: <AuthPage />,\r\n  },\r\n  {\r\n    path: \"/\",\r\n    element: <StudentShell />,\r\n    children: [\r\n      { index: true,            element: <StudentDashboard /> },\r\n      { path: \"classroom\",      element: <StudentClassrooms />},\r\n      { path: \"exams\",          element: <StudentExams />     },\r\n      { path: \"games\",          element: <GamesPage />        },\r\n    ],\r\n  },\r\n]);\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/node_modules/@eduai/edugames/src/router/index.tsx b/node_modules/@eduai/edugames/src/router/index.tsx
+--- a/node_modules/@eduai/edugames/src/router/index.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/node_modules/@eduai/edugames/src/router/index.tsx	(date 1776163827535)
+@@ -6,6 +6,7 @@
+ import { StudentExams } from "../features/exam/StudentExams";
+ import { AuthPage } from "../features/auth/AuthPage";
+ import { GamesPage } from "../features/games/GamesPage";
++import { ConstructionPage } from "../shared/components/ConstructionPage";
+ 
+ export const router = createBrowserRouter([
+   {
+@@ -20,6 +21,11 @@
+       { path: "classroom",      element: <StudentClassrooms />},
+       { path: "exams",          element: <StudentExams />     },
+       { path: "games",          element: <GamesPage />        },
++      { path: "*",              element: <ConstructionPage /> },
+     ],
+   },
++  {
++    path: "*",
++    element: <ConstructionPage />
++  }
+ ]);
+Index: node_modules/@eduai/teacherbuddy/src/features/dashboard/DashboardPage.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import React from \"react\";\r\nimport {\r\n  Users, BrainCircuit, AlertTriangle, TrendingUp, BookOpen,\r\n  Clock, ArrowRight, Activity, Star, Calendar, CheckCircle2,\r\n  Zap, BarChart2,\r\n} from \"lucide-react\";\r\nimport { GlassCard } from \"../../shared/components/GlassCard\";\r\nimport { Link } from \"react-router-dom\";\r\n\r\nconst stats = [\r\n  { label: \"Active Students\",       value: \"1,284\", delta: \"+12%\",  icon: Users,        color: \"#264796\", bg: \"rgba(38,71,150,0.1)\",  accent: \"border-l-[#264796]\"  },\r\n  { label: \"AI Evaluations Done\",   value: \"452\",   delta: \"+28%\",  icon: BrainCircuit, color: \"#d0ae61\", bg: \"rgba(208,174,97,0.12)\", accent: \"border-l-[#d0ae61]\"  },\r\n  { label: \"Risk Alerts\",           value: \"12\",    delta: \"−3\",    icon: AlertTriangle, color: \"#dc2626\",bg: \"rgba(220,38,38,0.1)\",  accent: \"border-l-red-500\"     },\r\n  { label: \"Avg. Score Improvement\",value: \"+14%\",  delta: \"vs last month\", icon: TrendingUp, color: \"#16a34a\", bg: \"rgba(22,163,74,0.1)\",accent: \"border-l-green-500\" },\r\n];\r\n\r\nconst classrooms = [\r\n  { code: \"CSC401\", name: \"Advanced Neural Networks\", batch: \"Batch 2026-A\", students: 42, time: \"2:00 PM\", progress: 68 },\r\n  { code: \"CSC312\", name: \"Data Structures & Algorithms\", batch: \"Batch 2025-B\", students: 38, time: \"10:00 AM\", progress: 82 },\r\n  { code: \"CSC501\", name: \"Cloud Computing & DevOps\", batch: \"Batch 2026-A\", students: 35, time: \"3:30 PM\", progress: 45 },\r\n  { code: \"CSC220\", name: \"Database Management Systems\", batch: \"Batch 2025-C\", students: 50, time: \"8:00 AM\", progress: 91 },\r\n];\r\n\r\nconst riskAlerts = [\r\n  { id: \"S4121\", name: \"Arjun Mehta\",   level: \"high\",     reason: \"Attendance dropped to 42%\",         score: 78 },\r\n  { id: \"S4122\", name: \"Priya Sharma\",  level: \"high\",     reason: \"3 consecutive exams below 40%\",     score: 82 },\r\n  { id: \"S4109\", name: \"Rohan Verma\",   level: \"moderate\", reason: \"2 missing assignment submissions\",  score: 61 },\r\n  { id: \"S4135\", name: \"Sneha Patil\",   level: \"moderate\", reason: \"Irregular attendance pattern\",      score: 55 },\r\n];\r\n\r\nconst recentActivity = [\r\n  { text: \"AI evaluated 55 subjective answers in CSC401\",          time: \"1h ago\",  icon: BrainCircuit, color: \"#264796\" },\r\n  { text: \"Priya Sharma submitted Neural Networks Mid-Term\",        time: \"2h ago\",  icon: CheckCircle2, color: \"#16a34a\" },\r\n  { text: \"Risk score updated for Batch 2026-A\",                    time: \"4h ago\",  icon: Activity,     color: \"#d0ae61\" },\r\n  { text: \"New course material uploaded to CSC501\",                 time: \"Yesterday\",icon: BookOpen,    color: \"#264796\" },\r\n];\r\n\r\nexport const DashboardPage: React.FC = () => {\r\n  return (\r\n    <div className=\"space-y-7 animate-fade-in\">\r\n      {/* Page Header */}\r\n      <div className=\"flex items-start justify-between\">\r\n        <div>\r\n          <h1 className=\"text-2xl font-bold\" style={{ color: \"var(--color-text-primary)\", fontFamily: \"var(--font-display)\" }}>\r\n            Good afternoon, Professor \uD83D\uDC4B\r\n          </h1>\r\n          <p className=\"text-sm mt-1\" style={{ color: \"var(--color-text-muted)\" }}>\r\n            Monday, 13 April 2026 — Here's your academic overview for today.\r\n          </p>\r\n        </div>\r\n        <div className=\"flex gap-2\">\r\n          <Link to=\"/exams\" className=\"btn btn-outline text-xs\">\r\n            <FileTextIcon size={13} /> Schedule Exam\r\n          </Link>\r\n          <Link to=\"/analytics\" className=\"btn btn-primary text-xs\">\r\n            <BarChart2 size={13} /> View Analytics\r\n          </Link>\r\n        </div>\r\n      </div>\r\n\r\n      {/* Stats Grid */}\r\n      <div className=\"grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4\">\r\n        {stats.map((stat, i) => (\r\n          <div\r\n            key={stat.label}\r\n            className={`glass-card p-5 border-l-4 ${stat.accent} animate-fade-in-up delay-${i}00`}\r\n          >\r\n            <div className=\"flex items-center justify-between mb-3\">\r\n              <div className=\"w-10 h-10 rounded-xl flex items-center justify-center\" style={{ background: stat.bg }}>\r\n                <stat.icon size={20} style={{ color: stat.color }} />\r\n              </div>\r\n              <span className=\"badge text-[10px] font-bold px-2 py-0.5 rounded-full\"\r\n                style={{\r\n                  background: stat.color === \"#dc2626\" ? \"rgba(220,38,38,0.1)\" : \"rgba(22,163,74,0.12)\",\r\n                  color: stat.color === \"#dc2626\" ? \"#dc2626\" : \"#16a34a\"\r\n                }}>\r\n                {stat.delta}\r\n              </span>\r\n            </div>\r\n            <p className=\"stat-number\">{stat.value}</p>\r\n            <p className=\"text-xs mt-1 font-medium\" style={{ color: \"var(--color-text-muted)\" }}>{stat.label}</p>\r\n          </div>\r\n        ))}\r\n      </div>\r\n\r\n      {/* Main Grid */}\r\n      <div className=\"grid grid-cols-1 xl:grid-cols-3 gap-6\">\r\n        {/* Classrooms */}\r\n        <div className=\"xl:col-span-2 space-y-4\">\r\n          <div className=\"flex items-center justify-between\">\r\n            <h2 className=\"section-title\">Ongoing Classrooms</h2>\r\n            <Link to=\"/classroom\" className=\"btn btn-ghost text-xs gap-1\">\r\n              View all <ArrowRight size={13} />\r\n            </Link>\r\n          </div>\r\n          <div className=\"grid sm:grid-cols-2 gap-4\">\r\n            {classrooms.map((cls, i) => (\r\n              <Link to=\"/classroom\" key={cls.code}>\r\n                <GlassCard interactive className={`animate-fade-in-up delay-${i % 3}00`}>\r\n                  <div className=\"gradient-blue rounded-xl mb-4 p-4 h-28 flex flex-col justify-between relative overflow-hidden\">\r\n                    <div className=\"absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-10 bg-white\" />\r\n                    <div className=\"absolute -right-2 -bottom-6 w-20 h-20 rounded-full opacity-8 bg-white\" />\r\n                    <div>\r\n                      <span className=\"badge text-[9px] px-2 py-0.5 rounded-full font-bold\"\r\n                        style={{ background: \"rgba(255,255,255,0.2)\", color: \"rgba(255,255,255,0.9)\" }}>\r\n                        {cls.batch}\r\n                      </span>\r\n                    </div>\r\n                    <div>\r\n                      <p className=\"text-white text-[10px] font-semibold uppercase tracking-widest opacity-70\">{cls.code}</p>\r\n                      <h3 className=\"text-white font-bold text-sm leading-snug mt-0.5\">{cls.name}</h3>\r\n                    </div>\r\n                  </div>\r\n                  <div className=\"space-y-3\">\r\n                    <div className=\"progress-bar\">\r\n                      <div className=\"progress-fill\" style={{ width: `${cls.progress}%` }} />\r\n                    </div>\r\n                    <div className=\"flex items-center justify-between text-xs\" style={{ color: \"var(--color-text-muted)\" }}>\r\n                      <div className=\"flex items-center gap-1.5\">\r\n                        <Users size={13} /> {cls.students} Students\r\n                      </div>\r\n                      <div className=\"flex items-center gap-1.5\">\r\n                        <Clock size={13} /> {cls.time}\r\n                      </div>\r\n                      <span className=\"font-semibold\" style={{ color: \"var(--color-brand-blue)\" }}>{cls.progress}%</span>\r\n                    </div>\r\n                  </div>\r\n                </GlassCard>\r\n              </Link>\r\n            ))}\r\n          </div>\r\n        </div>\r\n\r\n        {/* Right Column */}\r\n        <div className=\"space-y-4\">\r\n          {/* Upcoming */}\r\n          <GlassCard padding=\"sm\">\r\n            <div className=\"flex items-center gap-2 mb-3\">\r\n              <Calendar size={15} style={{ color: \"var(--color-brand-blue)\" }} />\r\n              <h3 className=\"section-title text-sm\">Today's Schedule</h3>\r\n            </div>\r\n            <div className=\"space-y-2.5\">\r\n              {[\r\n                { name: \"Neural Networks\", code: \"CSC401\", time: \"10:00 AM\", room: \"CS-Lab 3\",   status: \"upcoming\" },\r\n                { name: \"DSA Lecture\",     code: \"CSC312\", time: \"12:00 PM\", room: \"Seminar Hall\",status: \"live\"     },\r\n                { name: \"Cloud DevOps\",    code: \"CSC501\", time: \"3:30 PM\",  room: \"Online\",      status: \"upcoming\" },\r\n              ].map(s => (\r\n                <div key={s.name} className=\"flex items-center gap-3 p-2.5 rounded-lg border\"\r\n                  style={{ borderColor: \"var(--color-border)\", background: \"var(--color-bg-grad1)\" }}>\r\n                  <div className=\"flex flex-col items-center w-12 shrink-0\">\r\n                    <p className=\"text-[10px] font-bold\" style={{ color: \"var(--color-brand-blue)\" }}>{s.time.split(\" \")[0]}</p>\r\n                    <p className=\"text-[9px] opacity-60\">{s.time.split(\" \")[1]}</p>\r\n                  </div>\r\n                  <div className=\"flex-1 min-w-0\">\r\n                    <p className=\"text-xs font-semibold truncate\" style={{ color: \"var(--color-text-primary)\" }}>{s.name}</p>\r\n                    <p className=\"text-[10px]\" style={{ color: \"var(--color-text-muted)\" }}>{s.room}</p>\r\n                  </div>\r\n                  <span className={`badge text-[9px] px-1.5 py-0.5 ${s.status === \"live\" ? \"badge-green\" : \"badge-blue\"}`}>\r\n                    {s.status === \"live\" ? \"● Live\" : \"Soon\"}\r\n                  </span>\r\n                </div>\r\n              ))}\r\n            </div>\r\n          </GlassCard>\r\n\r\n          {/* Risk Alerts */}\r\n          <GlassCard padding=\"sm\">\r\n            <div className=\"flex items-center justify-between mb-3\">\r\n              <div className=\"flex items-center gap-2\">\r\n                <AlertTriangle size={15} className=\"text-red-500\" />\r\n                <h3 className=\"section-title text-sm\">AI Risk Alerts</h3>\r\n              </div>\r\n              <Link to=\"/analytics\" className=\"text-[10px] font-semibold\" style={{ color: \"var(--color-brand-blue)\" }}>\r\n                View all\r\n              </Link>\r\n            </div>\r\n            <div className=\"space-y-2\">\r\n              {riskAlerts.map(alert => (\r\n                <div key={alert.id} className=\"flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition-colors\"\r\n                  style={{}}\r\n                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-border)'}\r\n                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}\r\n                >\r\n                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${\r\n                    alert.level === \"high\" ? \"bg-red-100 text-red-700\" : \"bg-orange-100 text-orange-700\"\r\n                  }`}>\r\n                    {alert.name.charAt(0)}\r\n                  </div>\r\n                  <div className=\"flex-1 min-w-0\">\r\n                    <p className=\"text-xs font-semibold truncate\" style={{ color: \"var(--color-text-primary)\" }}>{alert.name}</p>\r\n                    <p className=\"text-[10px] leading-tight mt-0.5\" style={{ color: \"var(--color-text-muted)\" }}>{alert.reason}</p>\r\n                  </div>\r\n                  <div className=\"text-right shrink-0\">\r\n                    <span className={`badge text-[9px] px-1.5 py-0.5 ${alert.level === \"high\" ? \"badge-red\" : \"badge-orange\"}`}>\r\n                      {alert.score}\r\n                    </span>\r\n                  </div>\r\n                </div>\r\n              ))}\r\n            </div>\r\n            <Link to=\"/analytics\" className=\"btn btn-primary w-full mt-3 text-xs py-2\">\r\n              <Zap size={13} /> Run Global AI Analysis\r\n            </Link>\r\n          </GlassCard>\r\n\r\n          {/* Recent Activity */}\r\n          <GlassCard padding=\"sm\">\r\n            <div className=\"flex items-center gap-2 mb-3\">\r\n              <Activity size={15} style={{ color: \"var(--color-brand-blue)\" }} />\r\n              <h3 className=\"section-title text-sm\">Recent Activity</h3>\r\n            </div>\r\n            <div className=\"space-y-3\">\r\n              {recentActivity.map((act, i) => (\r\n                <div key={i} className=\"flex gap-2.5\">\r\n                  <div className=\"w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5\"\r\n                    style={{ background: `${act.color}15` }}>\r\n                    <act.icon size={13} style={{ color: act.color }} />\r\n                  </div>\r\n                  <div>\r\n                    <p className=\"text-[11px] leading-relaxed\" style={{ color: \"var(--color-text-secondary)\" }}>{act.text}</p>\r\n                    <p className=\"text-[10px] mt-0.5\" style={{ color: \"var(--color-text-muted)\" }}>{act.time}</p>\r\n                  </div>\r\n                </div>\r\n              ))}\r\n            </div>\r\n          </GlassCard>\r\n        </div>\r\n      </div>\r\n    </div>\r\n  );\r\n};\r\n\r\n// inline icon to avoid import mess\r\nconst FileTextIcon = ({ size }: { size: number }) => (\r\n  <svg width={size} height={size} viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\r\n    <path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\" />\r\n    <polyline points=\"14 2 14 8 20 8\" />\r\n    <line x1=\"16\" y1=\"13\" x2=\"8\" y2=\"13\" />\r\n    <line x1=\"16\" y1=\"17\" x2=\"8\" y2=\"17\" />\r\n    <polyline points=\"10 9 9 9 8 9\" />\r\n  </svg>\r\n);\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/node_modules/@eduai/teacherbuddy/src/features/dashboard/DashboardPage.tsx b/node_modules/@eduai/teacherbuddy/src/features/dashboard/DashboardPage.tsx
+--- a/node_modules/@eduai/teacherbuddy/src/features/dashboard/DashboardPage.tsx	(revision 0f52d188559c0a7707b01861567ad594536ca4c6)
++++ b/node_modules/@eduai/teacherbuddy/src/features/dashboard/DashboardPage.tsx	(date 1776163827537)
+@@ -89,13 +89,13 @@
+         <div className="xl:col-span-2 space-y-4">
+           <div className="flex items-center justify-between">
+             <h2 className="section-title">Ongoing Classrooms</h2>
+-            <Link to="/classroom" className="btn btn-ghost text-xs gap-1">
++            <Link to="/classrooms" className="btn btn-ghost text-xs gap-1">
+               View all <ArrowRight size={13} />
+             </Link>
+           </div>
+           <div className="grid sm:grid-cols-2 gap-4">
+             {classrooms.map((cls, i) => (
+-              <Link to="/classroom" key={cls.code}>
++              <Link to="/classrooms" key={cls.code}>
+                 <GlassCard interactive className={`animate-fade-in-up delay-${i % 3}00`}>
+                   <div className="gradient-blue rounded-xl mb-4 p-4 h-28 flex flex-col justify-between relative overflow-hidden">
+                     <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-10 bg-white" />
