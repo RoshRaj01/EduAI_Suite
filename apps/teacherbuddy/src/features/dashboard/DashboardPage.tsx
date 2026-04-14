@@ -89,13 +89,13 @@ export const DashboardPage: React.FC = () => {
         <div className="xl:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="section-title">Ongoing Classrooms</h2>
-            <Link to="/classroom" className="btn btn-ghost text-xs gap-1">
+            <Link to="/classrooms" className="btn btn-ghost text-xs gap-1">
               View all <ArrowRight size={13} />
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             {classrooms.map((cls, i) => (
-              <Link to="/classroom" key={cls.code}>
+              <Link to="/classrooms" key={cls.code}>
                 <GlassCard interactive className={`animate-fade-in-up delay-${i % 3}00`}>
                   <div className="gradient-blue rounded-xl mb-4 p-4 h-28 flex flex-col justify-between relative overflow-hidden">
                     <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-10 bg-white" />
