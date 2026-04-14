@@ -29,7 +29,7 @@ export const AuthPage: React.FC = () => {
   return (
     <div className="min-h-screen flex w-full">
       {/* ── Left Panel ── */}
-      <div className="hidden lg:flex w-1/2 flex-col justify-between p-12 relative overflow-hidden" style={{ background: "linear-gradient(135deg,#0f1e45 0%,#1c3570 50%,#264796 100%)" }}>
+      <div className="hidden lg:flex w-1/2 flex-col justify-between p-12 relative overflow-hidden" style={{ background: "linear-gradient(135deg,#1e0f45 0%,#351c70 50%,#682696 100%)" }}>
         {/* Decorative circles */}
         <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full" style={{ background: "rgba(208,174,97,0.08)" }} />
         <div className="absolute -bottom-20 -right-20 w-96 h-96 rounded-full" style={{ background: "rgba(38,71,150,0.25)" }} />
@@ -42,7 +42,7 @@ export const AuthPage: React.FC = () => {
               <img src={logo} alt="Christ University" className="w-full h-full object-contain" />
             </div>
             <div>
-              <p className="text-white font-black text-xl tracking-tight" style={{ fontFamily: "var(--font-display)" }}>EduAI Suite</p>
+              <p className="text-white font-black text-xl tracking-tight" style={{ fontFamily: "var(--font-display)" }}>EduGames</p>
               <p className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--color-brand-gold)" }}>
                 Christ (Deemed to be University)
               </p>
@@ -50,21 +50,22 @@ export const AuthPage: React.FC = () => {
           </div>
 
           <h1 className="text-4xl font-black text-white leading-tight mb-4" style={{ fontFamily: "var(--font-display)" }}>
-            Intelligence<br />
-            <span style={{ color: "var(--color-brand-gold)" }}>in Education.</span>
+            Play.<br />
+            Learn.<br />
+            <span style={{ color: "var(--color-brand-gold)" }}>Grow.</span>
           </h1>
           <p className="text-white/60 text-base leading-relaxed max-w-sm">
-            AI-powered academic management for faculty, students, and administrators at Christ University.
+            Interactive AI-powered learning games and wellbeing tools for students at Christ University.
           </p>
         </div>
 
         {/* Feature Highlights */}
         <div className="space-y-4 relative">
           {[
-            { emoji: "🧠", title: "AI Evaluation",  desc: "Automated subjective answer scoring with teacher review" },
-            { emoji: "⚠️",  title: "Risk Detection", desc: "Early warning system for student dropout risk" },
-            { emoji: "📊", title: "Live Analytics", desc: "Real-time performance dashboards and trend analysis" },
-            { emoji: "💚", title: "Wellbeing Zone", desc: "Breathing, focus timer, and mental health tools" },
+            { emoji: "🎮", title: "Play & Learn",  desc: "Master subjects through interactive mini-games" },
+            { emoji: "🏆",  title: "Leaderboards", desc: "Compete locally and earn reward badges" },
+            { emoji: "🎯", title: "Smart Quizzes", desc: "Adaptive challenges that adjust to your skill" },
+            { emoji: "💚", title: "Wellbeing Zone", desc: "Breathing, focus timer, and guided relaxation" },
           ].map(f => (
             <div key={f.title} className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base"
@@ -94,7 +95,7 @@ export const AuthPage: React.FC = () => {
                 <img src={logo} alt="Christ University" className="w-full h-full object-contain" />
               </div>
               <div>
-                <p className="font-black text-sm" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>EduAI Suite</p>
+                <p className="font-black text-sm" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>EduGames</p>
                 <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>Christ University</p>
               </div>
             </div>
@@ -102,10 +103,10 @@ export const AuthPage: React.FC = () => {
             {mode === "login" ? (
               <>
                 <h2 className="text-2xl font-black mb-1" style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
-                  Welcome back
+                  Welcome, Student!
                 </h2>
                 <p className="text-sm mb-6" style={{ color: "var(--color-text-muted)" }}>
-                  Sign in to your EduAI Suite account.
+                  Sign in to your EduGames account.
                 </p>
 
                 {/* Role Selector Removed: EduGames is Strictly Student Mode */}

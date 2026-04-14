@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { BookOpen, Gamepad2, LayoutDashboard, Clock, LogOut, ChevronRight, Menu, Moon, Sun, Bell, X, ShieldAlert } from "lucide-react";
 import logo from "../assets/logo (5).png";
@@ -14,9 +14,16 @@ const studentNavItems = [
 
 export const StudentShell: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
   const { isDark, toggleTheme } = useTheme();
-  const { setRole } = useAuthStore();
+  const { logout, role } = useAuthStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!role) navigate("/login");
+  }, [role, navigate]);
+
+  if (!role) return null;
 
   return (
     <div className="flex min-h-screen" style={{ background: "var(--color-surface-base)" }}>
@@ -52,7 +59,7 @@ export const StudentShell: React.FC = () => {
 
         {/* Bottom Links */}
         <div className="px-3 pb-4 border-t border-white/8 pt-3 space-y-1">
-          <button onClick={() => navigate("/login")} className="nav-item text-red-300/80 hover:text-red-200 hover:bg-red-500/10 w-full">
+          <button onClick={() => { logout(); navigate("/login"); }} className="nav-item text-red-300/80 hover:text-red-200 hover:bg-red-500/10 w-full">
             <LogOut size={19} className="shrink-0" />
             {sidebarOpen && <span>Logout</span>}
           </button>
@@ -72,8 +79,50 @@ export const StudentShell: React.FC = () => {
              <button onClick={toggleTheme} className="p-2 rounded-xl transition-all hover:bg-blue-50" style={{ color: "var(--color-text-muted)" }}>
                {isDark ? <Sun size={20} /> : <Moon size={20} />}
              </button>
-             <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow bg-emerald-500">
-                 AS
+             
+             {/* Profile */}
+             <div className="relative">
+               <button
+                 onClick={() => setProfileOpen(o => !o)}
+                 className="flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full transition-all hover:bg-slate-100 border border-slate-200/80"
+               >
+                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow bg-emerald-500">
+                     AS
+                 </div>
+                 <div className="hidden md:block text-left">
+                   <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>Aarav S.</p>
+                   <p className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>Student</p>
+                 </div>
+               </button>
+
+               {profileOpen && (
+                 <div className="glass-card absolute right-0 top-12 w-52 z-50 overflow-hidden animate-fade-in py-1">
+                   <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                     <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Aarav S.</p>
+                     <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>aarav.s@christuniversity.in</p>
+                     <span className="badge mt-2" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>Student</span>
+                   </div>
+                   {["View Profile", "Settings"].map(item => (
+                     <button key={item} 
+                       className="w-full text-left px-4 py-2.5 text-sm transition-colors"
+                       style={{ color: 'var(--color-text-secondary)' }}
+                       onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-brand-blue)'; e.currentTarget.style.backgroundColor = 'var(--color-border)' }}
+                       onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.backgroundColor = 'transparent' }}
+                     >
+                       {item}
+                     </button>
+                   ))}
+                   <div className="border-t mt-1" style={{ borderColor: 'var(--color-border)' }}>
+                     <button onClick={() => { logout(); navigate("/login"); }}
+                       className="w-full text-left px-4 py-2.5 text-sm text-red-500 transition-colors"
+                       onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                       onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                     >
+                       Sign Out
+                     </button>
+                   </div>
+                 </div>
+               )}
              </div>
           </div>
         </header>
@@ -82,6 +131,11 @@ export const StudentShell: React.FC = () => {
           <Outlet />
         </div>
       </main>
+
+      {/* Overlay to close dropdowns */}
+      {profileOpen && (
+        <div className="fixed inset-0 z-30" onClick={() => setProfileOpen(false)} />
+      )}
     </div>
   );
 };

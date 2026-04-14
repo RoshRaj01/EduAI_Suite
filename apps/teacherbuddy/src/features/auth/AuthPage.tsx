@@ -6,7 +6,7 @@ type Mode = "login" | "forgot";
 
 export const AuthPage: React.FC = () => {
   const [mode, setMode] = useState<Mode>("login");
-  const [role, setRole] = useState<"teacher" | "student" | "admin">("teacher");
+  const [role, setRole] = useState<"faculty" | "admin">("faculty");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -38,7 +38,7 @@ export const AuthPage: React.FC = () => {
               <img src={logo} alt="Christ University" className="w-full h-full object-contain" />
             </div>
             <div>
-              <p className="text-white font-black text-xl tracking-tight" style={{ fontFamily: "var(--font-display)" }}>EduAI Suite</p>
+              <p className="text-white font-black text-xl tracking-tight" style={{ fontFamily: "var(--font-display)" }}>TeacherBuddy</p>
               <p className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--color-brand-gold)" }}>
                 Christ (Deemed to be University)
               </p>
@@ -46,21 +46,21 @@ export const AuthPage: React.FC = () => {
           </div>
 
           <h1 className="text-4xl font-black text-white leading-tight mb-4" style={{ fontFamily: "var(--font-display)" }}>
-            Intelligence<br />
-            <span style={{ color: "var(--color-brand-gold)" }}>in Education.</span>
+            Empowering<br />
+            <span style={{ color: "var(--color-brand-gold)" }}>Educators.</span>
           </h1>
           <p className="text-white/60 text-base leading-relaxed max-w-sm">
-            AI-powered academic management for faculty, students, and administrators at Christ University.
+            AI-powered academic management and insight tools for faculty and administrators at Christ University.
           </p>
         </div>
 
         {/* Feature Highlights */}
         <div className="space-y-4 relative">
           {[
-            { emoji: "🧠", title: "AI Evaluation",  desc: "Automated subjective answer scoring with teacher review" },
-            { emoji: "⚠️",  title: "Risk Detection", desc: "Early warning system for student dropout risk" },
+            { emoji: "🧠", title: "AI Evaluation", desc: "Automated subjective answer scoring with teacher review" },
+            { emoji: "⚠️", title: "Risk Detection", desc: "Early warning system for student dropout risk" },
             { emoji: "📊", title: "Live Analytics", desc: "Real-time performance dashboards and trend analysis" },
-            { emoji: "💚", title: "Wellbeing Zone", desc: "Breathing, focus timer, and mental health tools" },
+            { emoji: "📚", title: "Content Studio", desc: "AI-generated lesson plans and interactive quizzes" },
           ].map(f => (
             <div key={f.title} className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base"
@@ -90,7 +90,7 @@ export const AuthPage: React.FC = () => {
                 <img src={logo} alt="Christ University" className="w-full h-full object-contain" />
               </div>
               <div>
-                <p className="font-black text-sm" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>EduAI Suite</p>
+                <p className="font-black text-sm" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>TeacherBuddy</p>
                 <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>Christ University</p>
               </div>
             </div>
@@ -98,15 +98,15 @@ export const AuthPage: React.FC = () => {
             {mode === "login" ? (
               <>
                 <h2 className="text-2xl font-black mb-1" style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
-                  Welcome back
+                  Faculty Portal
                 </h2>
                 <p className="text-sm mb-6" style={{ color: "var(--color-text-muted)" }}>
-                  Sign in to your EduAI Suite account.
+                  Sign in to your TeacherBuddy account.
                 </p>
 
                 {/* Role Selector */}
-                <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: "var(--color-bg-grad1)", border: "1px solid var(--color-border)" }}>
-                  {(["teacher", "student", "admin"] as const).map(r => (
+                <div className="flex gap-1 p-1 rounded-xl mb-6 hidden" style={{ background: "var(--color-bg-grad1)", border: "1px solid var(--color-border)" }}>
+                  {(["faculty", "admin"] as const).map(r => (
                     <button
                       key={r}
                       onClick={() => setRole(r)}
