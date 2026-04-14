@@ -1,15 +1,59 @@
-EduAI_Suite_SDD_v1.0 (1).docx
-sdd_extracted.txt
-edu.db
-/backend/venv/
-/implementation_plan.md
-# Python
+# ========================
+# 🐍 Python
+# ========================
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Virtual environment
+# Virtual environments
 venv/
+.venv/
+env/
 backend/venv/
 
-# Database (optional)
+# ========================
+# 🗄️ Database
+# ========================
 *.db
+*.sqlite3
+
+# ========================
+# 🌐 Node / Frontend
+# ========================
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# ========================
+# ⚙️ Environment files
+# ========================
+.env
+.env.local
+.env.*
+
+# ========================
+# 🧠 IDE / Editor
+# ========================
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ========================
+# 📝 Logs
+# ========================
+*.log
+
+# ========================
+# 📦 OS files
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# 📄 Project-specific (optional)
+# ========================
+sdd_extracted.txt
