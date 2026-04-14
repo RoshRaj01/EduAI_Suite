@@ -1,22 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  Users, Clock, Plus, Search, ChevronRight,
-} from "lucide-react";
-import { GlassCard } from "../../shared/components/GlassCard";
-
-const mockClassrooms = [
-  {
-    id: 1,
-    code: "CSC401",
-    name: "Advanced Neural Networks",
-    batch: "Batch 2026-A",
-    students: 42,
-    next_class: "Today, 2:00 PM",
-    progress: 68,
-    color: "#264796",
-    description: "Deep learning architectures",
-  },
-];
+import { Users, Clock, Plus } from "lucide-react";
 
 export const ClassroomsPage: React.FC = () => {
 
@@ -27,7 +10,7 @@ export const ClassroomsPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
 
-  // 🔥 NEW: Tabs
+  // 🔥 Tabs
   const [activeTab, setActiveTab] = useState<"home" | "announcements" | "students">("home");
 
   useEffect(() => {
@@ -38,8 +21,8 @@ export const ClassroomsPage: React.FC = () => {
           setClassrooms(data);
           setSelectedId(data[0].id);
         } else {
-          setClassrooms(mockClassrooms);
-          setSelectedId(mockClassrooms[0].id);
+          setClassrooms([]);
+          setSelectedId(null);
         }
       });
   }, []);
@@ -58,110 +41,113 @@ export const ClassroomsPage: React.FC = () => {
   }, [selectedId]);
 
   const selected = classrooms.find(c => c.id === selectedId);
-  if (!selected) return <div>Loading...</div>;
-
-  const filtered = classrooms.filter(
-    c => c.name.toLowerCase().includes(search.toLowerCase()) ||
-         c.code.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
 
-      <div className="flex justify-between">
+      {/* 🔥 HEADER ROW (TITLE + SEARCH SIDE BY SIDE) */}
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Classroom Management</h1>
-        <button className="btn btn-primary text-xs">
-          <Plus size={14} /> Create Classroom
-        </button>
+        <input
+          className="form-input w-72"
+          placeholder="Search..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {/* 🔥 MAIN GRID */}
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
-        {/* LEFT */}
-        <div>
-          <input
-            className="form-input mb-3"
-            placeholder="Search..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-
-          {filtered.map(c => (
-            <div
-              key={c.id}
-              onClick={() => setSelectedId(c.id)}
-              className="glass-card p-3 cursor-pointer mb-2"
-            >
-              <p>{c.code}</p>
-              <p>{c.name}</p>
-              <p>{c.next_class}</p>
-            </div>
-          ))}
+        {/* LEFT SIDEBAR (COURSES LIST) */}
+        <div className="space-y-2">
+          {classrooms
+            .filter(c =>
+              c.name.toLowerCase().includes(search.toLowerCase()) ||
+              c.code.toLowerCase().includes(search.toLowerCase())
+            )
+            .map(c => (
+              <div
+                key={c.id}
+                onClick={() => setSelectedId(c.id)}
+                className="glass-card p-3 cursor-pointer"
+              >
+                <p>{c.code}</p>
+                <p>{c.name}</p>
+                <p className="text-xs text-gray-500">{c.next_class}</p>
+              </div>
+            ))}
         </div>
 
-        {/* RIGHT */}
-        <div className="xl:col-span-2 space-y-4">
+        {/* RIGHT CONTENT (FULL WIDTH AREA) */}
+        <div className="xl:col-span-3 space-y-4">
 
-          {/* HEADER */}
-          <div className="p-4 rounded-xl bg-blue-100">
-            <h2 className="text-lg font-bold">{selected.name}</h2>
-            <p className="text-sm">{selected.description}</p>
-          </div>
+          {!selected ? (
+            <div>No data from backend</div>
+          ) : (
+            <>
+              {/* COURSE HEADER */}
+              <div className="p-4 rounded-xl bg-blue-100">
+                <h2 className="text-lg font-bold">{selected.name}</h2>
+                <p className="text-sm">{selected.description}</p>
+              </div>
 
-          {/* 🔥 TABS */}
-          <div className="flex gap-4 border-b pb-2">
-            {["home", "announcements", "students"].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                className={`text-sm font-semibold ${activeTab === tab ? "text-blue-600" : "text-gray-400"}`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+              {/* 🔥 CENTERED TABS */}
+              <div className="flex justify-center gap-6 border-b pb-2">
+                {["home", "announcements", "students"].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab as any)}
+                    className={`text-sm font-semibold ${activeTab === tab ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-400"}`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
 
-          {/* TAB CONTENT */}
+              {/* 🔥 FULL WIDTH CONTENT (CHANGES PER TAB) */}
+              <div className="p-4">
 
-          {/* HOME */}
-          {activeTab === "home" && (
-            <div>
-              <p><Users size={14} /> Students: {selected.students}</p>
-              <p><Clock size={14} /> Next Class: {selected.next_class}</p>
-              <p>Progress: {selected.progress}%</p>
-            </div>
-          )}
-
-          {/* ANNOUNCEMENTS */}
-          {activeTab === "announcements" && (
-            <div>
-              {assignments.length === 0 ? (
-                <p>No announcements</p>
-              ) : (
-                assignments.map((a: any) => (
-                  <div key={a.id} className="p-2 border rounded mb-2">
-                    <p className="font-semibold">{a.title}</p>
-                    <p className="text-sm">{a.body}</p>
+                {activeTab === "home" && (
+                  <div className="space-y-2">
+                    <p><Users size={14} /> Students: {selected.students}</p>
+                    <p><Clock size={14} /> Next Class: {selected.next_class}</p>
+                    <p>Progress: {selected.progress}%</p>
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                )}
 
-          {/* STUDENTS */}
-          {activeTab === "students" && (
-            <div>
-              {students.length === 0 ? (
-                <p>No students</p>
-              ) : (
-                students.map((s: any) => (
-                  <div key={s.id} className="p-2 border rounded mb-2">
-                    <p>{s.name}</p>
-                    <p className="text-sm">{s.roll}</p>
+                {activeTab === "announcements" && (
+                  <div className="space-y-2">
+                    {assignments.length === 0 ? (
+                      <p>No announcements</p>
+                    ) : (
+                      assignments.map((a: any) => (
+                        <div key={a.id} className="p-3 border rounded">
+                          <p className="font-semibold">{a.title}</p>
+                          <p className="text-sm">{a.body}</p>
+                        </div>
+                      ))
+                    )}
                   </div>
-                ))
-              )}
-            </div>
+                )}
+
+                {activeTab === "students" && (
+                  <div className="space-y-2">
+                    {students.length === 0 ? (
+                      <p>No students</p>
+                    ) : (
+                      students.map((s: any) => (
+                        <div key={s.id} className="p-3 border rounded">
+                          <p>{s.name}</p>
+                          <p className="text-sm">{s.roll}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+              </div>
+            </>
           )}
 
         </div>

@@ -17,7 +17,7 @@ course1 = Course(
     batch="2026-A",
     students=42,
     next_class="Today, 2:00 PM",
-    progress=68,
+    progress=88,
     color="#264796",
     description="Deep learning architectures"
 )
