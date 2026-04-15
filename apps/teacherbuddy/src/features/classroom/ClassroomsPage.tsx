@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip } from "lucide-react";
+import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle } from "lucide-react";
 
 const API_URL = "http://localhost:8000";
 
@@ -17,6 +17,7 @@ export const ClassroomsPage: React.FC = () => {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -48,111 +49,111 @@ export const ClassroomsPage: React.FC = () => {
   });
   const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
 
-  const fetchCourses = () => {
-    fetch(`${API_URL}/courses/`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setClassrooms(data);
-          if (data.length > 0 && !selectedId) setSelectedId(data[0].id);
-        } else {
-          setClassrooms([]);
-        }
-      });
+  const fetchCourses = async () => {
+    try {
+      const res = await fetch(`${API_URL}/courses/`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setClassrooms(data);
+        if (data.length > 0 && !selectedId) setSelectedId(data[0].id);
+      } else {
+        setClassrooms([]);
+      }
+    } catch {
+      setErrorMsg("Failed to connect to backend server.");
+    }
   };
 
-  const fetchCourseData = () => {
+  const fetchCourseData = async () => {
     if (!selectedId) return;
-    
-    fetch(`${API_URL}/announcements/${selectedId}`)
-      .then(res => res.json())
-      .then(data => setAnnouncements(Array.isArray(data) ? data : []));
-
-    fetch(`${API_URL}/students/${selectedId}`)
-      .then(res => res.json())
-      .then(data => setStudents(Array.isArray(data) ? data : []));
-
-    fetch(`${API_URL}/assignments/${selectedId}`)
-      .then(res => res.json())
-      .then(data => setAssignments(Array.isArray(data) ? data : []));
-
-    fetchCourses();
+    try {
+      const [ann, stu, asgn] = await Promise.all([
+        fetch(`${API_URL}/announcements/${selectedId}`).then(r => r.json()),
+        fetch(`${API_URL}/students/${selectedId}`).then(r => r.json()),
+        fetch(`${API_URL}/assignments/${selectedId}`).then(r => r.json())
+      ]);
+      setAnnouncements(Array.isArray(ann) ? ann : []);
+      setStudents(Array.isArray(stu) ? stu : []);
+      setAssignments(Array.isArray(asgn) ? asgn : []);
+      fetchCourses(); // to update student counts
+    } catch (e) {
+      setErrorMsg("Error fetching dynamic active class data.");
+    }
   };
 
-  useEffect(() => {
-    fetchCourses();
-  }, []);
+  useEffect(() => { fetchCourses(); }, []);
+  useEffect(() => { if (selectedId) fetchCourseData(); }, [selectedId]);
 
-  useEffect(() => {
-    if (selectedId) fetchCourseData();
-  }, [selectedId]);
+  const handleApiCall = async (action: () => Promise<Response>, onSuccess: () => void) => {
+    try {
+      const res = await action();
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
+      onSuccess();
+      setErrorMsg(null);
+    } catch (err: any) {
+      setErrorMsg("Database Error: Is your database schema corrupted or outdated? Please completely restart your terminal with 'uvicorn app.main:app' and delete edu.db! Detail: " + err.message);
+    }
+  };
 
-  const handleCreateCourse = async (e: React.FormEvent) => {
+  const handleCreateCourse = (e: React.FormEvent) => {
     e.preventDefault();
     const payload = { ...courseForm, students: 0, progress: 0.0 };
-    await fetch(`${API_URL}/courses/`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
-    });
-    setShowCourseModal(false);
-    setCourseForm({ code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796" });
-    fetchCourses();
+    handleApiCall(
+      () => fetch(`${API_URL}/courses/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+      () => { setShowCourseModal(false); setCourseForm({ code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796" }); fetchCourses(); }
+    );
   };
 
-  const handleDeleteCourse = async (id: number) => {
+  const handleDeleteCourse = (id: number) => {
     if (!window.confirm("Delete this entire course?")) return;
-    await fetch(`${API_URL}/courses/${id}`, { method: "DELETE" });
-    if (selectedId === id) setSelectedId(null);
-    fetchCourses();
+    handleApiCall(
+      () => fetch(`${API_URL}/courses/${id}`, { method: "DELETE" }),
+      () => { if (selectedId === id) setSelectedId(null); fetchCourses(); }
+    );
   };
 
-  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+  const handleCreateAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedId) return;
-    await fetch(`${API_URL}/announcements/${selectedId}`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(announcementForm)
-    });
-    setAnnouncementForm({ title: "", body: "", time: "Just now", pinned: false });
-    setShowAnnouncementModal(false);
-    fetchCourseData();
+    handleApiCall(
+      () => fetch(`${API_URL}/announcements/${selectedId}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(announcementForm) }),
+      () => { setAnnouncementForm({ title: "", body: "", time: "Just now", pinned: false }); setShowAnnouncementModal(false); fetchCourseData(); }
+    );
   };
 
-  const handleDeleteAnnouncement = async (id: number) => {
+  const handleDeleteAnnouncement = (id: number) => {
     if (!window.confirm("Delete announcement?")) return;
-    await fetch(`${API_URL}/announcements/${id}`, { method: "DELETE" });
-    fetchCourseData();
+    handleApiCall(() => fetch(`${API_URL}/announcements/${id}`, { method: "DELETE" }), fetchCourseData);
   };
 
-  const handleAddStudentManual = async (e: React.FormEvent) => {
+  const handleAddStudentManual = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedId) return;
-    await fetch(`${API_URL}/students/${selectedId}`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(studentForm)
-    });
-    setStudentForm({ name: "", email: "", registration_number: "", student_class: "", department: DEPARTMENTS[0] });
-    setShowStudentModal(false);
-    fetchCourseData();
+    handleApiCall(
+      () => fetch(`${API_URL}/students/${selectedId}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(studentForm) }),
+      () => { setStudentForm({ name: "", email: "", registration_number: "", student_class: "", department: DEPARTMENTS[0] }); setShowStudentModal(false); fetchCourseData(); }
+    );
   };
 
-  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0] || !selectedId) return;
     const file = e.target.files[0];
     const formData = new FormData();
     formData.append("file", file);
 
-    await fetch(`${API_URL}/students/bulk_upload/${selectedId}`, {
-      method: "POST", body: formData
-    });
-    setShowStudentModal(false);
-    fetchCourseData();
+    handleApiCall(
+      () => fetch(`${API_URL}/students/bulk_upload/${selectedId}`, { method: "POST", body: formData }),
+      () => { setShowStudentModal(false); fetchCourseData(); }
+    );
   };
 
-  const handleDeleteStudent = async (id: number) => {
+  const handleDeleteStudent = (id: number) => {
     if (!window.confirm("Remove student from this course?")) return;
-    await fetch(`${API_URL}/students/${id}`, { method: "DELETE" });
-    fetchCourseData();
+    handleApiCall(() => fetch(`${API_URL}/students/${id}`, { method: "DELETE" }), fetchCourseData);
   };
 
-  const handleCreateAssignment = async (e: React.FormEvent) => {
+  const handleCreateAssignment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedId) return;
 
@@ -161,148 +162,151 @@ export const ClassroomsPage: React.FC = () => {
     formData.append("description", assignmentForm.description);
     formData.append("due_date", assignmentForm.dueDate);
     formData.append("max_points", assignmentForm.maxPoints.toString());
-    if (assignmentFile) {
-      formData.append("file", assignmentFile);
-    }
+    if (assignmentFile) formData.append("file", assignmentFile);
 
-    await fetch(`${API_URL}/assignments/${selectedId}`, {
-      method: "POST", body: formData
-    });
-    
-    setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 });
-    setAssignmentFile(null);
-    setShowAssignmentModal(false);
-    fetchCourseData();
+    handleApiCall(
+      () => fetch(`${API_URL}/assignments/${selectedId}`, { method: "POST", body: formData }),
+      () => { setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); setAssignmentFile(null); setShowAssignmentModal(false); fetchCourseData(); }
+    );
   };
 
-  const handleDeleteAssignment = async (id: number) => {
+  const handleDeleteAssignment = (id: number) => {
     if (!window.confirm("Delete this assignment?")) return;
-    await fetch(`${API_URL}/assignments/${id}`, { method: "DELETE" });
-    fetchCourseData();
+    handleApiCall(() => fetch(`${API_URL}/assignments/${id}`, { method: "DELETE" }), fetchCourseData);
   };
-
 
   const selected = classrooms.find(c => c.id === selectedId);
 
+  // Common Modal Input Style Class
+  const premiumInput = "w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 mt-1 text-sm focus:ring-2 focus:ring-brand-blue/50 focus:border-brand-blue outline-none transition-all placeholder:text-slate-400";
+  const premiumLabel = "text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 pl-1";
+
   return (
     <div className="space-y-4">
+      {errorMsg && (
+        <div className="p-4 bg-red-100 border border-red-400/50 text-red-700 rounded-xl flex items-start gap-3 shadow-sm scale-100 transition-all">
+           <AlertCircle size={20} className="shrink-0 mt-0.5" />
+           <p className="text-sm font-semibold">{errorMsg}</p>
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Classroom Management</h1>
-          <button onClick={() => setShowCourseModal(true)} className="btn btn-primary btn-sm flex items-center gap-2">
+          <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Classroom Management</h1>
+          <button onClick={() => setShowCourseModal(true)} className="btn bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 btn-sm flex items-center gap-2 rounded-xl transition-all hover:-translate-y-0.5">
             <PlusCircle size={18} /> Create New Class
           </button>
         </div>
-        <input
-          className="form-input w-72" placeholder="Search for a classroom..."
-          value={search} onChange={e => setSearch(e.target.value)}
-        />
+        <input className="form-input w-72 rounded-xl border-none shadow-sm dark:bg-slate-800/50" placeholder="Search classrooms..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
         {/* SIDEBAR */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {classrooms
             .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase()))
             .map(c => (
               <div
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
-                className={`glass-card p-4 cursor-pointer relative group flex justify-between items-start ${selectedId === c.id ? 'ring-2 ring-brand-blue' : ''}`}
+                className={`glass-card p-5 cursor-pointer relative group flex justify-between items-start transition-all duration-300 ${selectedId === c.id ? 'ring-2 ring-brand-blue shadow-lg scale-105 z-10' : 'hover:scale-[1.02]'}`}
                 style={{ background: selectedId === c.id ? 'var(--color-brand-blue-pale)' : 'var(--color-surface-card)' }}
               >
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--color-brand-gold-dark)" }}>{c.code}</p>
-                  <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{c.name}</p>
-                  <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>{c.students} Students</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "var(--color-brand-gold-dark)" }}>{c.code}</p>
+                  <p className="font-bold text-lg leading-tight" style={{ color: "var(--color-text-primary)" }}>{c.name}</p>
+                  <p className="text-xs font-semibold mt-2 opacity-80" style={{ color: "var(--color-text-muted)" }}>{c.students} Enrolled</p>
                 </div>
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleDeleteCourse(c.id); }} 
-                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-1 rounded transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={16} />
                 </button>
               </div>
             ))}
         </div>
 
         {/* MAIN PANE */}
-        <div className="xl:col-span-3 space-y-4">
+        <div className="xl:col-span-3 space-y-4 relative">
           {!selected ? (
-            <div className="p-10 text-center glass-card"><p style={{color: "var(--color-text-muted)"}}>No course selected or created.</p></div>
+            <div className="p-16 text-center glass-card rounded-3xl border-dashed border-2 opacity-60"><p className="text-lg font-medium" style={{color: "var(--color-text-muted)"}}>No course selected or created.</p></div>
           ) : (
-            <>
-              <div className="p-6 rounded-2xl relative overflow-hidden flex justify-between items-start"
-                style={{ background: `linear-gradient(135deg, ${selected.color || 'var(--color-brand-blue)'}, var(--color-brand-blue-mid))` }}>
-                <div className="relative z-10 text-white">
-                  <h2 className="text-2xl font-bold tracking-tight">{selected.name}</h2>
-                  <p className="text-white/80 text-sm mt-1 max-w-2xl">{selected.description}</p>
-                  {selected.enrollment_code && <p className="text-xs mt-3 font-mono bg-black/20 p-1 px-2 inline-block rounded">Code: {selected.enrollment_code}</p>}
+            <div className="animate-in fade-in duration-300">
+              <div className="p-8 rounded-3xl relative overflow-hidden flex justify-between items-end shadow-2xl"
+                style={{ background: `linear-gradient(135deg, ${selected.color || 'var(--color-brand-blue)'}, #1a202c)` }}>
+                <div className="relative z-10 text-white max-w-xl">
+                  <span className="text-xs font-bold tracking-widest uppercase text-white/50 mb-2 block">Active Dashboard</span>
+                  <h2 className="text-4xl font-black tracking-tight mb-2">{selected.name}</h2>
+                  <p className="text-white/80 text-base mb-4 leading-relaxed">{selected.description}</p>
+                  {selected.enrollment_code && <p className="text-xs font-mono bg-white/10 px-3 py-1.5 inline-block rounded-md border border-white/10">Code: <b>{selected.enrollment_code}</b></p>}
                 </div>
-                <div className="relative z-10 flex gap-2">
-                  <button onClick={() => setShowAssignmentModal(true)} className="btn btn-gold btn-sm">
-                    <FilePlus size={16} /> New Assignment
+                <div className="relative z-10 flex gap-3">
+                  <button onClick={() => setShowAssignmentModal(true)} className="btn bg-gold text-slate-900 border-none font-bold hover:bg-yellow-400 shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
+                    <FilePlus size={18} className="mr-2 inline" /> Create Assignment
                   </button>
-                  <button onClick={() => setShowStudentModal(true)} className="btn bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur-md btn-sm">
-                    <UserPlus size={16} /> Add Students
+                  <button onClick={() => setShowStudentModal(true)} className="btn bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur-md font-semibold shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
+                    <UserPlus size={18} className="mr-2 inline" /> Add Students
                   </button>
                 </div>
+                <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-[100px] -mr-10 -mt-10 pointer-events-none"></div>
               </div>
 
-              <div className="flex justify-center gap-6 border-b pb-2">
-                {["home", "assignments", "students"].map(tab => (
+              <div className="flex justify-center gap-10 border-b border-slate-200 dark:border-slate-800 pb-0 mt-6 px-4">
+                {["home", "assignments", "students"].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab as any)}
-                    className={`text-sm font-semibold capitalize pt-4 pb-2 transition-all relative ${activeTab === tab ? "text-brand-blue" : "text-text-muted hover:text-text-secondary"}`}
-                    style={{ color: activeTab === tab ? "var(--color-brand-blue)" : "var(--color-text-muted)" }}
+                    className={`text-sm tracking-wide font-bold capitalize pb-4 relative transition-all ${activeTab === tab ? "text-brand-blue" : "text-slate-400 hover:text-slate-600"}`}
                   >
                     {tab}
-                    {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-blue rounded-full animate-fade-in" style={{ backgroundColor: "var(--color-brand-blue)" }} />}
+                    {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand-blue rounded-t-full" />}
                   </button>
                 ))}
               </div>
 
-              <div className="p-4">
+              <div className="p-2 py-6">
                 {activeTab === "home" && (
-                  <div className="space-y-6 animate-fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div className="glass-card p-4">
-                          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Enrolled</p>
-                          <div className="flex items-center gap-3"><Users size={20} style={{ color: "var(--color-brand-blue)" }} /><p className="text-2xl font-bold">{students.length}</p></div>
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <div className="glass-card p-6 rounded-2xl">
+                          <p className="text-xs font-bold uppercase tracking-widest mb-3 opacity-60">Total Enrolled</p>
+                          <div className="flex items-center gap-4"><div className="p-3 bg-brand-blue/10 rounded-xl"><Users size={28} className="text-brand-blue" /></div><p className="text-4xl font-extrabold">{students.length}</p></div>
                        </div>
-                       <div className="glass-card p-4">
-                          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Course Progress</p>
-                          <div className="space-y-2">
-                             <div className="flex justify-between items-center"><p className="text-xl font-bold">{selected.progress}%</p></div>
-                             <div className="progress-bar"><div className="progress-fill" style={{ width: `${selected.progress}%` }} /></div>
+                       <div className="glass-card p-6 rounded-2xl">
+                          <p className="text-xs font-bold uppercase tracking-widest mb-3 opacity-60">Course Progress</p>
+                          <div className="space-y-3 mt-1">
+                             <div className="flex justify-between items-center"><p className="text-2xl font-extrabold">{selected.progress}%</p></div>
+                             <div className="progress-bar rounded-full h-3 bg-slate-100 dark:bg-slate-800"><div className="progress-fill bg-brand-blue h-3 rounded-full shadow-lg shadow-blue-500/50" style={{ width: `${selected.progress}%` }} /></div>
                           </div>
                        </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between border-b pb-2">
-                        <div className="flex items-center gap-2">
-                          <Megaphone size={18} style={{ color: "var(--color-brand-blue)" }} />
-                          <h3 className="font-bold text-lg">Class Announcements</h3>
+                    <div className="space-y-4 glass-card p-8 rounded-2xl border-none ring-1 ring-slate-900/5 dark:ring-white/5">
+                      <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg"><Megaphone size={20} className="text-brand-blue" /></div>
+                          <h3 className="font-extrabold text-xl">Class Announcements</h3>
                         </div>
-                        <button onClick={() => setShowAnnouncementModal(true)} className="text-xs font-bold bg-brand-blue text-white px-3 py-1 rounded hover:opacity-90">Post Announcement</button>
+                        <button onClick={() => setShowAnnouncementModal(true)} className="text-sm font-bold bg-brand-blue text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-blue-500/20 transition-all hover:-translate-y-0.5">Post Announcement</button>
                       </div>
-                      <div className="grid gap-3">
+                      <div className="grid gap-4 mt-2">
                         {announcements.length === 0 ? (
-                           <div className="p-8 text-center glass-card"><p style={{ color: "var(--color-text-muted)" }}>No announcements.</p></div>
+                           <div className="py-12 text-center"><p className="text-slate-400 font-medium">Clear skies. No announcements yet.</p></div>
                         ) : (
                           announcements.map((a: any) => (
-                            <div key={a.id} className="p-4 glass-card border-l-4 border-l-brand-blue flex justify-between items-start group">
+                            <div key={a.id} className="p-5 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-start group shadow-sm transition-all hover:shadow-md">
                               <div>
-                                <p className="font-bold text-sm mb-1">{a.title}</p>
-                                <p className="text-sm line-clamp-3">{a.body}</p>
-                                <p className="text-[10px] mt-2 font-medium" style={{ color: "var(--color-text-muted)" }}>{a.time}</p>
+                                <div className="flex items-center gap-3 mb-1">
+                                  <p className="font-bold text-base text-slate-800 dark:text-slate-100">{a.title}</p>
+                                  {a.pinned && <span className="text-[10px] uppercase font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded border border-red-200">Pinned</span>}
+                                </div>
+                                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl">{a.body}</p>
+                                <p className="text-[10px] mt-3 font-bold text-slate-400 uppercase tracking-wider">{a.time}</p>
                               </div>
-                              <button onClick={() => handleDeleteAnnouncement(a.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded">
-                                <Trash2 size={16} />
+                              <button onClick={() => handleDeleteAnnouncement(a.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded-lg transition-all">
+                                <Trash2 size={18} />
                               </button>
                             </div>
                           ))
@@ -313,26 +317,26 @@ export const ClassroomsPage: React.FC = () => {
                 )}
 
                 {activeTab === "assignments" && (
-                   <div className="space-y-4 animate-fade-in">
+                   <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <div className="grid gap-4">
                         {assignments.length === 0 ? (
-                          <div className="p-10 text-center glass-card"><p style={{ color: "var(--color-text-muted)" }}>No assignments yet.</p></div>
+                          <div className="p-16 text-center glass-card rounded-2xl"><p className="text-slate-400 font-medium">No assignments yet.</p></div>
                         ) : (
                           assignments.map((a: any) => (
-                             <div key={a.id} className="p-4 glass-card flex justify-between items-start group">
+                             <div key={a.id} className="p-6 bg-white dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 flex justify-between items-start group shadow-sm hover:shadow-md transition-all">
                                 <div className="flex-1">
-                                   <div className="flex justify-between items-center pr-4">
-                                      <p className="font-bold text-brand-blue mb-1">{a.title}</p>
-                                      <span className="text-xs font-bold text-white bg-green-600 px-2 py-0.5 rounded-full">{a.max_points} Pts</span>
+                                   <div className="flex justify-between items-center pr-6 mb-2">
+                                      <p className="font-bold text-brand-blue text-lg">{a.title}</p>
+                                      <span className="text-xs font-bold text-green-700 bg-green-100 border border-green-200 px-3 py-1 rounded-full">{a.max_points} Points Max</span>
                                    </div>
-                                   <p className="text-sm mt-1">{a.description}</p>
-                                   <div className="flex items-center gap-4 text-xs mt-3" style={{ color: "var(--color-text-muted)" }}>
-                                      <div className="flex items-center gap-1"><Clock size={12} className="text-red-500" /><span>Due: {a.due_date.replace('T', ', ')}</span></div>
-                                      {a.media_path && <div className="flex items-center gap-1 text-blue-500"><Paperclip size={12} /><span>Attachment included</span></div>}
+                                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{a.description}</p>
+                                   <div className="flex items-center gap-6 text-xs font-semibold text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg inline-flex">
+                                      <div className="flex items-center gap-2"><Clock size={14} className="text-red-500" /><span>Due: {a.due_date.replace('T', ' at ')}</span></div>
+                                      {a.media_path && <div className="flex items-center gap-2 text-blue-600"><Paperclip size={14} /><span>Attachment</span></div>}
                                    </div>
                                 </div>
-                                <button onClick={() => handleDeleteAssignment(a.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded">
-                                  <Trash2 size={16} />
+                                <button onClick={() => handleDeleteAssignment(a.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded-lg transition-all">
+                                  <Trash2 size={18} />
                                 </button>
                              </div>
                           ))
@@ -342,23 +346,24 @@ export const ClassroomsPage: React.FC = () => {
                 )}
 
                 {activeTab === "students" && (
-                  <div className="space-y-3">
+                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {students.length === 0 ? (
-                       <div className="text-center py-10"><p style={{ color: "var(--color-text-muted)" }}>No students found.</p></div>
+                       <div className="text-center py-16 glass-card rounded-2xl"><p className="text-slate-400 font-medium">No students enrolled. Add some to begin mapping grades.</p></div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {students.map((s: any) => (
-                          <div key={s.id} className="p-4 glass-card flex items-center justify-between group">
+                          <div key={s.id} className="p-4 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between group shadow-sm">
                             <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-extrabold text-lg shadow-md"
                                 style={{ background: "var(--color-brand-blue)" }}>{s.name.charAt(0)}</div>
                               <div>
-                                <p className="font-semibold text-sm">{s.name}</p>
-                                <p className="text-[10px] text-gray-500">Reg: {s.registration_number} | {s.email} | {s.student_class} | {s.department}</p>
+                                <p className="font-bold text-slate-800 dark:text-slate-100">{s.name}</p>
+                                <p className="text-xs font-semibold text-slate-400 mt-1">{s.registration_number} • {s.department}</p>
+                                <p className="text-[10px] text-slate-400">{s.email}</p>
                               </div>
                             </div>
-                            <button onClick={() => handleDeleteStudent(s.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded">
-                              <Trash2 size={16} />
+                            <button onClick={() => handleDeleteStudent(s.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded-lg transition-all">
+                              <Trash2 size={18} />
                             </button>
                           </div>
                         ))}
@@ -367,70 +372,71 @@ export const ClassroomsPage: React.FC = () => {
                   </div>
                 )}
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
 
-      {/* --- MODALS --- */}
+      {/* --- SUPER PREMIUM MODALS --- */}
       
       {showCourseModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111] border border-white/20 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Create New Class</h3>
-              <button className="text-slate-500 hover:text-slate-800 dark:hover:text-white" onClick={() => setShowCourseModal(false)}><X size={20}/></button>
+              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">Create New Class</h3>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 dark:bg-slate-800 p-2 rounded-full dark:hover:text-white transition-colors" onClick={() => setShowCourseModal(false)}><X size={20}/></button>
             </div>
-            <form onSubmit={handleCreateCourse} className="space-y-4">
-              <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Course Code (e.g., CSC101)" value={courseForm.code} onChange={e=>setCourseForm({...courseForm, code: e.target.value})} />
-              <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Course Name" value={courseForm.name} onChange={e=>setCourseForm({...courseForm, name: e.target.value})} />
-              <input className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Batch / Year" value={courseForm.batch} onChange={e=>setCourseForm({...courseForm, batch: e.target.value})} />
-              <input className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Enrollment Code (optional)" value={courseForm.enrollment_code} onChange={e=>setCourseForm({...courseForm, enrollment_code: e.target.value})} />
-              <textarea className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Description" rows={3} value={courseForm.description} onChange={e=>setCourseForm({...courseForm, description: e.target.value})} />
-              <button type="submit" className="w-full btn btn-primary py-3 rounded-lg font-bold">Create Course</button>
+            <form onSubmit={handleCreateCourse} className="space-y-5">
+              <div><label className={premiumLabel}>Course Code</label><input required className={premiumInput} placeholder="e.g., CSC101" value={courseForm.code} onChange={e=>setCourseForm({...courseForm, code: e.target.value})} /></div>
+              <div><label className={premiumLabel}>Course Name</label><input required className={premiumInput} placeholder="e.g., Advance Algorithms" value={courseForm.name} onChange={e=>setCourseForm({...courseForm, name: e.target.value})} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                 <div><label className={premiumLabel}>Batch</label><input className={premiumInput} placeholder="2026-A" value={courseForm.batch} onChange={e=>setCourseForm({...courseForm, batch: e.target.value})} /></div>
+                 <div><label className={premiumLabel}>Optional Code</label><input className={premiumInput} placeholder="Join Code" value={courseForm.enrollment_code} onChange={e=>setCourseForm({...courseForm, enrollment_code: e.target.value})} /></div>
+              </div>
+              <div><label className={premiumLabel}>Description</label><textarea className={premiumInput} placeholder="Brief summary of syllabus..." rows={3} value={courseForm.description} onChange={e=>setCourseForm({...courseForm, description: e.target.value})} /></div>
+              <button type="submit" className="w-full bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-brand-blue/30 py-4 rounded-xl font-bold text-lg transition-all hover:-translate-y-1">Initialize Course</button>
             </form>
           </div>
         </div>
       )}
 
       {showStudentModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111] border border-white/20 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Add Students</h3>
-              <button className="text-slate-500 hover:text-slate-800 dark:hover:text-white" onClick={() => setShowStudentModal(false)}><X size={20}/></button>
+              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">Enroll Students</h3>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 dark:bg-slate-800 p-2 rounded-full dark:hover:text-white transition-colors" onClick={() => setShowStudentModal(false)}><X size={20}/></button>
             </div>
             
-            <div className="flex gap-2 mb-6 border-b border-slate-100 dark:border-slate-800 pb-2">
-              <button onClick={() => setStudentTab("manual")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${studentTab === "manual" ? "bg-brand-blue text-white shadow-md shadow-blue-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>Manual Entry</button>
-              <button onClick={() => setStudentTab("csv")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${studentTab === "csv" ? "bg-brand-blue text-white shadow-md shadow-blue-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>CSV Upload</button>
+            <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 mb-6 rounded-xl">
+              <button onClick={() => setStudentTab("manual")} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${studentTab === "manual" ? "bg-white dark:bg-slate-700 text-brand-blue shadow-sm" : "text-slate-500"}`}>Manual Entry</button>
+              <button onClick={() => setStudentTab("csv")} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${studentTab === "csv" ? "bg-white dark:bg-slate-700 text-brand-blue shadow-sm" : "text-slate-500"}`}>Bulk CSV</button>
             </div>
 
             {studentTab === "manual" ? (
               <form onSubmit={handleAddStudentManual} className="space-y-4">
-                <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Student Name" value={studentForm.name} onChange={e=>setStudentForm({...studentForm, name: e.target.value})} />
-                <input required type="email" className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Email Address" value={studentForm.email} onChange={e=>setStudentForm({...studentForm, email: e.target.value})} />
-                <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Registration Number" value={studentForm.registration_number} onChange={e=>setStudentForm({...studentForm, registration_number: e.target.value})} />
-                <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Class/Section" value={studentForm.student_class} onChange={e=>setStudentForm({...studentForm, student_class: e.target.value})} />
-                
-                <select 
-                   className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none appearance-none" 
-                   value={studentForm.department} 
-                   onChange={e=>setStudentForm({...studentForm, department: e.target.value})}
-                >
-                  {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
-                </select>
-
-                <button type="submit" className="w-full btn btn-primary py-3 rounded-lg font-bold">Enroll Student</button>
+                <div><label className={premiumLabel}>Full Name</label><input required className={premiumInput} placeholder="John Doe" value={studentForm.name} onChange={e=>setStudentForm({...studentForm, name: e.target.value})} /></div>
+                <div><label className={premiumLabel}>Email Address</label><input required type="email" className={premiumInput} placeholder="student@university.edu" value={studentForm.email} onChange={e=>setStudentForm({...studentForm, email: e.target.value})} /></div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className={premiumLabel}>Reg Number</label><input required className={premiumInput} placeholder="ID908" value={studentForm.registration_number} onChange={e=>setStudentForm({...studentForm, registration_number: e.target.value})} /></div>
+                  <div><label className={premiumLabel}>Class</label><input required className={premiumInput} placeholder="Section A" value={studentForm.student_class} onChange={e=>setStudentForm({...studentForm, student_class: e.target.value})} /></div>
+                </div>
+                <div>
+                  <label className={premiumLabel}>Department</label>
+                  <select className={`${premiumInput} appearance-none cursor-pointer`} value={studentForm.department} onChange={e=>setStudentForm({...studentForm, department: e.target.value})}>
+                    {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
+                  </select>
+                </div>
+                <button type="submit" className="w-full bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-brand-blue/30 py-4 mt-2 rounded-xl font-bold text-lg transition-all hover:-translate-y-1">Add Student</button>
               </form>
             ) : (
-              <div className="space-y-4 py-4">
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
-                  Upload a CSV file containing: <br/>
-                  <code className="bg-slate-100 dark:bg-slate-800 text-brand-blue px-2 py-1 rounded text-xs mt-1 inline-block">[reg_number, name, email, class, dept]</code>
-                </p>
-                <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <input type="file" accept=".csv" ref={studentFileInputRef} onChange={handleBulkUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer" />
+              <div className="space-y-6 py-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                   <p className="text-sm font-semibold text-brand-blue mb-1">CSV Format Required</p>
+                   <code className="text-xs font-bold text-slate-600 dark:text-slate-400">Column Order: Registration Number, Name, Email, Class, Department</code>
+                </div>
+                <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <input type="file" accept=".csv" ref={studentFileInputRef} onChange={handleBulkUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-6 file:rounded-xl file:border-0 file:font-extrabold file:bg-brand-blue file:text-white hover:file:bg-blue-700 cursor-pointer shadow-lg shadow-blue-500/20" />
                 </div>
               </div>
             )}
@@ -439,53 +445,53 @@ export const ClassroomsPage: React.FC = () => {
       )}
 
       {showAnnouncementModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111] border border-white/20 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Post Announcement</h3>
-              <button className="text-slate-500 hover:text-slate-800 dark:hover:text-white" onClick={() => setShowAnnouncementModal(false)}><X size={20}/></button>
+              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">Broadcast Message</h3>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 dark:bg-slate-800 p-2 rounded-full dark:hover:text-white transition-colors" onClick={() => setShowAnnouncementModal(false)}><X size={20}/></button>
             </div>
-            <form onSubmit={handleCreateAnnouncement} className="space-y-4">
-              <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Title" value={announcementForm.title} onChange={e=>setAnnouncementForm({...announcementForm, title: e.target.value})} />
-              <textarea required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Details..." rows={4} value={announcementForm.body} onChange={e=>setAnnouncementForm({...announcementForm, body: e.target.value})} />
-              <div className="flex items-center gap-3 text-sm pt-2 text-slate-600 dark:text-slate-300">
-                <input type="checkbox" id="pinned" checked={announcementForm.pinned} onChange={e=>setAnnouncementForm({...announcementForm, pinned: e.target.checked})} className="w-4 h-4 rounded text-brand-blue focus:ring-brand-blue" />
-                <label htmlFor="pinned" className="font-medium">Pin to top of class</label>
+            <form onSubmit={handleCreateAnnouncement} className="space-y-5">
+              <div><label className={premiumLabel}>Headline / Title</label><input required className={premiumInput} placeholder="Urgent update..." value={announcementForm.title} onChange={e=>setAnnouncementForm({...announcementForm, title: e.target.value})} /></div>
+              <div><label className={premiumLabel}>Announcement Body</label><textarea required className={premiumInput} placeholder="Type your message explicitly here..." rows={4} value={announcementForm.body} onChange={e=>setAnnouncementForm({...announcementForm, body: e.target.value})} /></div>
+              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/50">
+                <input type="checkbox" id="pinned" checked={announcementForm.pinned} onChange={e=>setAnnouncementForm({...announcementForm, pinned: e.target.checked})} className="w-5 h-5 rounded border-slate-300 text-brand-blue focus:ring-brand-blue cursor-pointer" />
+                <label htmlFor="pinned" className="font-bold text-sm cursor-pointer select-none">Pin this to top of dashboard feed</label>
               </div>
-              <button type="submit" className="w-full btn btn-primary py-3 rounded-lg font-bold">Post Announcement</button>
+              <button type="submit" className="w-full bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-brand-blue/30 py-4 rounded-xl font-bold text-lg transition-all hover:-translate-y-1">Distribute Now</button>
             </form>
           </div>
         </div>
       )}
 
       {showAssignmentModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111] border border-white/20 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Create Assignment</h3>
-              <button className="text-slate-500 hover:text-slate-800 dark:hover:text-white" onClick={() => setShowAssignmentModal(false)}><X size={20}/></button>
+              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">New Assignment Details</h3>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 dark:bg-slate-800 p-2 rounded-full dark:hover:text-white transition-colors" onClick={() => setShowAssignmentModal(false)}><X size={20}/></button>
             </div>
             <form onSubmit={handleCreateAssignment} className="space-y-4">
-              <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Assignment Title" value={assignmentForm.title} onChange={e=>setAssignmentForm({...assignmentForm, title: e.target.value})} />
-              <textarea required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Task description and details..." rows={3} value={assignmentForm.description} onChange={e=>setAssignmentForm({...assignmentForm, description: e.target.value})} />
+              <div><label className={premiumLabel}>Designation Title</label><input required className={premiumInput} placeholder="Unit 2 Worksheet" value={assignmentForm.title} onChange={e=>setAssignmentForm({...assignmentForm, title: e.target.value})} /></div>
+              <div><label className={premiumLabel}>Instructions Payload</label><textarea required className={premiumInput} placeholder="Read chapter 4 strictly to conclude answers..." rows={3} value={assignmentForm.description} onChange={e=>setAssignmentForm({...assignmentForm, description: e.target.value})} /></div>
               
-              <div className="flex gap-4">
-                 <div className="w-1/2">
-                    <label className="text-xs text-slate-500 mb-1 block">Deadline</label>
-                    <input required type="datetime-local" className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none text-slate-600 dark:text-slate-300" value={assignmentForm.dueDate} onChange={e=>setAssignmentForm({...assignmentForm, dueDate: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                    <label className={premiumLabel}>Strict Deadline</label>
+                    <input required type="datetime-local" className={`${premiumInput} text-slate-600 dark:text-slate-300 font-semibold`} value={assignmentForm.dueDate} onChange={e=>setAssignmentForm({...assignmentForm, dueDate: e.target.value})} />
                  </div>
-                 <div className="w-1/2">
-                    <label className="text-xs text-slate-500 mb-1 block">Max Points</label>
-                    <input required type="number" min="0" className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" value={assignmentForm.maxPoints} onChange={e=>setAssignmentForm({...assignmentForm, maxPoints: parseInt(e.target.value) || 0})} />
+                 <div>
+                    <label className={premiumLabel}>Marks Grading</label>
+                    <input required type="number" min="0" className={`${premiumInput} font-extrabold text-brand-blue`} value={assignmentForm.maxPoints} onChange={e=>setAssignmentForm({...assignmentForm, maxPoints: parseInt(e.target.value) || 0})} />
                  </div>
               </div>
 
-              <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-4 text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                <p className="text-xs text-slate-500 mb-2">Upload reference material / worksheet (optional)</p>
-                <input type="file" onChange={e => setAssignmentFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-gray-100 dark:file:bg-slate-800 file:text-slate-700 dark:file:text-slate-300 hover:file:bg-gray-200 cursor-pointer mx-auto" />
+              <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-5 text-center mt-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">Attachment Payload (Optional)</p>
+                <input type="file" onChange={e => setAssignmentFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer mx-auto" />
               </div>
 
-              <button type="submit" className="w-full bg-gold text-slate-900 font-bold py-3 rounded-lg hover:bg-yellow-500 shadow-md">Distribute Assignment</button>
+              <button type="submit" className="w-full bg-gold text-slate-900 border-none font-bold py-4 rounded-xl hover:bg-yellow-400 shadow-xl shadow-yellow-500/20 text-lg transition-all hover:-translate-y-1 mt-2">Activate Assignment Block</button>
             </form>
           </div>
         </div>

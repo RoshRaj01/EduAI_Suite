@@ -5,9 +5,12 @@ from app.models.announcement import Announcement
 from app.models.student import Student
 from app.models.assignment import Assignment
 
-if os.path.exists("edu.db"):
+if os.path.exists("eduV2.db"):
     # Delete to recreate fresh tables with new fields
-    os.remove("edu.db")
+    try:
+        os.remove("eduV2.db")
+    except PermissionError:
+        pass
 
 Base.metadata.create_all(bind=engine)
 
