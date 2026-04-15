@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Users, Clock, Plus } from "lucide-react";
+import { Users, Clock, Plus, PlusCircle, FilePlus, UserPlus, Megaphone } from "lucide-react";
 
 export const ClassroomsPage: React.FC = () => {
 
@@ -11,7 +11,13 @@ export const ClassroomsPage: React.FC = () => {
   const [search, setSearch] = useState("");
 
   // 🔥 Tabs
-  const [activeTab, setActiveTab] = useState<"home" | "announcements" | "students">("home");
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<"home" | "assignments" | "students">("home");
+
+  // Interaction States
+  const handleCreateClass = () => alert("Create Class Modal would open here");
+  const handleCreateAssignment = () => alert("Create Assignment Modal would open here");
+  const handleAddStudents = () => alert("Add Students Modal would open here");
 
   useEffect(() => {
     fetch("http://localhost:8000/courses")
@@ -32,7 +38,13 @@ export const ClassroomsPage: React.FC = () => {
 
     fetch(`http://localhost:8000/announcements/${selectedId}`)
       .then(res => res.json())
-      .then(data => setAssignments(Array.isArray(data) ? data : []));
+      .then(data => setAnnouncements(Array.isArray(data) ? data : []));
+
+    // Mock assignments for now as we don't have a specific endpoint yet
+    setAssignments([
+      { id: 1, title: "Lab Report - 1", dueDate: "2024-04-20" },
+      { id: 2, title: "Mid-Term Project", dueDate: "2024-04-25" }
+    ]);
 
     fetch(`http://localhost:8000/students/${selectedId}`)
       .then(res => res.json())
@@ -47,7 +59,16 @@ export const ClassroomsPage: React.FC = () => {
 
       {/* 🔥 HEADER ROW (TITLE + SEARCH SIDE BY SIDE) */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Classroom Management</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Classroom Management</h1>
+          <button
+            onClick={handleCreateClass}
+            className="btn btn-primary btn-sm flex items-center gap-2"
+          >
+            <PlusCircle size={18} />
+            Create New Class
+          </button>
+        </div>
         <input
           className="form-input w-72"
           placeholder="Search for a classroom..."
@@ -91,11 +112,27 @@ export const ClassroomsPage: React.FC = () => {
           ) : (
             <>
               {/* COURSE HEADER */}
-              <div className="p-6 rounded-2xl relative overflow-hidden"
+              <div className="p-6 rounded-2xl relative overflow-hidden flex justify-between items-start"
                 style={{ background: "linear-gradient(135deg, var(--color-brand-blue), var(--color-brand-blue-mid))", color: "white" }}>
                 <div className="relative z-10">
                   <h2 className="text-2xl font-bold tracking-tight">{selected.name}</h2>
                   <p className="text-blue-100/90 text-sm mt-1 max-w-2xl">{selected.description}</p>
+                </div>
+                <div className="relative z-10 flex gap-2">
+                  <button
+                    onClick={handleCreateAssignment}
+                    className="btn btn-gold btn-sm"
+                  >
+                    <FilePlus size={16} />
+                    New Assignment
+                  </button>
+                  <button
+                    onClick={handleAddStudents}
+                    className="btn bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur-md btn-sm"
+                  >
+                    <UserPlus size={16} />
+                    Add Students
+                  </button>
                 </div>
                 {/* Decorative circle */}
                 <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
@@ -103,7 +140,7 @@ export const ClassroomsPage: React.FC = () => {
 
               {/* 🔥 CENTERED TABS */}
               <div className="flex justify-center gap-6 border-b pb-2">
-                {["home", "announcements", "students"].map(tab => (
+                {["home", "assignments", "students"].map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab as any)}
@@ -124,47 +161,84 @@ export const ClassroomsPage: React.FC = () => {
               <div className="p-4">
 
                 {activeTab === "home" && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
-                    <div className="glass-card p-4">
-                      <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Students Enrolled</p>
-                      <div className="flex items-center gap-3">
-                        <Users size={20} style={{ color: "var(--color-brand-blue)" }} />
-                        <p className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{selected.students}</p>
+                  <div className="space-y-6 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="glass-card p-4">
+                        <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Students Enrolled</p>
+                        <div className="flex items-center gap-3">
+                          <Users size={20} style={{ color: "var(--color-brand-blue)" }} />
+                          <p className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{selected.students}</p>
+                        </div>
+                      </div>
+                      <div className="glass-card p-4">
+                        <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Next Session</p>
+                        <div className="flex items-center gap-3">
+                          <Clock size={20} style={{ color: "var(--color-brand-blue)" }} />
+                          <p className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>{selected.next_class}</p>
+                        </div>
+                      </div>
+                      <div className="glass-card p-4">
+                        <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Course Progress</p>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <p className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{selected.progress}%</p>
+                          </div>
+                          <div className="progress-bar">
+                            <div className="progress-fill" style={{ width: `${selected.progress}%` }} />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="glass-card p-4">
-                      <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Next Session</p>
-                      <div className="flex items-center gap-3">
-                        <Clock size={20} style={{ color: "var(--color-brand-blue)" }} />
-                        <p className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>{selected.next_class}</p>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 border-b pb-2">
+                        <Megaphone size={18} style={{ color: "var(--color-brand-blue)" }} />
+                        <h3 className="font-bold text-lg">Class Announcements</h3>
                       </div>
-                    </div>
-                    <div className="glass-card p-4">
-                      <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Course Progress</p>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <p className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{selected.progress}%</p>
-                        </div>
-                        <div className="progress-bar">
-                          <div className="progress-fill" style={{ width: `${selected.progress}%` }} />
-                        </div>
+                      <div className="grid gap-3">
+                        {announcements.length === 0 ? (
+                          <div className="p-8 text-center glass-card">
+                            <p style={{ color: "var(--color-text-muted)" }}>No announcements yet.</p>
+                          </div>
+                        ) : (
+                          announcements.map((a: any) => (
+                            <div key={a.id} className="p-4 glass-card border-l-4 border-l-brand-blue">
+                              <p className="font-bold text-sm mb-1" style={{ color: "var(--color-text-primary)" }}>{a.title}</p>
+                              <p className="text-sm line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>{a.body}</p>
+                              <p className="text-[10px] mt-2 font-medium" style={{ color: "var(--color-text-muted)" }}>Posted 2 hours ago</p>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
                   </div>
                 )}
 
-                {activeTab === "announcements" && (
-                  <div className="space-y-2">
-                    {assignments.length === 0 ? (
-                      <p>No announcements</p>
-                    ) : (
-                      assignments.map((a: any) => (
-                        <div key={a.id} className="p-3 border rounded">
-                          <p className="font-semibold">{a.title}</p>
-                          <p className="text-sm">{a.body}</p>
+                {activeTab === "assignments" && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-bold text-lg">Class Assignments</h3>
+                    </div>
+                    <div className="grid gap-3">
+                      {assignments.length === 0 ? (
+                        <div className="p-8 text-center glass-card">
+                          <p style={{ color: "var(--color-text-muted)" }}>No assignments posted yet.</p>
                         </div>
-                      ))
-                    )}
+                      ) : (
+                        assignments.map((a: any) => (
+                          <div key={a.id} className="p-4 glass-card flex justify-between items-center hover:bg-brand-blue-pale/20">
+                            <div>
+                              <p className="font-bold text-sm mb-1" style={{ color: "var(--color-text-primary)" }}>{a.title}</p>
+                              <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                                <Clock size={12} />
+                                <span>Due: {a.dueDate}</span>
+                              </div>
+                            </div>
+                            <button className="btn btn-outline btn-sm">View Details</button>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 )}
 
