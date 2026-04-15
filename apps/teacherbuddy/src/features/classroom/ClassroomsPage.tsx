@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle, Edit2 } from "lucide-react";
+import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle, Edit2, AlertTriangle } from "lucide-react";
 
 const API_URL = "http://localhost:8000";
 
@@ -27,9 +27,11 @@ export const ClassroomsPage: React.FC = () => {
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
-  
+
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: string, id: number, message: string } | null>(null);
 
   // Forms
   const [courseForm, setCourseForm] = useState({
@@ -90,12 +92,18 @@ export const ClassroomsPage: React.FC = () => {
     try {
       const res = await action();
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text);
+        // Only try to read body for non-204 error responses
+        let errorDetail = `HTTP ${res.status}`;
+        try {
+          const text = await res.text();
+          if (text) errorDetail = text;
+        } catch { }
+        throw new Error(errorDetail);
       }
       onSuccess();
       setErrorMsg(null);
     } catch (err: any) {
+      console.error("API call failed:", err);
       setErrorMsg("Database Error: Is your database schema corrupted or outdated? Please completely restart your terminal with 'uvicorn app.main:app' and delete edu.db! Detail: " + err.message);
     }
   };
@@ -110,11 +118,7 @@ export const ClassroomsPage: React.FC = () => {
   };
 
   const handleDeleteCourse = (id: number) => {
-    if (!window.confirm("Delete this entire course?")) return;
-    handleApiCall(
-      () => fetch(`${API_URL}/courses/${id}`, { method: "DELETE" }),
-      () => { if (selectedId === id) setSelectedId(null); fetchCourses(); }
-    );
+    setDeleteConfirm({ type: "course", id, message: "Are you sure you want to delete this course? This action is irreversible." });
   };
 
   const handleCreateAnnouncement = (e: React.FormEvent) => {
@@ -126,8 +130,7 @@ export const ClassroomsPage: React.FC = () => {
   };
 
   const handleDeleteAnnouncement = (id: number) => {
-    if (!window.confirm("Delete announcement?")) return;
-    handleApiCall(() => fetch(`${API_URL}/announcements/${id}`, { method: "DELETE" }), fetchCourseData);
+    setDeleteConfirm({ type: "announcement", id, message: "Are you sure you want to delete this announcement?" });
   };
 
   const handleAddStudentManual = (e: React.FormEvent) => {
@@ -151,8 +154,7 @@ export const ClassroomsPage: React.FC = () => {
   };
 
   const handleDeleteStudent = (id: number) => {
-    if (!window.confirm("Remove student from this course?")) return;
-    handleApiCall(() => fetch(`${API_URL}/students/${id}`, { method: "DELETE" }), fetchCourseData);
+    setDeleteConfirm({ type: "student", id, message: "Are you sure you want to remove this student from the course?" });
   };
 
   const handleOpenEditAssignment = (assignment: any) => {
@@ -179,39 +181,63 @@ export const ClassroomsPage: React.FC = () => {
     if (assignmentFile) formData.append("file", assignmentFile);
 
     const method = editingAssignmentId ? "PUT" : "POST";
-    const endpointUrl = editingAssignmentId 
+    const endpointUrl = editingAssignmentId
       ? `${API_URL}/assignments/${editingAssignmentId}`
       : `${API_URL}/assignments/${selectedId}`;
 
     handleApiCall(
       () => fetch(endpointUrl, { method, body: formData }),
-      () => { 
-        setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); 
-        setAssignmentFile(null); 
+      () => {
+        setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 });
+        setAssignmentFile(null);
         setEditingAssignmentId(null);
-        setShowAssignmentModal(false); 
-        fetchCourseData(); 
+        setShowAssignmentModal(false);
+        fetchCourseData();
       }
     );
   };
 
   const handleDeleteAssignment = (id: number) => {
-    if (!window.confirm("Delete this assignment?")) return;
-    handleApiCall(() => fetch(`${API_URL}/assignments/${id}`, { method: "DELETE" }), fetchCourseData);
+    setDeleteConfirm({ type: "assignment", id, message: "Are you sure you want to delete this assignment?" });
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirm) return;
+    
+    const { type, id } = deleteConfirm;
+    const actionMap: Record<string, () => Promise<Response>> = {
+      course: () => fetch(`${API_URL}/courses/${id}`, { method: "DELETE" }),
+      announcement: () => fetch(`${API_URL}/announcements/${id}`, { method: "DELETE" }),
+      student: () => fetch(`${API_URL}/students/${id}`, { method: "DELETE" }),
+      assignment: () => fetch(`${API_URL}/assignments/${id}`, { method: "DELETE" })
+    };
+
+    handleApiCall(
+      actionMap[type],
+      () => {
+        if (type === "course") {
+          if (selectedId === id) setSelectedId(null);
+          fetchCourses();
+        } else {
+          fetchCourseData();
+        }
+      }
+    );
+    setDeleteConfirm(null);
   };
 
   const selected = classrooms.find(c => c.id === selectedId);
 
   // Common Modal Input Style Class
-  const premiumInput = "w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 mt-1 text-sm focus:ring-2 focus:ring-brand-blue/50 focus:border-brand-blue outline-none transition-all placeholder:text-slate-400";
-  const premiumLabel = "text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 pl-1";
+  const premiumInput = "w-full bg-white border border-slate-300 rounded-xl px-4 py-3 mt-1 text-sm text-slate-800 focus:ring-2 focus:ring-brand-blue/50 focus:border-brand-blue outline-none transition-all placeholder:text-slate-400 ";
+  const premiumLabel = "text-xs font-bold uppercase tracking-wider text-slate-600 pl-1";
 
   return (
     <div className="space-y-4">
       {errorMsg && (
-        <div className="p-4 bg-red-100 border border-red-400/50 text-red-700 rounded-xl flex items-start gap-3 shadow-sm scale-100 transition-all">
-           <AlertCircle size={20} className="shrink-0 mt-0.5" />
-           <p className="text-sm font-semibold">{errorMsg}</p>
+        <div className="p-4 bg-red-50 border border-red-300 text-red-800 rounded-xl flex items-start gap-3 shadow-sm transition-all">
+          <AlertCircle size={20} className="shrink-0 mt-0.5" />
+          <p className="text-sm font-semibold">{errorMsg}</p>
         </div>
       )}
 
@@ -222,7 +248,7 @@ export const ClassroomsPage: React.FC = () => {
             <PlusCircle size={18} /> Create New Class
           </button>
         </div>
-        <input className="form-input w-72 rounded-xl border-none shadow-sm dark:bg-slate-800/50" placeholder="Search classrooms..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="form-input w-72 rounded-xl border border-slate-300 shadow-sm bg-white text-slate-800 placeholder:text-slate-400" placeholder="Search classrooms..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -235,17 +261,17 @@ export const ClassroomsPage: React.FC = () => {
               <div
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
-                className={`glass-card p-5 cursor-pointer relative group flex justify-between items-start transition-all duration-300 ${selectedId === c.id ? 'ring-2 ring-brand-blue shadow-lg scale-105 z-10' : 'hover:scale-[1.02]'}`}
-                style={{ background: selectedId === c.id ? 'var(--color-brand-blue-pale)' : 'var(--color-surface-card)' }}
+                className={`p-5 cursor-pointer relative group flex justify-between items-start transition-all duration-300 rounded-2xl border ${selectedId === c.id ? 'ring-2 ring-brand-blue/40 border-brand-blue shadow-lg shadow-brand-blue/10 scale-105 z-10 bg-brand-blue-pale ' : 'border-slate-200 bg-white shadow-sm hover:shadow-md hover:scale-[1.02] hover:border-slate-300 '}`}
               >
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "var(--color-brand-gold-dark)" }}>{c.code}</p>
-                  <p className="font-bold text-lg leading-tight" style={{ color: "var(--color-text-primary)" }}>{c.name}</p>
-                  <p className="text-xs font-semibold mt-2 opacity-80" style={{ color: "var(--color-text-muted)" }}>{c.students} Enrolled</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1 text-brand-gold-dark">{c.code}</p>
+                  <p className="font-bold text-lg leading-tight text-slate-900 ">{c.name}</p>
+                  <p className="text-xs font-bold mt-2 text-brand-blue ">{c.students} Enrolled</p>
                 </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleDeleteCourse(c.id); }} 
-                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteCourse(c.id); }}
+                  className="relative z-10 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-100 p-2 rounded-full transition-all cursor-pointer"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -256,34 +282,36 @@ export const ClassroomsPage: React.FC = () => {
         {/* MAIN PANE */}
         <div className="xl:col-span-3 space-y-4 relative">
           {!selected ? (
-            <div className="p-16 text-center glass-card rounded-3xl border-dashed border-2 opacity-60"><p className="text-lg font-medium" style={{color: "var(--color-text-muted)"}}>No course selected or created.</p></div>
+            <div className="p-16 text-center rounded-3xl border-dashed border-2 border-slate-300 bg-white/60 "><p className="text-lg font-medium text-slate-500 ">No course selected or created.</p></div>
           ) : (
             <div className="animate-in fade-in duration-300">
-              <div className="p-8 rounded-3xl relative overflow-hidden flex justify-between items-end shadow-2xl"
+              <div className="p-8 rounded-3xl relative overflow-hidden shadow-2xl"
                 style={{ background: `linear-gradient(135deg, ${selected.color || 'var(--color-brand-blue)'}, #1a202c)` }}>
-                <div className="relative z-10 text-white max-w-xl">
-                  <span className="text-xs font-bold tracking-widest uppercase text-white/50 mb-2 block">Active Dashboard</span>
-                  <h2 className="text-4xl font-black tracking-tight mb-2">{selected.name}</h2>
-                  <p className="text-white/80 text-base mb-4 leading-relaxed">{selected.description}</p>
-                  {selected.enrollment_code && <p className="text-xs font-mono bg-white/10 px-3 py-1.5 inline-block rounded-md border border-white/10">Code: <b>{selected.enrollment_code}</b></p>}
-                </div>
-                <div className="relative z-10 flex gap-3">
-                  <button onClick={() => { setEditingAssignmentId(null); setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); setShowAssignmentModal(true); }} className="btn bg-gold text-slate-900 border-none font-bold hover:bg-yellow-400 shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
-                    <FilePlus size={18} className="mr-2 inline" /> Create Assignment
-                  </button>
-                  <button onClick={() => setShowStudentModal(true)} className="btn bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur-md font-semibold shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
-                    <UserPlus size={18} className="mr-2 inline" /> Add Students
-                  </button>
+                <div className="relative z-10 flex flex-col md:flex-row md:justify-between md:items-end gap-6">
+                  <div className="text-white min-w-0">
+                    <span className="text-xs font-bold tracking-widest uppercase text-white/50 mb-2 block">Active Dashboard</span>
+                    <h2 className="text-4xl font-black tracking-tight mb-2">{selected.name}</h2>
+                    <p className="text-white/80 text-base mb-4 leading-relaxed">{selected.description}</p>
+                    {selected.enrollment_code && <p className="text-xs font-mono bg-white/10 px-3 py-1.5 inline-block rounded-md border border-white/10">Code: <b>{selected.enrollment_code}</b></p>}
+                  </div>
+                  <div className="flex flex-wrap gap-3 shrink-0">
+                    <button onClick={() => { setEditingAssignmentId(null); setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); setShowAssignmentModal(true); }} className="btn bg-white text-black border-none font-bold hover:bg-black hover:text-white shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
+                      <FilePlus size={18} className="mr-2 inline" /> Create Assignment
+                    </button>
+                    <button onClick={() => setShowStudentModal(true)} className="btn bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur-md font-semibold shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
+                      <UserPlus size={18} className="mr-2 inline" /> Add Students
+                    </button>
+                  </div>
                 </div>
                 <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-[100px] -mr-10 -mt-10 pointer-events-none"></div>
               </div>
 
-              <div className="flex justify-center gap-10 border-b border-slate-200 dark:border-slate-800 pb-0 mt-6 px-4">
+              <div className="flex justify-center gap-10 border-b border-slate-200 pb-0 mt-6 px-4">
                 {["home", "assignments", "students"].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab as any)}
-                    className={`text-sm tracking-wide font-bold capitalize pb-4 relative transition-all ${activeTab === tab ? "text-brand-blue" : "text-slate-400 hover:text-slate-600"}`}
+                    className={`text-sm tracking-wide font-bold capitalize pb-4 relative transition-all ${activeTab === tab ? "text-brand-blue " : "text-slate-600 hover:text-slate-900 "}`}
                   >
                     {tab}
                     {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand-blue rounded-t-full" />}
@@ -295,42 +323,42 @@ export const ClassroomsPage: React.FC = () => {
                 {activeTab === "home" && (
                   <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       <div className="glass-card p-6 rounded-2xl">
-                          <p className="text-xs font-bold uppercase tracking-widest mb-3 opacity-60">Total Enrolled</p>
-                          <div className="flex items-center gap-4"><div className="p-3 bg-brand-blue/10 rounded-xl"><Users size={28} className="text-brand-blue" /></div><p className="text-4xl font-extrabold">{students.length}</p></div>
-                       </div>
-                       <div className="glass-card p-6 rounded-2xl">
-                          <p className="text-xs font-bold uppercase tracking-widest mb-3 opacity-60">Course Progress</p>
-                          <div className="space-y-3 mt-1">
-                             <div className="flex justify-between items-center"><p className="text-2xl font-extrabold">{selected.progress}%</p></div>
-                             <div className="progress-bar rounded-full h-3 bg-slate-100 dark:bg-slate-800"><div className="progress-fill bg-brand-blue h-3 rounded-full shadow-lg shadow-blue-500/50" style={{ width: `${selected.progress}%` }} /></div>
-                          </div>
-                       </div>
+                      <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                        <p className="text-xs font-bold uppercase tracking-widest mb-3 text-slate-500 ">Total Enrolled</p>
+                        <div className="flex items-center gap-4"><div className="p-3 bg-brand-blue/10 rounded-xl"><Users size={28} className="text-brand-blue " /></div><p className="text-4xl font-extrabold text-slate-900 ">{students.length}</p></div>
+                      </div>
+                      <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                        <p className="text-xs font-bold uppercase tracking-widest mb-3 text-slate-500 ">Course Progress</p>
+                        <div className="space-y-3 mt-1">
+                          <div className="flex justify-between items-center"><p className="text-2xl font-extrabold text-slate-900 ">{selected.progress}%</p></div>
+                          <div className="progress-bar rounded-full h-3 bg-slate-200 "><div className="progress-fill bg-brand-blue h-3 rounded-full shadow-lg shadow-blue-500/40" style={{ width: `${selected.progress}%` }} /></div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-4 glass-card p-8 rounded-2xl border-none ring-1 ring-slate-900/5 dark:ring-white/5">
-                      <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div className="space-y-4 p-8 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                      <div className="flex items-center justify-between pb-4 border-b border-slate-200 ">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg"><Megaphone size={20} className="text-brand-blue" /></div>
-                          <h3 className="font-extrabold text-xl">Class Announcements</h3>
+                          <div className="p-2 bg-blue-50 rounded-lg"><Megaphone size={20} className="text-brand-blue" /></div>
+                          <h3 className="font-extrabold text-xl text-slate-900 ">Class Announcements</h3>
                         </div>
                         <button onClick={() => setShowAnnouncementModal(true)} className="text-sm font-bold bg-brand-blue text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-blue-500/20 transition-all hover:-translate-y-0.5">Post Announcement</button>
                       </div>
                       <div className="grid gap-4 mt-2">
                         {announcements.length === 0 ? (
-                           <div className="py-12 text-center"><p className="text-slate-400 font-medium">Clear skies. No announcements yet.</p></div>
+                          <div className="py-12 text-center"><p className="text-slate-500 font-medium">Clear skies. No announcements yet.</p></div>
                         ) : (
                           announcements.map((a: any) => (
-                            <div key={a.id} className="p-5 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-start group shadow-sm transition-all hover:shadow-md">
+                            <div key={a.id} className="p-5 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-start group shadow-sm transition-all hover:shadow-md hover:border-brand-blue/30">
                               <div>
                                 <div className="flex items-center gap-3 mb-1">
-                                  <p className="font-bold text-base text-slate-800 dark:text-slate-100">{a.title}</p>
+                                  <p className="font-bold text-base text-slate-900 ">{a.title}</p>
                                   {a.pinned && <span className="text-[10px] uppercase font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded border border-red-200">Pinned</span>}
                                 </div>
-                                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl">{a.body}</p>
+                                <p className="text-sm text-slate-600 leading-relaxed max-w-3xl">{a.body}</p>
                                 <p className="text-[10px] mt-3 font-bold text-slate-400 uppercase tracking-wider">{a.time}</p>
                               </div>
-                              <button onClick={() => handleDeleteAnnouncement(a.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded-lg transition-all">
+                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteAnnouncement(a.id); }} className="relative z-10 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-100 p-2 rounded-lg transition-all cursor-pointer">
                                 <Trash2 size={18} />
                               </button>
                             </div>
@@ -342,57 +370,57 @@ export const ClassroomsPage: React.FC = () => {
                 )}
 
                 {activeTab === "assignments" && (
-                   <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                      <div className="grid gap-4">
-                        {assignments.length === 0 ? (
-                          <div className="p-16 text-center glass-card rounded-2xl"><p className="text-slate-400 font-medium">No assignments yet.</p></div>
-                        ) : (
-                          assignments.map((a: any) => (
-                             <div key={a.id} className="p-6 bg-white dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 flex justify-between items-start group shadow-sm hover:shadow-md transition-all">
-                                <div className="flex-1">
-                                   <div className="flex justify-between items-center pr-6 mb-2">
-                                      <p className="font-bold text-brand-blue text-lg">{a.title}</p>
-                                      <span className="text-xs font-bold text-green-700 bg-green-100 border border-green-200 px-3 py-1 rounded-full">{a.max_points} Points Max</span>
-                                   </div>
-                                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{a.description}</p>
-                                   <div className="flex items-center gap-6 text-xs font-semibold text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg inline-flex">
-                                      <div className="flex items-center gap-2"><Clock size={14} className="text-red-500" /><span>Due: {a.due_date.replace('T', ' at ')}</span></div>
-                                      {a.media_path && <div className="flex items-center gap-2 text-blue-600"><Paperclip size={14} /><span>Attachment</span></div>}
-                                   </div>
-                                </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                  <button onClick={() => handleOpenEditAssignment(a)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-all" title="Edit Assignment">
-                                    <Edit2 size={18} />
-                                  </button>
-                                  <button onClick={() => handleDeleteAssignment(a.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-all" title="Delete Assignment">
-                                    <Trash2 size={18} />
-                                  </button>
-                                </div>
-                             </div>
-                          ))
-                        )}
-                      </div>
-                   </div>
+                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid gap-4">
+                      {assignments.length === 0 ? (
+                        <div className="p-16 text-center rounded-2xl bg-white/60 border border-slate-200 "><p className="text-slate-500 font-medium">No assignments yet.</p></div>
+                      ) : (
+                        assignments.map((a: any) => (
+                          <div key={a.id} className="p-6 bg-white rounded-2xl border border-slate-200 flex justify-between items-start group shadow-sm hover:shadow-md transition-all hover:border-brand-blue/30">
+                            <div className="flex-1">
+                              <div className="flex justify-between items-center pr-6 mb-2">
+                                <p className="font-bold text-brand-blue text-lg">{a.title}</p>
+                                <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-3 py-1 rounded-full">{a.max_points} Points Max</span>
+                              </div>
+                              <p className="text-sm text-slate-700 mb-4 leading-relaxed">{a.description}</p>
+                              <div className="flex items-center gap-6 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 p-3 rounded-lg inline-flex">
+                                <div className="flex items-center gap-2"><Clock size={14} className="text-red-500" /><span>Due: {a.due_date.replace('T', ' at ')}</span></div>
+                                {a.media_path && <div className="flex items-center gap-2 text-blue-700 "><Paperclip size={14} /><span>Attachment</span></div>}
+                              </div>
+                            </div>
+                            <div className="relative z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenEditAssignment(a); }} className="text-blue-500 hover:bg-blue-100 p-2 rounded-lg transition-all cursor-pointer" title="Edit Assignment">
+                                <Edit2 size={18} />
+                              </button>
+                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteAssignment(a.id); }} className="text-red-500 hover:bg-red-100 p-2 rounded-lg transition-all cursor-pointer" title="Delete Assignment">
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 )}
 
                 {activeTab === "students" && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {students.length === 0 ? (
-                       <div className="text-center py-16 glass-card rounded-2xl"><p className="text-slate-400 font-medium">No students enrolled. Add some to begin mapping grades.</p></div>
+                      <div className="text-center py-16 rounded-2xl bg-white/60 border border-slate-200 "><p className="text-slate-500 font-medium">No students enrolled. Add some to begin mapping grades.</p></div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {students.map((s: any) => (
-                          <div key={s.id} className="p-4 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between group shadow-sm">
+                          <div key={s.id} className="p-4 bg-white rounded-xl border border-slate-200 flex items-center justify-between group shadow-sm hover:shadow-md hover:border-brand-blue/30 transition-all">
                             <div className="flex items-center gap-4">
                               <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-extrabold text-lg shadow-md"
                                 style={{ background: "var(--color-brand-blue)" }}>{s.name.charAt(0)}</div>
                               <div>
-                                <p className="font-bold text-slate-800 dark:text-slate-100">{s.name}</p>
-                                <p className="text-xs font-semibold text-slate-400 mt-1">{s.registration_number} • {s.department}</p>
-                                <p className="text-[10px] text-slate-400">{s.email}</p>
+                                <p className="font-bold text-slate-900 ">{s.name}</p>
+                                <p className="text-xs font-bold text-slate-500 mt-1">{s.registration_number} • {s.department}</p>
+                                <p className="text-[10px] font-bold text-brand-blue ">{s.email}</p>
                               </div>
                             </div>
-                            <button onClick={() => handleDeleteStudent(s.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded-lg transition-all">
+                            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteStudent(s.id); }} className="relative z-10 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-100 p-2 rounded-lg transition-all cursor-pointer">
                               <Trash2 size={18} />
                             </button>
                           </div>
@@ -408,22 +436,22 @@ export const ClassroomsPage: React.FC = () => {
       </div>
 
       {/* --- SUPER PREMIUM MODALS --- */}
-      
+
       {showCourseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#111] border border-white/20 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+          <div className="bg-white [#111] border border-slate-200 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] [0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">Create New Class</h3>
-              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 dark:bg-slate-800 p-2 rounded-full dark:hover:text-white transition-colors" onClick={() => setShowCourseModal(false)}><X size={20}/></button>
+              <h3 className="font-extrabold text-2xl text-slate-800 ">Create New Class</h3>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowCourseModal(false)}><X size={20} /></button>
             </div>
             <form onSubmit={handleCreateCourse} className="space-y-5">
-              <div><label className={premiumLabel}>Course Code</label><input required className={premiumInput} placeholder="e.g., CSC101" value={courseForm.code} onChange={e=>setCourseForm({...courseForm, code: e.target.value})} /></div>
-              <div><label className={premiumLabel}>Course Name</label><input required className={premiumInput} placeholder="e.g., Advance Algorithms" value={courseForm.name} onChange={e=>setCourseForm({...courseForm, name: e.target.value})} /></div>
+              <div><label className={premiumLabel}>Course Code</label><input required className={premiumInput} placeholder="e.g., CSC101" value={courseForm.code} onChange={e => setCourseForm({ ...courseForm, code: e.target.value })} /></div>
+              <div><label className={premiumLabel}>Course Name</label><input required className={premiumInput} placeholder="e.g., Advance Algorithms" value={courseForm.name} onChange={e => setCourseForm({ ...courseForm, name: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-4">
-                 <div><label className={premiumLabel}>Batch</label><input className={premiumInput} placeholder="2026-A" value={courseForm.batch} onChange={e=>setCourseForm({...courseForm, batch: e.target.value})} /></div>
-                 <div><label className={premiumLabel}>Optional Code</label><input className={premiumInput} placeholder="Join Code" value={courseForm.enrollment_code} onChange={e=>setCourseForm({...courseForm, enrollment_code: e.target.value})} /></div>
+                <div><label className={premiumLabel}>Batch</label><input className={premiumInput} placeholder="2026-A" value={courseForm.batch} onChange={e => setCourseForm({ ...courseForm, batch: e.target.value })} /></div>
+                <div><label className={premiumLabel}>Optional Code</label><input className={premiumInput} placeholder="Join Code" value={courseForm.enrollment_code} onChange={e => setCourseForm({ ...courseForm, enrollment_code: e.target.value })} /></div>
               </div>
-              <div><label className={premiumLabel}>Description</label><textarea className={premiumInput} placeholder="Brief summary of syllabus..." rows={3} value={courseForm.description} onChange={e=>setCourseForm({...courseForm, description: e.target.value})} /></div>
+              <div><label className={premiumLabel}>Description</label><textarea className={premiumInput} placeholder="Brief summary of syllabus..." rows={3} value={courseForm.description} onChange={e => setCourseForm({ ...courseForm, description: e.target.value })} /></div>
               <button type="submit" className="w-full bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-brand-blue/30 py-4 rounded-xl font-bold text-lg transition-all hover:-translate-y-1">Initialize Course</button>
             </form>
           </div>
@@ -432,28 +460,28 @@ export const ClassroomsPage: React.FC = () => {
 
       {showStudentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#111] border border-white/20 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+          <div className="bg-white [#111] border border-slate-200 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] [0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">Enroll Students</h3>
-              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 dark:bg-slate-800 p-2 rounded-full dark:hover:text-white transition-colors" onClick={() => setShowStudentModal(false)}><X size={20}/></button>
+              <h3 className="font-extrabold text-2xl text-slate-800 ">Enroll Students</h3>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowStudentModal(false)}><X size={20} /></button>
             </div>
-            
-            <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 mb-6 rounded-xl">
-              <button onClick={() => setStudentTab("manual")} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${studentTab === "manual" ? "bg-white dark:bg-slate-700 text-brand-blue shadow-sm" : "text-slate-500"}`}>Manual Entry</button>
-              <button onClick={() => setStudentTab("csv")} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${studentTab === "csv" ? "bg-white dark:bg-slate-700 text-brand-blue shadow-sm" : "text-slate-500"}`}>Bulk CSV</button>
+
+            <div className="flex bg-slate-100 p-1 mb-6 rounded-xl">
+              <button onClick={() => setStudentTab("manual")} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${studentTab === "manual" ? "bg-white text-brand-blue shadow-sm" : "text-slate-500"}`}>Manual Entry</button>
+              <button onClick={() => setStudentTab("csv")} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${studentTab === "csv" ? "bg-white text-brand-blue shadow-sm" : "text-slate-500"}`}>Bulk CSV</button>
             </div>
 
             {studentTab === "manual" ? (
               <form onSubmit={handleAddStudentManual} className="space-y-4">
-                <div><label className={premiumLabel}>Full Name</label><input required className={premiumInput} placeholder="John Doe" value={studentForm.name} onChange={e=>setStudentForm({...studentForm, name: e.target.value})} /></div>
-                <div><label className={premiumLabel}>Email Address</label><input required type="email" className={premiumInput} placeholder="student@university.edu" value={studentForm.email} onChange={e=>setStudentForm({...studentForm, email: e.target.value})} /></div>
+                <div><label className={premiumLabel}>Full Name</label><input required className={premiumInput} placeholder="John Doe" value={studentForm.name} onChange={e => setStudentForm({ ...studentForm, name: e.target.value })} /></div>
+                <div><label className={premiumLabel}>Email Address</label><input required type="email" className={premiumInput} placeholder="student@university.edu" value={studentForm.email} onChange={e => setStudentForm({ ...studentForm, email: e.target.value })} /></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div><label className={premiumLabel}>Reg Number</label><input required className={premiumInput} placeholder="ID908" value={studentForm.registration_number} onChange={e=>setStudentForm({...studentForm, registration_number: e.target.value})} /></div>
-                  <div><label className={premiumLabel}>Class</label><input required className={premiumInput} placeholder="Section A" value={studentForm.student_class} onChange={e=>setStudentForm({...studentForm, student_class: e.target.value})} /></div>
+                  <div><label className={premiumLabel}>Reg Number</label><input required className={premiumInput} placeholder="ID908" value={studentForm.registration_number} onChange={e => setStudentForm({ ...studentForm, registration_number: e.target.value })} /></div>
+                  <div><label className={premiumLabel}>Class</label><input required className={premiumInput} placeholder="Section A" value={studentForm.student_class} onChange={e => setStudentForm({ ...studentForm, student_class: e.target.value })} /></div>
                 </div>
                 <div>
                   <label className={premiumLabel}>Department</label>
-                  <select className={`${premiumInput} appearance-none cursor-pointer`} value={studentForm.department} onChange={e=>setStudentForm({...studentForm, department: e.target.value})}>
+                  <select className={`${premiumInput} appearance-none cursor-pointer`} value={studentForm.department} onChange={e => setStudentForm({ ...studentForm, department: e.target.value })}>
                     {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
                   </select>
                 </div>
@@ -461,11 +489,11 @@ export const ClassroomsPage: React.FC = () => {
               </form>
             ) : (
               <div className="space-y-6 py-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
-                   <p className="text-sm font-semibold text-brand-blue mb-1">CSV Format Required</p>
-                   <code className="text-xs font-bold text-slate-600 dark:text-slate-400">Column Order: Registration Number, Name, Email, Class, Department</code>
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 ">
+                  <p className="text-sm font-semibold text-brand-blue mb-1">CSV Format Required</p>
+                  <code className="text-xs font-bold text-slate-600 ">Column Order: Registration Number, Name, Email, Class, Department</code>
                 </div>
-                <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors">
                   <input type="file" accept=".csv" ref={studentFileInputRef} onChange={handleBulkUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-6 file:rounded-xl file:border-0 file:font-extrabold file:bg-brand-blue file:text-white hover:file:bg-blue-700 cursor-pointer shadow-lg shadow-blue-500/20" />
                 </div>
               </div>
@@ -476,17 +504,17 @@ export const ClassroomsPage: React.FC = () => {
 
       {showAnnouncementModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#111] border border-white/20 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+          <div className="bg-white [#111] border border-slate-200 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] [0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">Broadcast Message</h3>
-              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 dark:bg-slate-800 p-2 rounded-full dark:hover:text-white transition-colors" onClick={() => setShowAnnouncementModal(false)}><X size={20}/></button>
+              <h3 className="font-extrabold text-2xl text-slate-800 ">Broadcast Message</h3>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowAnnouncementModal(false)}><X size={20} /></button>
             </div>
             <form onSubmit={handleCreateAnnouncement} className="space-y-5">
-              <div><label className={premiumLabel}>Headline / Title</label><input required className={premiumInput} placeholder="Urgent update..." value={announcementForm.title} onChange={e=>setAnnouncementForm({...announcementForm, title: e.target.value})} /></div>
-              <div><label className={premiumLabel}>Announcement Body</label><textarea required className={premiumInput} placeholder="Type your message explicitly here..." rows={4} value={announcementForm.body} onChange={e=>setAnnouncementForm({...announcementForm, body: e.target.value})} /></div>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/50">
-                <input type="checkbox" id="pinned" checked={announcementForm.pinned} onChange={e=>setAnnouncementForm({...announcementForm, pinned: e.target.checked})} className="w-5 h-5 rounded border-slate-300 text-brand-blue focus:ring-brand-blue cursor-pointer" />
-                <label htmlFor="pinned" className="font-bold text-sm cursor-pointer select-none">Pin this to top of dashboard feed</label>
+              <div><label className={premiumLabel}>Headline / Title</label><input required className={premiumInput} placeholder="Urgent update..." value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} /></div>
+              <div><label className={premiumLabel}>Announcement Body</label><textarea required className={premiumInput} placeholder="Type your message explicitly here..." rows={4} value={announcementForm.body} onChange={e => setAnnouncementForm({ ...announcementForm, body: e.target.value })} /></div>
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 ">
+                <input type="checkbox" id="pinned" checked={announcementForm.pinned} onChange={e => setAnnouncementForm({ ...announcementForm, pinned: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-brand-blue focus:ring-brand-blue cursor-pointer" />
+                <label htmlFor="pinned" className="font-bold text-sm cursor-pointer select-none text-slate-700 ">Pin this to top of dashboard feed</label>
               </div>
               <button type="submit" className="w-full bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-brand-blue/30 py-4 rounded-xl font-bold text-lg transition-all hover:-translate-y-1">Distribute Now</button>
             </form>
@@ -496,39 +524,68 @@ export const ClassroomsPage: React.FC = () => {
 
       {showAssignmentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#111] border border-white/20 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+          <div className="bg-white [#111] border border-slate-200 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] [0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">
+              <h3 className="font-extrabold text-2xl text-slate-800 ">
                 {editingAssignmentId ? "Modify Assignment" : "New Assignment Details"}
               </h3>
-              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 dark:bg-slate-800 p-2 rounded-full dark:hover:text-white transition-colors" onClick={() => setShowAssignmentModal(false)}><X size={20}/></button>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowAssignmentModal(false)}><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveAssignment} className="space-y-4">
-              <div><label className={premiumLabel}>Designation Title</label><input required className={premiumInput} placeholder="Unit 2 Worksheet" value={assignmentForm.title} onChange={e=>setAssignmentForm({...assignmentForm, title: e.target.value})} /></div>
-              <div><label className={premiumLabel}>Instructions Payload</label><textarea required className={premiumInput} placeholder="Read chapter 4 strictly to conclude answers..." rows={3} value={assignmentForm.description} onChange={e=>setAssignmentForm({...assignmentForm, description: e.target.value})} /></div>
-              
+              <div><label className={premiumLabel}>Designation Title</label><input required className={premiumInput} placeholder="Unit 2 Worksheet" value={assignmentForm.title} onChange={e => setAssignmentForm({ ...assignmentForm, title: e.target.value })} /></div>
+              <div><label className={premiumLabel}>Instructions Payload</label><textarea required className={premiumInput} placeholder="Read chapter 4 strictly to conclude answers..." rows={3} value={assignmentForm.description} onChange={e => setAssignmentForm({ ...assignmentForm, description: e.target.value })} /></div>
+
               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <label className={premiumLabel}>Strict Deadline</label>
-                    <input required type="datetime-local" className={`${premiumInput} text-slate-600 dark:text-slate-300 font-semibold`} value={assignmentForm.dueDate} onChange={e=>setAssignmentForm({...assignmentForm, dueDate: e.target.value})} />
-                 </div>
-                 <div>
-                    <label className={premiumLabel}>Marks Grading</label>
-                    <input required type="number" min="0" className={`${premiumInput} font-extrabold text-brand-blue`} value={assignmentForm.maxPoints} onChange={e=>setAssignmentForm({...assignmentForm, maxPoints: parseInt(e.target.value) || 0})} />
-                 </div>
+                <div>
+                  <label className={premiumLabel}>Strict Deadline</label>
+                  <input required type="datetime-local" className={`${premiumInput} text-slate-600 font-semibold`} value={assignmentForm.dueDate} onChange={e => setAssignmentForm({ ...assignmentForm, dueDate: e.target.value })} />
+                </div>
+                <div>
+                  <label className={premiumLabel}>Marks Grading</label>
+                  <input required type="number" min="0" className={`${premiumInput} font-extrabold text-brand-blue`} value={assignmentForm.maxPoints} onChange={e => setAssignmentForm({ ...assignmentForm, maxPoints: parseInt(e.target.value) || 0 })} />
+                </div>
               </div>
 
-              <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-5 text-center mt-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-5 text-center mt-2 hover:bg-slate-50 transition-colors">
                 <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">
-                   {editingAssignmentId ? "Update Attachment (Optional)" : "Attachment Payload (Optional)"}
+                  {editingAssignmentId ? "Update Attachment (Optional)" : "Attachment Payload (Optional)"}
                 </p>
                 <input type="file" onChange={e => setAssignmentFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer mx-auto" />
               </div>
 
               <button type="submit" className="w-full bg-gold text-slate-900 border-none font-bold py-4 rounded-xl hover:bg-yellow-400 shadow-xl shadow-yellow-500/20 text-lg transition-all hover:-translate-y-1 mt-2">
-                 {editingAssignmentId ? "Save Changes & Announce" : "Activate Assignment Block"}
+                {editingAssignmentId ? "Save Changes & Announce" : "Activate Assignment Block"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-3xl p-8 w-full max-w-sm shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                <AlertTriangle size={32} />
+              </div>
+              <h3 className="font-extrabold text-2xl text-slate-900 mb-2">Confirm Action</h3>
+              <p className="text-slate-600 font-medium mb-8 leading-relaxed px-2">{deleteConfirm.message}</p>
+              
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 py-3.5 px-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 transition-all hover:-translate-y-0.5"
+                >
+                  Yes, Confirm
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

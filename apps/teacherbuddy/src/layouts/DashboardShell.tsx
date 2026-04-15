@@ -17,13 +17,10 @@ import {
   Activity,
   X,
   Menu,
-  Moon,
-  Sun,
   Gamepad2,
   Wrench,
 } from "lucide-react";
 import logo from "../assets/logo (5).png";
-import { useTheme } from "../shared/hooks/useTheme";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/", end: true, keywords: "home overview summary stats" },
@@ -53,7 +50,6 @@ export const DashboardShell: React.FC = () => {
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const { isDark, toggleTheme } = useTheme();
 
   // Filter nav items based on search query
   const searchResults = searchQuery.trim()
@@ -188,16 +184,7 @@ export const DashboardShell: React.FC = () => {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
-          {/* Theme Toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-full transition-colors relative"
-            style={{ color: "var(--color-text-muted)", backgroundColor: "transparent" }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = "var(--color-border)"}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
-          >
-            {isDark ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
+
 
           {/* Notification Bell */}
           <div className="relative">
