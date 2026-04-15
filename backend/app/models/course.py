@@ -13,3 +13,4 @@ class Course(Base):
     progress = Column(Float)
     color = Column(String)
     description = Column(String)
+    enrollment_code = Column(String, unique=True, index=True, nullable=True)
