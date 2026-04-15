@@ -3,6 +3,15 @@ import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X } fr
 
 const API_URL = "http://localhost:8000";
 
+const DEPARTMENTS = [
+  "Computer Science",
+  "Statistics and Data Science",
+  "Commerce",
+  "English",
+  "Law",
+  "Business and Management"
+];
+
 export const ClassroomsPage: React.FC = () => {
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -19,24 +28,21 @@ export const ClassroomsPage: React.FC = () => {
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
 
-  // Course Form State
+  // Forms
   const [courseForm, setCourseForm] = useState({
-    code: "", name: "", batch: "", next_class: "", description: "", enrollment_code: "", color: "#264796"
+    code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796"
   });
 
-  // Student Form State
   const [studentForm, setStudentForm] = useState({
-    name: "", registration_number: "", student_class: "", department: ""
+    name: "", email: "", registration_number: "", student_class: "", department: DEPARTMENTS[0]
   });
   const [studentTab, setStudentTab] = useState<"manual" | "csv">("manual");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Announcement Form State
   const [announcementForm, setAnnouncementForm] = useState({
     title: "", body: "", time: "Just now", pinned: false
   });
 
-  // Assignment Form State (Mock)
   const [assignmentForm, setAssignmentForm] = useState({
     title: "", dueDate: ""
   });
@@ -65,7 +71,6 @@ export const ClassroomsPage: React.FC = () => {
       .then(res => res.json())
       .then(data => setStudents(Array.isArray(data) ? data : []));
 
-    // Refetch courses as well to update student counts
     fetchCourses();
   };
 
@@ -75,13 +80,10 @@ export const ClassroomsPage: React.FC = () => {
 
   useEffect(() => {
     if (selectedId) fetchCourseData();
-    // Default Mock assignments
     setAssignments([
       { id: Date.now(), title: "Mid-Term Project", dueDate: "2024-04-25" }
     ]);
   }, [selectedId]);
-
-  // -- API HANDLERS --
 
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +92,7 @@ export const ClassroomsPage: React.FC = () => {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
     });
     setShowCourseModal(false);
+    setCourseForm({ code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796" });
     fetchCourses();
   };
 
@@ -123,7 +126,7 @@ export const ClassroomsPage: React.FC = () => {
     await fetch(`${API_URL}/students/${selectedId}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(studentForm)
     });
-    setStudentForm({ name: "", registration_number: "", student_class: "", department: "" });
+    setStudentForm({ name: "", email: "", registration_number: "", student_class: "", department: DEPARTMENTS[0] });
     setShowStudentModal(false);
     fetchCourseData();
   };
@@ -159,7 +162,6 @@ export const ClassroomsPage: React.FC = () => {
   return (
     <div className="space-y-4">
 
-      {/* HEADER */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Classroom Management</h1>
@@ -173,10 +175,9 @@ export const ClassroomsPage: React.FC = () => {
         />
       </div>
 
-      {/* MAIN GRID */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
-        {/* SIDEBAR (COURSES) */}
+        {/* SIDEBAR */}
         <div className="space-y-2">
           {classrooms
             .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase()))
@@ -190,10 +191,7 @@ export const ClassroomsPage: React.FC = () => {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--color-brand-gold-dark)" }}>{c.code}</p>
                   <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{c.name}</p>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <Clock size={12} style={{ color: "var(--color-text-muted)" }} />
-                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{c.next_class}</p>
-                  </div>
+                  <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>{c.students} Students</p>
                 </div>
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleDeleteCourse(c.id); }} 
@@ -205,13 +203,12 @@ export const ClassroomsPage: React.FC = () => {
             ))}
         </div>
 
-        {/* RIGHT CONTENT */}
+        {/* MAIN PANE */}
         <div className="xl:col-span-3 space-y-4">
           {!selected ? (
             <div className="p-10 text-center glass-card"><p style={{color: "var(--color-text-muted)"}}>No course selected or created.</p></div>
           ) : (
             <>
-              {/* COURSE HEADER */}
               <div className="p-6 rounded-2xl relative overflow-hidden flex justify-between items-start"
                 style={{ background: `linear-gradient(135deg, ${selected.color || 'var(--color-brand-blue)'}, var(--color-brand-blue-mid))` }}>
                 <div className="relative z-10 text-white">
@@ -229,7 +226,6 @@ export const ClassroomsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* TABS */}
               <div className="flex justify-center gap-6 border-b pb-2">
                 {["home", "assignments", "students"].map(tab => (
                   <button
@@ -244,18 +240,20 @@ export const ClassroomsPage: React.FC = () => {
                 ))}
               </div>
 
-              {/* TAB CONTENT */}
               <div className="p-4">
                 {activeTab === "home" && (
                   <div className="space-y-6 animate-fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                        <div className="glass-card p-4">
                           <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Enrolled</p>
                           <div className="flex items-center gap-3"><Users size={20} style={{ color: "var(--color-brand-blue)" }} /><p className="text-2xl font-bold">{students.length}</p></div>
                        </div>
                        <div className="glass-card p-4">
-                          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Next Session</p>
-                          <div className="flex items-center gap-3"><Clock size={20} style={{ color: "var(--color-brand-blue)" }} /><p className="text-lg font-semibold">{selected.next_class}</p></div>
+                          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Course Progress</p>
+                          <div className="space-y-2">
+                             <div className="flex justify-between items-center"><p className="text-xl font-bold">{selected.progress}%</p></div>
+                             <div className="progress-bar"><div className="progress-fill" style={{ width: `${selected.progress}%` }} /></div>
+                          </div>
                        </div>
                     </div>
 
@@ -319,7 +317,7 @@ export const ClassroomsPage: React.FC = () => {
                                 style={{ background: "var(--color-brand-blue)" }}>{s.name.charAt(0)}</div>
                               <div>
                                 <p className="font-semibold text-sm">{s.name}</p>
-                                <p className="text-[10px] text-gray-500">Reg: {s.registration_number} | {s.student_class} | {s.department}</p>
+                                <p className="text-[10px] text-gray-500">Reg: {s.registration_number} | {s.email} | {s.student_class} | {s.department}</p>
                               </div>
                             </div>
                             <button onClick={() => handleDeleteStudent(s.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded">
@@ -339,92 +337,101 @@ export const ClassroomsPage: React.FC = () => {
 
       {/* --- MODALS --- */}
       
-      {/* Course Modal */}
       {showCourseModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">Create New Class</h3>
-              <button onClick={() => setShowCourseModal(false)}><X size={20}/></button>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Create New Class</h3>
+              <button className="text-slate-500 hover:text-slate-800 dark:hover:text-white" onClick={() => setShowCourseModal(false)}><X size={20}/></button>
             </div>
-            <form onSubmit={handleCreateCourse} className="space-y-3">
-              <input required className="form-input w-full" placeholder="Course Code (e.g., CSC101)" value={courseForm.code} onChange={e=>setCourseForm({...courseForm, code: e.target.value})} />
-              <input required className="form-input w-full" placeholder="Course Name" value={courseForm.name} onChange={e=>setCourseForm({...courseForm, name: e.target.value})} />
-              <input className="form-input w-full" placeholder="Batch / Year" value={courseForm.batch} onChange={e=>setCourseForm({...courseForm, batch: e.target.value})} />
-              <input className="form-input w-full" placeholder="Next Class info" value={courseForm.next_class} onChange={e=>setCourseForm({...courseForm, next_class: e.target.value})} />
-              <input className="form-input w-full" placeholder="Enrollment Code (optional)" value={courseForm.enrollment_code} onChange={e=>setCourseForm({...courseForm, enrollment_code: e.target.value})} />
-              <textarea className="form-input w-full" placeholder="Description" rows={3} value={courseForm.description} onChange={e=>setCourseForm({...courseForm, description: e.target.value})} />
-              <button type="submit" className="w-full btn btn-primary py-2 mt-2">Create Course</button>
+            <form onSubmit={handleCreateCourse} className="space-y-4">
+              <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Course Code (e.g., CSC101)" value={courseForm.code} onChange={e=>setCourseForm({...courseForm, code: e.target.value})} />
+              <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Course Name" value={courseForm.name} onChange={e=>setCourseForm({...courseForm, name: e.target.value})} />
+              <input className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Batch / Year" value={courseForm.batch} onChange={e=>setCourseForm({...courseForm, batch: e.target.value})} />
+              <input className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Enrollment Code (optional)" value={courseForm.enrollment_code} onChange={e=>setCourseForm({...courseForm, enrollment_code: e.target.value})} />
+              <textarea className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Description" rows={3} value={courseForm.description} onChange={e=>setCourseForm({...courseForm, description: e.target.value})} />
+              <button type="submit" className="w-full btn btn-primary py-3 rounded-lg font-bold">Create Course</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Student Modal */}
       {showStudentModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">Add Students</h3>
-              <button onClick={() => setShowStudentModal(false)}><X size={20}/></button>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Add Students</h3>
+              <button className="text-slate-500 hover:text-slate-800 dark:hover:text-white" onClick={() => setShowStudentModal(false)}><X size={20}/></button>
             </div>
             
-            <div className="flex gap-2 mb-4 border-b pb-2">
-              <button onClick={() => setStudentTab("manual")} className={`px-3 py-1 rounded text-sm ${studentTab === "manual" ? "bg-brand-blue text-white" : "hover:bg-gray-100"}`}>Manual</button>
-              <button onClick={() => setStudentTab("csv")} className={`px-3 py-1 rounded text-sm ${studentTab === "csv" ? "bg-brand-blue text-white" : "hover:bg-gray-100"}`}>CSV Upload</button>
+            <div className="flex gap-2 mb-6 border-b border-slate-100 dark:border-slate-800 pb-2">
+              <button onClick={() => setStudentTab("manual")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${studentTab === "manual" ? "bg-brand-blue text-white shadow-md shadow-blue-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>Manual Entry</button>
+              <button onClick={() => setStudentTab("csv")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${studentTab === "csv" ? "bg-brand-blue text-white shadow-md shadow-blue-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>CSV Upload</button>
             </div>
 
             {studentTab === "manual" ? (
-              <form onSubmit={handleAddStudentManual} className="space-y-3">
-                <input required className="form-input w-full" placeholder="Student Name" value={studentForm.name} onChange={e=>setStudentForm({...studentForm, name: e.target.value})} />
-                <input required className="form-input w-full" placeholder="Registration Number" value={studentForm.registration_number} onChange={e=>setStudentForm({...studentForm, registration_number: e.target.value})} />
-                <input required className="form-input w-full" placeholder="Class/Section" value={studentForm.student_class} onChange={e=>setStudentForm({...studentForm, student_class: e.target.value})} />
-                <input required className="form-input w-full" placeholder="Department" value={studentForm.department} onChange={e=>setStudentForm({...studentForm, department: e.target.value})} />
-                <button type="submit" className="w-full btn btn-primary py-2 mt-2">Enroll Student</button>
+              <form onSubmit={handleAddStudentManual} className="space-y-4">
+                <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Student Name" value={studentForm.name} onChange={e=>setStudentForm({...studentForm, name: e.target.value})} />
+                <input required type="email" className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Email Address" value={studentForm.email} onChange={e=>setStudentForm({...studentForm, email: e.target.value})} />
+                <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Registration Number" value={studentForm.registration_number} onChange={e=>setStudentForm({...studentForm, registration_number: e.target.value})} />
+                <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Class/Section" value={studentForm.student_class} onChange={e=>setStudentForm({...studentForm, student_class: e.target.value})} />
+                
+                <select 
+                   className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none appearance-none" 
+                   value={studentForm.department} 
+                   onChange={e=>setStudentForm({...studentForm, department: e.target.value})}
+                >
+                  {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
+                </select>
+
+                <button type="submit" className="w-full btn btn-primary py-3 rounded-lg font-bold">Enroll Student</button>
               </form>
             ) : (
               <div className="space-y-4 py-4">
-                <p className="text-sm text-gray-500 mb-2">Upload a CSV file containing: <b>[registration_number, name, class, department]</b> (no headers needed if strictly formatted, but parser safely skips first row).</p>
-                <input type="file" accept=".csv" ref={fileInputRef} onChange={handleBulkUpload} className="block w-full text-sm border p-2 rounded" />
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
+                  Upload a CSV file containing: <br/>
+                  <code className="bg-slate-100 dark:bg-slate-800 text-brand-blue px-2 py-1 rounded text-xs mt-1 inline-block">[reg_number, name, email, class, dept]</code>
+                </p>
+                <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <input type="file" accept=".csv" ref={fileInputRef} onChange={handleBulkUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer" />
+                </div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Announcement Modal */}
       {showAnnouncementModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">Post Announcement</h3>
-              <button onClick={() => setShowAnnouncementModal(false)}><X size={20}/></button>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Post Announcement</h3>
+              <button className="text-slate-500 hover:text-slate-800 dark:hover:text-white" onClick={() => setShowAnnouncementModal(false)}><X size={20}/></button>
             </div>
-            <form onSubmit={handleCreateAnnouncement} className="space-y-3">
-              <input required className="form-input w-full" placeholder="Title" value={announcementForm.title} onChange={e=>setAnnouncementForm({...announcementForm, title: e.target.value})} />
-              <textarea required className="form-input w-full" placeholder="Details..." rows={4} value={announcementForm.body} onChange={e=>setAnnouncementForm({...announcementForm, body: e.target.value})} />
-              <div className="flex items-center gap-2 text-sm pt-2">
-                <input type="checkbox" id="pinned" checked={announcementForm.pinned} onChange={e=>setAnnouncementForm({...announcementForm, pinned: e.target.checked})} />
-                <label htmlFor="pinned">Pin to top</label>
+            <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+              <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Title" value={announcementForm.title} onChange={e=>setAnnouncementForm({...announcementForm, title: e.target.value})} />
+              <textarea required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Details..." rows={4} value={announcementForm.body} onChange={e=>setAnnouncementForm({...announcementForm, body: e.target.value})} />
+              <div className="flex items-center gap-3 text-sm pt-2 text-slate-600 dark:text-slate-300">
+                <input type="checkbox" id="pinned" checked={announcementForm.pinned} onChange={e=>setAnnouncementForm({...announcementForm, pinned: e.target.checked})} className="w-4 h-4 rounded text-brand-blue focus:ring-brand-blue" />
+                <label htmlFor="pinned" className="font-medium">Pin to top of class</label>
               </div>
-              <button type="submit" className="w-full btn btn-primary py-2 mt-2">Post Announcement</button>
+              <button type="submit" className="w-full btn btn-primary py-3 rounded-lg font-bold">Post Announcement</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* mock Assignment Modal */}
       {showAssignmentModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">Create Assignment</h3>
-              <button onClick={() => setShowAssignmentModal(false)}><X size={20}/></button>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Create Assignment</h3>
+              <button className="text-slate-500 hover:text-slate-800 dark:hover:text-white" onClick={() => setShowAssignmentModal(false)}><X size={20}/></button>
             </div>
-            <form onSubmit={handleCreateAssignment} className="space-y-3">
-              <input required className="form-input w-full" placeholder="Assignment Title" value={assignmentForm.title} onChange={e=>setAssignmentForm({...assignmentForm, title: e.target.value})} />
-              <input required type="date" className="form-input w-full" value={assignmentForm.dueDate} onChange={e=>setAssignmentForm({...assignmentForm, dueDate: e.target.value})} />
-              <button type="submit" className="w-full bg-gold text-white font-bold py-2 mt-2 rounded border border-yellow-600 hover:bg-yellow-600">Create (Mock)</button>
+            <form onSubmit={handleCreateAssignment} className="space-y-4">
+              <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Assignment Title" value={assignmentForm.title} onChange={e=>setAssignmentForm({...assignmentForm, title: e.target.value})} />
+              <input required type="date" className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none text-slate-600 dark:text-slate-300" value={assignmentForm.dueDate} onChange={e=>setAssignmentForm({...assignmentForm, dueDate: e.target.value})} />
+              <button type="submit" className="w-full bg-gold text-slate-900 font-bold py-3 rounded-lg hover:bg-yellow-500 shadow-md">Create Assignment (Mock)</button>
             </form>
           </div>
         </div>
