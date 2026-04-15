@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle } from "lucide-react";
+import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle, Edit2 } from "lucide-react";
 
 const API_URL = "http://localhost:8000";
 
@@ -27,7 +27,9 @@ export const ClassroomsPage: React.FC = () => {
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
 
   // Forms
   const [courseForm, setCourseForm] = useState({
@@ -153,7 +155,19 @@ export const ClassroomsPage: React.FC = () => {
     handleApiCall(() => fetch(`${API_URL}/students/${id}`, { method: "DELETE" }), fetchCourseData);
   };
 
-  const handleCreateAssignment = (e: React.FormEvent) => {
+  const handleOpenEditAssignment = (assignment: any) => {
+    setEditingAssignmentId(assignment.id);
+    setAssignmentForm({
+      title: assignment.title,
+      description: assignment.description,
+      dueDate: assignment.due_date,
+      maxPoints: assignment.max_points
+    });
+    setAssignmentFile(null);
+    setShowAssignmentModal(true);
+  };
+
+  const handleSaveAssignment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedId) return;
 
@@ -164,9 +178,20 @@ export const ClassroomsPage: React.FC = () => {
     formData.append("max_points", assignmentForm.maxPoints.toString());
     if (assignmentFile) formData.append("file", assignmentFile);
 
+    const method = editingAssignmentId ? "PUT" : "POST";
+    const endpointUrl = editingAssignmentId 
+      ? `${API_URL}/assignments/${editingAssignmentId}`
+      : `${API_URL}/assignments/${selectedId}`;
+
     handleApiCall(
-      () => fetch(`${API_URL}/assignments/${selectedId}`, { method: "POST", body: formData }),
-      () => { setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); setAssignmentFile(null); setShowAssignmentModal(false); fetchCourseData(); }
+      () => fetch(endpointUrl, { method, body: formData }),
+      () => { 
+        setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); 
+        setAssignmentFile(null); 
+        setEditingAssignmentId(null);
+        setShowAssignmentModal(false); 
+        fetchCourseData(); 
+      }
     );
   };
 
@@ -243,7 +268,7 @@ export const ClassroomsPage: React.FC = () => {
                   {selected.enrollment_code && <p className="text-xs font-mono bg-white/10 px-3 py-1.5 inline-block rounded-md border border-white/10">Code: <b>{selected.enrollment_code}</b></p>}
                 </div>
                 <div className="relative z-10 flex gap-3">
-                  <button onClick={() => setShowAssignmentModal(true)} className="btn bg-gold text-slate-900 border-none font-bold hover:bg-yellow-400 shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
+                  <button onClick={() => { setEditingAssignmentId(null); setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); setShowAssignmentModal(true); }} className="btn bg-gold text-slate-900 border-none font-bold hover:bg-yellow-400 shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
                     <FilePlus size={18} className="mr-2 inline" /> Create Assignment
                   </button>
                   <button onClick={() => setShowStudentModal(true)} className="btn bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur-md font-semibold shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
@@ -335,9 +360,14 @@ export const ClassroomsPage: React.FC = () => {
                                       {a.media_path && <div className="flex items-center gap-2 text-blue-600"><Paperclip size={14} /><span>Attachment</span></div>}
                                    </div>
                                 </div>
-                                <button onClick={() => handleDeleteAssignment(a.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded-lg transition-all">
-                                  <Trash2 size={18} />
-                                </button>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                  <button onClick={() => handleOpenEditAssignment(a)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-all" title="Edit Assignment">
+                                    <Edit2 size={18} />
+                                  </button>
+                                  <button onClick={() => handleDeleteAssignment(a.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-all" title="Delete Assignment">
+                                    <Trash2 size={18} />
+                                  </button>
+                                </div>
                              </div>
                           ))
                         )}
@@ -468,10 +498,12 @@ export const ClassroomsPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white dark:bg-[#111] border border-white/20 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">New Assignment Details</h3>
+              <h3 className="font-extrabold text-2xl text-slate-800 dark:text-slate-100">
+                {editingAssignmentId ? "Modify Assignment" : "New Assignment Details"}
+              </h3>
               <button className="text-slate-400 hover:text-slate-800 bg-slate-100 dark:bg-slate-800 p-2 rounded-full dark:hover:text-white transition-colors" onClick={() => setShowAssignmentModal(false)}><X size={20}/></button>
             </div>
-            <form onSubmit={handleCreateAssignment} className="space-y-4">
+            <form onSubmit={handleSaveAssignment} className="space-y-4">
               <div><label className={premiumLabel}>Designation Title</label><input required className={premiumInput} placeholder="Unit 2 Worksheet" value={assignmentForm.title} onChange={e=>setAssignmentForm({...assignmentForm, title: e.target.value})} /></div>
               <div><label className={premiumLabel}>Instructions Payload</label><textarea required className={premiumInput} placeholder="Read chapter 4 strictly to conclude answers..." rows={3} value={assignmentForm.description} onChange={e=>setAssignmentForm({...assignmentForm, description: e.target.value})} /></div>
               
@@ -487,11 +519,15 @@ export const ClassroomsPage: React.FC = () => {
               </div>
 
               <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-5 text-center mt-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">Attachment Payload (Optional)</p>
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">
+                   {editingAssignmentId ? "Update Attachment (Optional)" : "Attachment Payload (Optional)"}
+                </p>
                 <input type="file" onChange={e => setAssignmentFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer mx-auto" />
               </div>
 
-              <button type="submit" className="w-full bg-gold text-slate-900 border-none font-bold py-4 rounded-xl hover:bg-yellow-400 shadow-xl shadow-yellow-500/20 text-lg transition-all hover:-translate-y-1 mt-2">Activate Assignment Block</button>
+              <button type="submit" className="w-full bg-gold text-slate-900 border-none font-bold py-4 rounded-xl hover:bg-yellow-400 shadow-xl shadow-yellow-500/20 text-lg transition-all hover:-translate-y-1 mt-2">
+                 {editingAssignmentId ? "Save Changes & Announce" : "Activate Assignment Block"}
+              </button>
             </form>
           </div>
         </div>

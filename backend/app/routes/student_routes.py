@@ -27,6 +27,7 @@ def manual_enroll(course_id: int, student: StudentCreate, db: Session = Depends(
         raise HTTPException(status_code=404, detail="Course not found")
     
     new_student = Student(**student.model_dump(), course_id=course_id)
+    course.students = (course.students or 0) + 1
     db.add(new_student)
     db.commit()
     db.refresh(new_student)
@@ -63,6 +64,7 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session 
             )
             
     db.bulk_save_objects(students_to_add)
+    course.students = (course.students or 0) + len(students_to_add)
     db.commit()
     return {"message": f"Successfully enrolled {len(students_to_add)} students"}
 
@@ -73,6 +75,7 @@ def enroll_via_code(enrollment_code: str, student: StudentCreate, db: Session = 
         raise HTTPException(status_code=404, detail="Invalid enrollment code")
         
     new_student = Student(**student.model_dump(), course_id=course.id)
+    course.students = (course.students or 0) + 1
     db.add(new_student)
     db.commit()
     db.refresh(new_student)
@@ -84,6 +87,10 @@ def delete_student(student_id: int, db: Session = Depends(get_db)):
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
         
+    course = db.query(Course).filter(Course.id == student.course_id).first()
+    if course and course.students and course.students > 0:
+        course.students -= 1
+
     db.delete(student)
     db.commit()
     return None
