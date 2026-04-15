@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X } from "lucide-react";
+import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip } from "lucide-react";
 
 const API_URL = "http://localhost:8000";
 
@@ -37,15 +37,16 @@ export const ClassroomsPage: React.FC = () => {
     name: "", email: "", registration_number: "", student_class: "", department: DEPARTMENTS[0]
   });
   const [studentTab, setStudentTab] = useState<"manual" | "csv">("manual");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const studentFileInputRef = useRef<HTMLInputElement>(null);
 
   const [announcementForm, setAnnouncementForm] = useState({
     title: "", body: "", time: "Just now", pinned: false
   });
 
   const [assignmentForm, setAssignmentForm] = useState({
-    title: "", dueDate: ""
+    title: "", description: "", dueDate: "", maxPoints: 100
   });
+  const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
 
   const fetchCourses = () => {
     fetch(`${API_URL}/courses/`)
@@ -71,6 +72,10 @@ export const ClassroomsPage: React.FC = () => {
       .then(res => res.json())
       .then(data => setStudents(Array.isArray(data) ? data : []));
 
+    fetch(`${API_URL}/assignments/${selectedId}`)
+      .then(res => res.json())
+      .then(data => setAssignments(Array.isArray(data) ? data : []));
+
     fetchCourses();
   };
 
@@ -80,9 +85,6 @@ export const ClassroomsPage: React.FC = () => {
 
   useEffect(() => {
     if (selectedId) fetchCourseData();
-    setAssignments([
-      { id: Date.now(), title: "Mid-Term Project", dueDate: "2024-04-25" }
-    ]);
   }, [selectedId]);
 
   const handleCreateCourse = async (e: React.FormEvent) => {
@@ -150,12 +152,35 @@ export const ClassroomsPage: React.FC = () => {
     fetchCourseData();
   };
 
-  const handleCreateAssignment = (e: React.FormEvent) => {
+  const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAssignments([{ id: Date.now(), ...assignmentForm }, ...assignments]);
+    if (!selectedId) return;
+
+    const formData = new FormData();
+    formData.append("title", assignmentForm.title);
+    formData.append("description", assignmentForm.description);
+    formData.append("due_date", assignmentForm.dueDate);
+    formData.append("max_points", assignmentForm.maxPoints.toString());
+    if (assignmentFile) {
+      formData.append("file", assignmentFile);
+    }
+
+    await fetch(`${API_URL}/assignments/${selectedId}`, {
+      method: "POST", body: formData
+    });
+    
+    setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 });
+    setAssignmentFile(null);
     setShowAssignmentModal(false);
-    setAssignmentForm({ title: "", dueDate: "" });
+    fetchCourseData();
   };
+
+  const handleDeleteAssignment = async (id: number) => {
+    if (!window.confirm("Delete this assignment?")) return;
+    await fetch(`${API_URL}/assignments/${id}`, { method: "DELETE" });
+    fetchCourseData();
+  };
+
 
   const selected = classrooms.find(c => c.id === selectedId);
 
@@ -289,17 +314,29 @@ export const ClassroomsPage: React.FC = () => {
 
                 {activeTab === "assignments" && (
                    <div className="space-y-4 animate-fade-in">
-                      <div className="grid gap-3">
-                        {assignments.map((a: any) => (
-                           <div key={a.id} className="p-4 glass-card flex justify-between items-center">
-                              <div>
-                                 <p className="font-bold text-sm mb-1">{a.title}</p>
-                                 <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
-                                    <Clock size={12} /><span>Due: {a.dueDate}</span>
-                                 </div>
-                              </div>
-                           </div>
-                        ))}
+                      <div className="grid gap-4">
+                        {assignments.length === 0 ? (
+                          <div className="p-10 text-center glass-card"><p style={{ color: "var(--color-text-muted)" }}>No assignments yet.</p></div>
+                        ) : (
+                          assignments.map((a: any) => (
+                             <div key={a.id} className="p-4 glass-card flex justify-between items-start group">
+                                <div className="flex-1">
+                                   <div className="flex justify-between items-center pr-4">
+                                      <p className="font-bold text-brand-blue mb-1">{a.title}</p>
+                                      <span className="text-xs font-bold text-white bg-green-600 px-2 py-0.5 rounded-full">{a.max_points} Pts</span>
+                                   </div>
+                                   <p className="text-sm mt-1">{a.description}</p>
+                                   <div className="flex items-center gap-4 text-xs mt-3" style={{ color: "var(--color-text-muted)" }}>
+                                      <div className="flex items-center gap-1"><Clock size={12} className="text-red-500" /><span>Due: {a.due_date.replace('T', ', ')}</span></div>
+                                      {a.media_path && <div className="flex items-center gap-1 text-blue-500"><Paperclip size={12} /><span>Attachment included</span></div>}
+                                   </div>
+                                </div>
+                                <button onClick={() => handleDeleteAssignment(a.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 p-2 rounded">
+                                  <Trash2 size={16} />
+                                </button>
+                             </div>
+                          ))
+                        )}
                       </div>
                    </div>
                 )}
@@ -393,7 +430,7 @@ export const ClassroomsPage: React.FC = () => {
                   <code className="bg-slate-100 dark:bg-slate-800 text-brand-blue px-2 py-1 rounded text-xs mt-1 inline-block">[reg_number, name, email, class, dept]</code>
                 </p>
                 <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <input type="file" accept=".csv" ref={fileInputRef} onChange={handleBulkUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer" />
+                  <input type="file" accept=".csv" ref={studentFileInputRef} onChange={handleBulkUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer" />
                 </div>
               </div>
             )}
@@ -430,8 +467,25 @@ export const ClassroomsPage: React.FC = () => {
             </div>
             <form onSubmit={handleCreateAssignment} className="space-y-4">
               <input required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Assignment Title" value={assignmentForm.title} onChange={e=>setAssignmentForm({...assignmentForm, title: e.target.value})} />
-              <input required type="date" className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none text-slate-600 dark:text-slate-300" value={assignmentForm.dueDate} onChange={e=>setAssignmentForm({...assignmentForm, dueDate: e.target.value})} />
-              <button type="submit" className="w-full bg-gold text-slate-900 font-bold py-3 rounded-lg hover:bg-yellow-500 shadow-md">Create Assignment (Mock)</button>
+              <textarea required className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" placeholder="Task description and details..." rows={3} value={assignmentForm.description} onChange={e=>setAssignmentForm({...assignmentForm, description: e.target.value})} />
+              
+              <div className="flex gap-4">
+                 <div className="w-1/2">
+                    <label className="text-xs text-slate-500 mb-1 block">Deadline</label>
+                    <input required type="datetime-local" className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none text-slate-600 dark:text-slate-300" value={assignmentForm.dueDate} onChange={e=>setAssignmentForm({...assignmentForm, dueDate: e.target.value})} />
+                 </div>
+                 <div className="w-1/2">
+                    <label className="text-xs text-slate-500 mb-1 block">Max Points</label>
+                    <input required type="number" min="0" className="form-input w-full bg-slate-50 dark:bg-slate-800 border-none" value={assignmentForm.maxPoints} onChange={e=>setAssignmentForm({...assignmentForm, maxPoints: parseInt(e.target.value) || 0})} />
+                 </div>
+              </div>
+
+              <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-4 text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <p className="text-xs text-slate-500 mb-2">Upload reference material / worksheet (optional)</p>
+                <input type="file" onChange={e => setAssignmentFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-gray-100 dark:file:bg-slate-800 file:text-slate-700 dark:file:text-slate-300 hover:file:bg-gray-200 cursor-pointer mx-auto" />
+              </div>
+
+              <button type="submit" className="w-full bg-gold text-slate-900 font-bold py-3 rounded-lg hover:bg-yellow-500 shadow-md">Distribute Assignment</button>
             </form>
           </div>
         </div>

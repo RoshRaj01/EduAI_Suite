@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.database import Base, engine
-from app.routes import course_routes, announcement_routes, resource_routes, student_routes
+from app.routes import course_routes, announcement_routes, resource_routes, student_routes, assignment_routes
 from fastapi.middleware.cors import CORSMiddleware
 
 Base.metadata.create_all(bind=engine)
@@ -19,6 +19,7 @@ app.include_router(course_routes.router)
 app.include_router(announcement_routes.router)
 app.include_router(resource_routes.router)
 app.include_router(student_routes.router)
+app.include_router(assignment_routes.router)
 
 @app.get("/")
 def root():

@@ -3,6 +3,7 @@ from app.database import SessionLocal, Base, engine
 from app.models.course import Course
 from app.models.announcement import Announcement
 from app.models.student import Student
+from app.models.assignment import Assignment
 
 if os.path.exists("edu.db"):
     # Delete to recreate fresh tables with new fields
@@ -55,6 +56,24 @@ db.add_all([
         body="Scheduled next week",
         time="Yesterday",
         pinned=False
+    )
+])
+
+# 🔹 Assignments
+db.add_all([
+    Assignment(
+        course_id=course1.id,
+        title="Lab Report - 1",
+        description="Write a detailed report on backpropagation implementation.",
+        due_date="2024-04-20",
+        max_points=50
+    ),
+    Assignment(
+        course_id=course1.id,
+        title="Mid-Term Project",
+        description="Design a generic CNN for image classification.",
+        due_date="2024-04-25",
+        max_points=100
     )
 ])
 
