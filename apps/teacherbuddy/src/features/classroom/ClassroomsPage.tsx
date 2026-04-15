@@ -47,10 +47,10 @@ export const ClassroomsPage: React.FC = () => {
 
       {/* 🔥 HEADER ROW (TITLE + SEARCH SIDE BY SIDE) */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Classroom Management</h1>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Classroom Management</h1>
         <input
           className="form-input w-72"
-          placeholder="Search..."
+          placeholder="Search for a classroom..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -70,11 +70,15 @@ export const ClassroomsPage: React.FC = () => {
               <div
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
-                className="glass-card p-3 cursor-pointer"
+                className={`glass-card p-4 cursor-pointer card-interactive ${selectedId === c.id ? 'ring-2 ring-brand-blue ring-offset-2' : ''}`}
+                style={{ background: selectedId === c.id ? 'var(--color-brand-blue-pale)' : 'var(--color-surface-card)' }}
               >
-                <p>{c.code}</p>
-                <p>{c.name}</p>
-                <p className="text-xs text-gray-500">{c.next_class}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--color-brand-gold-dark)" }}>{c.code}</p>
+                <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{c.name}</p>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <Clock size={12} style={{ color: "var(--color-text-muted)" }} />
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{c.next_class}</p>
+                </div>
               </div>
             ))}
         </div>
@@ -87,9 +91,14 @@ export const ClassroomsPage: React.FC = () => {
           ) : (
             <>
               {/* COURSE HEADER */}
-              <div className="p-4 rounded-xl bg-blue-100">
-                <h2 className="text-lg font-bold">{selected.name}</h2>
-                <p className="text-sm">{selected.description}</p>
+              <div className="p-6 rounded-2xl relative overflow-hidden"
+                style={{ background: "linear-gradient(135deg, var(--color-brand-blue), var(--color-brand-blue-mid))", color: "white" }}>
+                <div className="relative z-10">
+                  <h2 className="text-2xl font-bold tracking-tight">{selected.name}</h2>
+                  <p className="text-blue-100/90 text-sm mt-1 max-w-2xl">{selected.description}</p>
+                </div>
+                {/* Decorative circle */}
+                <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
               </div>
 
               {/* 🔥 CENTERED TABS */}
@@ -98,9 +107,15 @@ export const ClassroomsPage: React.FC = () => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab as any)}
-                    className={`text-sm font-semibold ${activeTab === tab ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-400"}`}
+                    className={`text-sm font-semibold capitalize pt-4 pb-2 transition-all relative ${activeTab === tab ? "text-brand-blue" : "text-text-muted hover:text-text-secondary"
+                      }`}
+                    style={{ color: activeTab === tab ? "var(--color-brand-blue)" : "var(--color-text-muted)" }}
                   >
                     {tab}
+                    {activeTab === tab && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-blue rounded-full animate-fade-in"
+                        style={{ backgroundColor: "var(--color-brand-blue)" }} />
+                    )}
                   </button>
                 ))}
               </div>
@@ -109,10 +124,32 @@ export const ClassroomsPage: React.FC = () => {
               <div className="p-4">
 
                 {activeTab === "home" && (
-                  <div className="space-y-2">
-                    <p><Users size={14} /> Students: {selected.students}</p>
-                    <p><Clock size={14} /> Next Class: {selected.next_class}</p>
-                    <p>Progress: {selected.progress}%</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
+                    <div className="glass-card p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Students Enrolled</p>
+                      <div className="flex items-center gap-3">
+                        <Users size={20} style={{ color: "var(--color-brand-blue)" }} />
+                        <p className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>{selected.students}</p>
+                      </div>
+                    </div>
+                    <div className="glass-card p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Next Session</p>
+                      <div className="flex items-center gap-3">
+                        <Clock size={20} style={{ color: "var(--color-brand-blue)" }} />
+                        <p className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>{selected.next_class}</p>
+                      </div>
+                    </div>
+                    <div className="glass-card p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-text-muted)" }}>Course Progress</p>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <p className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{selected.progress}%</p>
+                        </div>
+                        <div className="progress-bar">
+                          <div className="progress-fill" style={{ width: `${selected.progress}%` }} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -132,16 +169,26 @@ export const ClassroomsPage: React.FC = () => {
                 )}
 
                 {activeTab === "students" && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {students.length === 0 ? (
-                      <p>No students</p>
+                      <div className="text-center py-10">
+                        <p style={{ color: "var(--color-text-muted)" }}>No students found in this classroom.</p>
+                      </div>
                     ) : (
-                      students.map((s: any) => (
-                        <div key={s.id} className="p-3 border rounded">
-                          <p>{s.name}</p>
-                          <p className="text-sm">{s.roll}</p>
-                        </div>
-                      ))
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {students.map((s: any) => (
+                          <div key={s.id} className="p-4 glass-card flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                              style={{ background: "linear-gradient(135deg, var(--color-brand-blue), var(--color-brand-blue-light))" }}>
+                              {s.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{s.name}</p>
+                              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Roll No: {s.roll}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}

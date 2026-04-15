@@ -90,7 +90,7 @@ export const DashboardShell: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen text-slate-800 dark:text-slate-200" style={{ background: "var(--color-surface-base)" }}>
+    <div className="min-h-screen" style={{ background: "var(--color-surface-base)", color: "var(--color-text-primary)" }}>
 
       {/* ── Top App Bar ──────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 z-50 h-[64px] flex items-center justify-between px-4"
@@ -244,7 +244,7 @@ export const DashboardShell: React.FC = () => {
             )}
           </div>
 
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 hidden sm:block" />
+          <div className="w-px h-6 hidden sm:block" style={{ backgroundColor: "var(--color-border)" }} />
 
           {/* Profile */}
           <div className="relative">
@@ -303,9 +303,9 @@ export const DashboardShell: React.FC = () => {
               to={item.href}
               end={item.end}
               className={({ isActive }) =>
-                `flex items-center gap-4 px-5 py-3.5 rounded-r-full transition-colors ${isActive
-                  ? "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-                  : "hover:bg-slate-100 dark:hover:bg-slate-800/50"
+                `flex items-center gap-4 px-5 py-3.5 rounded-r-full transition-all group ${isActive
+                  ? "bg-brand-blue/10 text-brand-blue shadow-sm"
+                  : "hover:bg-brand-blue/5"
                 }`
               }
               style={({ isActive }) => ({
