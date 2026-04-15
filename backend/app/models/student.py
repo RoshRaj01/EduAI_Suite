@@ -8,6 +8,7 @@ class Student(Base):
     course_id = Column(Integer, ForeignKey("courses.id"))
     name = Column(String)
     registration_number = Column(String)
+    email = Column(String)
     student_class = Column(String)
     department = Column(String)
     attendance = Column(Integer, default=0)

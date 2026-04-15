@@ -6,7 +6,6 @@ class CourseBase(BaseModel):
     name: str
     batch: str
     students: int
-    next_class: str
     progress: float
     color: str
     description: str
@@ -19,7 +18,6 @@ class CourseUpdate(BaseModel):
     name: Optional[str] = None
     batch: Optional[str] = None
     students: Optional[int] = None
-    next_class: Optional[str] = None
     progress: Optional[float] = None
     color: Optional[str] = None
     description: Optional[str] = None

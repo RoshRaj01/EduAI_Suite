@@ -9,7 +9,6 @@ class Course(Base):
     name = Column(String)
     batch = Column(String)
     students = Column(Integer)
-    next_class = Column(String)
     progress = Column(Float)
     color = Column(String)
     description = Column(String)

@@ -18,7 +18,6 @@ course1 = Course(
     name="Advanced Neural Networks",
     batch="2026-A",
     students=42,
-    next_class="Today, 2:00 PM",
     progress=88,
     color="#264796",
     description="Deep learning architectures"
@@ -29,7 +28,6 @@ course2 = Course(
     name="Data Structures",
     batch="2025-B",
     students=38,
-    next_class="Tomorrow, 10:00 AM",
     progress=82,
     color="#d0ae61",
     description="DSA fundamentals"
@@ -65,6 +63,7 @@ db.add_all([
     Student(
         course_id=course1.id,
         name="Arjun Mehta",
+        email="arjun@example.com",
         registration_number="S4121",
         student_class="2026-A",
         department="Computer Science",
@@ -74,6 +73,7 @@ db.add_all([
     Student(
         course_id=course1.id,
         name="Sneha Patil",
+        email="sneha@example.com",
         registration_number="S4135",
         student_class="2026-A",
         department="Computer Science",

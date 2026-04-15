@@ -3,6 +3,7 @@ from typing import Optional
 
 class StudentBase(BaseModel):
     name: str
+    email: str
     registration_number: str
     student_class: str
     department: str

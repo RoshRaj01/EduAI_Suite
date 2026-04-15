@@ -46,14 +46,15 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session 
     
     students_to_add = []
     for row in reader:
-        # Expected format: registration_number, name, class, department
-        if len(row) >= 4:
-            reg_num, name, student_class, dept = row[0], row[1], row[2], row[3]
+        # Expected format: registration_number, name, email, class, department
+        if len(row) >= 5:
+            reg_num, name, email, student_class, dept = row[0], row[1], row[2], row[3], row[4]
             students_to_add.append(
                 Student(
                     course_id=course_id,
                     registration_number=reg_num,
                     name=name,
+                    email=email,
                     student_class=student_class,
                     department=dept,
                     attendance=0,
@@ -76,3 +77,13 @@ def enroll_via_code(enrollment_code: str, student: StudentCreate, db: Session = 
     db.commit()
     db.refresh(new_student)
     return new_student
+
+@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_student(student_id: int, db: Session = Depends(get_db)):
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+        
+    db.delete(student)
+    db.commit()
+    return None
