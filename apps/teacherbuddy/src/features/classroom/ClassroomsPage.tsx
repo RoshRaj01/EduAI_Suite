@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle, Edit2, AlertTriangle } from "lucide-react";
+import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle, Edit2, AlertTriangle, Download } from "lucide-react";
 
 const API_URL = "http://localhost:8000";
 
@@ -47,6 +47,7 @@ export const ClassroomsPage: React.FC = () => {
   const [announcementForm, setAnnouncementForm] = useState({
     title: "", body: "", time: "Just now", pinned: false
   });
+  const [announcementFile, setAnnouncementFile] = useState<File | null>(null);
 
   const [assignmentForm, setAssignmentForm] = useState({
     title: "", description: "", dueDate: "", maxPoints: 100
@@ -123,9 +124,21 @@ export const ClassroomsPage: React.FC = () => {
 
   const handleCreateAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
+    const formData = new FormData();
+    formData.append("title", announcementForm.title);
+    formData.append("body", announcementForm.body);
+    formData.append("time", announcementForm.time);
+    formData.append("pinned", String(announcementForm.pinned));
+    if (announcementFile) formData.append("file", announcementFile);
+
     handleApiCall(
-      () => fetch(`${API_URL}/announcements/${selectedId}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(announcementForm) }),
-      () => { setAnnouncementForm({ title: "", body: "", time: "Just now", pinned: false }); setShowAnnouncementModal(false); fetchCourseData(); }
+      () => fetch(`${API_URL}/announcements/${selectedId}`, { method: "POST", body: formData }),
+      () => {
+        setAnnouncementForm({ title: "", body: "", time: "Just now", pinned: false });
+        setAnnouncementFile(null);
+        setShowAnnouncementModal(false);
+        fetchCourseData();
+      }
     );
   };
 
@@ -231,6 +244,11 @@ export const ClassroomsPage: React.FC = () => {
   // Common Modal Input Style Class
   const premiumInput = "w-full bg-white border border-slate-300 rounded-xl px-4 py-3 mt-1 text-sm text-slate-800 focus:ring-2 focus:ring-brand-blue/50 focus:border-brand-blue outline-none transition-all placeholder:text-slate-400 ";
   const premiumLabel = "text-xs font-bold uppercase tracking-wider text-slate-600 pl-1";
+  const getDownloadUrl = (path?: string | null) => {
+    if (!path) return "";
+    const normalized = path.replace(/\\/g, "/");
+    return normalized.startsWith("http") ? normalized : `${API_URL}${normalized.startsWith("/") ? normalized : `/${normalized}`}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -295,7 +313,7 @@ export const ClassroomsPage: React.FC = () => {
                     {selected.enrollment_code && <p className="text-xs font-mono bg-white/10 px-3 py-1.5 inline-block rounded-md border border-white/10">Code: <b>{selected.enrollment_code}</b></p>}
                   </div>
                   <div className="flex flex-wrap gap-3 shrink-0">
-                    <button onClick={() => { setEditingAssignmentId(null); setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); setShowAssignmentModal(true); }} className="btn bg-white text-black border-none font-bold hover:bg-black hover:text-white shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
+                    <button onClick={() => { setEditingAssignmentId(null); setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); setAssignmentFile(null); setShowAssignmentModal(true); }} className="btn bg-white text-black border-none font-bold hover:bg-black hover:text-white shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
                       <FilePlus size={18} className="mr-2 inline" /> Create Assignment
                     </button>
                     <button onClick={() => setShowStudentModal(true)} className="btn bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur-md font-semibold shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
@@ -342,7 +360,7 @@ export const ClassroomsPage: React.FC = () => {
                           <div className="p-2 bg-blue-50 rounded-lg"><Megaphone size={20} className="text-brand-blue" /></div>
                           <h3 className="font-extrabold text-xl text-slate-900 ">Class Announcements</h3>
                         </div>
-                        <button onClick={() => setShowAnnouncementModal(true)} className="text-sm font-bold bg-brand-blue text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-blue-500/20 transition-all hover:-translate-y-0.5">Post Announcement</button>
+                        <button onClick={() => { setAnnouncementFile(null); setShowAnnouncementModal(true); }} className="text-sm font-bold bg-brand-blue text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-blue-500/20 transition-all hover:-translate-y-0.5">Post Announcement</button>
                       </div>
                       <div className="grid gap-4 mt-2">
                         {announcements.length === 0 ? (
@@ -351,11 +369,17 @@ export const ClassroomsPage: React.FC = () => {
                           announcements.map((a: any) => (
                             <div key={a.id} className="p-5 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-start group shadow-sm transition-all hover:shadow-md hover:border-brand-blue/30">
                               <div>
-                                <div className="flex items-center gap-3 mb-1">
+                              <div className="flex items-center gap-3 mb-1">
                                   <p className="font-bold text-base text-slate-900 ">{a.title}</p>
                                   {a.pinned && <span className="text-[10px] uppercase font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded border border-red-200">Pinned</span>}
                                 </div>
                                 <p className="text-sm text-slate-600 leading-relaxed max-w-3xl">{a.body}</p>
+                                {a.attachment_path && (
+                                  <a href={getDownloadUrl(a.attachment_path)} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-blue hover:text-blue-700">
+                                    <Download size={14} />
+                                    Show file
+                                  </a>
+                                )}
                                 <p className="text-[10px] mt-3 font-bold text-slate-400 uppercase tracking-wider">{a.time}</p>
                               </div>
                               <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteAnnouncement(a.id); }} className="relative z-10 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-100 p-2 rounded-lg transition-all cursor-pointer">
@@ -385,7 +409,12 @@ export const ClassroomsPage: React.FC = () => {
                               <p className="text-sm text-slate-700 mb-4 leading-relaxed">{a.description}</p>
                               <div className="flex items-center gap-6 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 p-3 rounded-lg inline-flex">
                                 <div className="flex items-center gap-2"><Clock size={14} className="text-red-500" /><span>Due: {a.due_date.replace('T', ' at ')}</span></div>
-                                {a.media_path && <div className="flex items-center gap-2 text-blue-700 "><Paperclip size={14} /><span>Attachment</span></div>}
+                                {a.media_path && (
+                                  <a href={getDownloadUrl(a.media_path)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-700 hover:text-blue-800">
+                                    <Paperclip size={14} />
+                                    <span>Show file</span>
+                                  </a>
+                                )}
                               </div>
                             </div>
                             <div className="relative z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
@@ -507,11 +536,15 @@ export const ClassroomsPage: React.FC = () => {
           <div className="bg-white [#111] border border-slate-200 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] [0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-extrabold text-2xl text-slate-800 ">Broadcast Message</h3>
-              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowAnnouncementModal(false)}><X size={20} /></button>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => { setShowAnnouncementModal(false); setAnnouncementFile(null); }}><X size={20} /></button>
             </div>
             <form onSubmit={handleCreateAnnouncement} className="space-y-5">
               <div><label className={premiumLabel}>Headline / Title</label><input required className={premiumInput} placeholder="Urgent update..." value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} /></div>
               <div><label className={premiumLabel}>Announcement Body</label><textarea required className={premiumInput} placeholder="Type your message explicitly here..." rows={4} value={announcementForm.body} onChange={e => setAnnouncementForm({ ...announcementForm, body: e.target.value })} /></div>
+              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-5 text-center mt-2 hover:bg-slate-50 transition-colors">
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">Attachment Payload (Optional)</p>
+                <input type="file" accept=".pdf,.pptx,.docx" onChange={e => setAnnouncementFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer mx-auto" />
+              </div>
               <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 ">
                 <input type="checkbox" id="pinned" checked={announcementForm.pinned} onChange={e => setAnnouncementForm({ ...announcementForm, pinned: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-brand-blue focus:ring-brand-blue cursor-pointer" />
                 <label htmlFor="pinned" className="font-bold text-sm cursor-pointer select-none text-slate-700 ">Pin this to top of dashboard feed</label>
@@ -529,7 +562,7 @@ export const ClassroomsPage: React.FC = () => {
               <h3 className="font-extrabold text-2xl text-slate-800 ">
                 {editingAssignmentId ? "Modify Assignment" : "New Assignment Details"}
               </h3>
-              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowAssignmentModal(false)}><X size={20} /></button>
+               <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => { setShowAssignmentModal(false); setAssignmentFile(null); }}><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveAssignment} className="space-y-4">
               <div><label className={premiumLabel}>Designation Title</label><input required className={premiumInput} placeholder="Unit 2 Worksheet" value={assignmentForm.title} onChange={e => setAssignmentForm({ ...assignmentForm, title: e.target.value })} /></div>
@@ -550,7 +583,7 @@ export const ClassroomsPage: React.FC = () => {
                 <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">
                   {editingAssignmentId ? "Update Attachment (Optional)" : "Attachment Payload (Optional)"}
                 </p>
-                <input type="file" onChange={e => setAssignmentFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer mx-auto" />
+                <input type="file" accept=".pdf,.pptx,.docx" onChange={e => setAssignmentFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer mx-auto" />
               </div>
 
               <button type="submit" className="w-full bg-gold text-slate-900 border-none font-bold py-4 rounded-xl hover:bg-yellow-400 shadow-xl shadow-yellow-500/20 text-lg transition-all hover:-translate-y-1 mt-2">

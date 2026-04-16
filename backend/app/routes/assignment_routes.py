@@ -4,11 +4,10 @@ from app.database import SessionLocal
 from app.models.assignment import Assignment
 from app.models.course import Course
 from app.models.announcement import Announcement
-from app.schemas.assignment import AssignmentResponse, AssignmentCreate
+from app.schemas.assignment import AssignmentResponse
 from datetime import datetime
-import os
-import shutil
 from typing import Optional
+from app.utils.file_uploads import save_optional_upload
 
 router = APIRouter(prefix="/assignments", tags=["Assignments"])
 
@@ -18,10 +17,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-# Directory to save uploaded assignments media
-UPLOAD_DIR = "uploads/assignments"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.get("/{course_id}", response_model=list[AssignmentResponse])
 def get_assignments(course_id: int, db: Session = Depends(get_db)):
@@ -41,12 +36,7 @@ async def create_assignment(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    media_path = None
-    if file:
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        media_path = file_path
+    media_path = save_optional_upload(file, "assignments")
 
     new_assignment = Assignment(
         course_id=course_id,
@@ -72,12 +62,12 @@ async def create_assignment(
 @router.put("/{assignment_id}", response_model=AssignmentResponse)
 async def update_assignment(
     assignment_id: int,
-    title: str = Form(None),
-    description: str = Form(None),
-    due_date: str = Form(None),
-    max_points: int = Form(None),
+    title: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    due_date: Optional[str] = Form(None),
+    max_points: Optional[int] = Form(None),
     file: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:
@@ -88,10 +78,7 @@ async def update_assignment(
     if due_date is not None: assignment.due_date = due_date
     if max_points is not None: assignment.max_points = max_points
     if file:
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        assignment.media_path = file_path
+        assignment.media_path = save_optional_upload(file, "assignments")
         
     now_str = datetime.now().strftime("%I:%M %p, %b %d")
     an = Announcement(course_id=assignment.course_id, title=f"Assignment Updated: {assignment.title}", body=f"Details or attachments for assignment '{assignment.title}' have been modified.", time=now_str, pinned=False)

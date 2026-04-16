@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { Gamepad2, Brain, Users, BarChart, FlaskConical, Target, HardHat } from "lucide-react";
+import { Gamepad2, Users, BarChart, FlaskConical, Target, HardHat } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTheme } from "../../shared/hooks/useTheme";
 
 const gameCategories = [
   {
@@ -43,7 +42,6 @@ const gameCategories = [
 ];
 
 export const GamesPage: React.FC = () => {
-  const { isDark } = useTheme();
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
 
   return (

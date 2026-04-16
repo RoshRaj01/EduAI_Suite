@@ -57,25 +57,6 @@
     --color-ai-bubble: rgba(255,255,255,0.95);
   }
 
-  html.dark {
-    --color-bg-base: #050811;
-    --color-card-bg: rgba(15, 23, 42, 0.82);
-    --color-sidebar-bg: #0a0f1d;
-    --color-text-main: #f8fafc;
-    --color-text-sub: #cbd5e1;
-    --color-text-dim: #94a3b8;
-    --color-border-main: rgba(255,255,255,0.08);
-    
-    --color-bg-start: #050811;
-    --color-bg-end: #0a0f1d;
-    --color-bg-grad1: rgba(38,71,150,0.15);
-    --color-bg-grad2: rgba(208,174,97,0.1);
-    
-    --color-header-bg: rgba(15, 23, 42, 0.88);
-    --color-input-bg: rgba(30, 41, 59, 0.9);
-    --color-ai-bubble: rgba(30, 41, 59, 0.95);
-  }
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   html { scroll-behavior: smooth; }
@@ -114,14 +95,6 @@
   box-shadow: 0 4px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.05);
   border-radius: 16px;
   transition: all 0.3s ease;
-}
-
-@utility glass-card-dark {
-  background: rgba(28,53,112,0.72);
-  backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 8px 32px rgba(15,30,69,0.3);
-  border-radius: 16px;
 }
 
 @utility glass-sidebar {

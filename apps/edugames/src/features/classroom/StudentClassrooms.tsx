@@ -1,69 +1,539 @@
-import React from "react";
-import { BookOpen, Clock, Download, ChevronRight, CheckCircle2 } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Download,
+  Loader2,
+  Megaphone,
+  Paperclip,
+  RefreshCw,
+  Search,
+} from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
-const myClasses = [
-  { code: "CSC401", name: "Advanced Neural Networks", prof: "Prof. John Doe", progress: 68, color: "#264796" },
-  { code: "CSC312", name: "Data Structures & Alg.", prof: "Dr. Smith", progress: 82, color: "#d0ae61" },
-];
+const API_URL = "http://localhost:8000";
 
-const myAssignments = [
-  { class: "CSC401", name: "Lab 4: Backpropagation", due: "Tonight, 11:59PM", status: "pending" },
-  { class: "CSC312", name: "Assignment 2", due: "Tomorrow", status: "submitted" },
-];
+type Course = {
+  id: number;
+  code: string;
+  name: string;
+  batch: string;
+  students: number;
+  progress: number;
+  color: string;
+  description: string;
+  enrollment_code?: string | null;
+};
+
+type Assignment = {
+  id: number;
+  course_id: number;
+  title: string;
+  description: string;
+  due_date: string;
+  max_points: number;
+  media_path?: string | null;
+};
+
+type Announcement = {
+  id: number;
+  course_id: number;
+  title: string;
+  body: string;
+  time: string;
+  pinned: boolean;
+  attachment_path?: string | null;
+};
+
+const formatDueDate = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value.replace("T", " at ");
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+};
+
+const getAssignmentStatus = (dueDate: string) => {
+  const parsed = new Date(dueDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return "Upcoming";
+  }
+
+  const diff = parsed.getTime() - Date.now();
+  if (diff < 0) return "Overdue";
+  if (diff < 1000 * 60 * 60 * 24) return "Due Soon";
+  return "Open";
+};
+
+const getFileUrl = (path?: string | null) => {
+  if (!path) return "";
+  const normalized = path.replace(/\\/g, "/");
+  return normalized.startsWith("http") ? normalized : `${API_URL}${normalized.startsWith("/") ? normalized : `/${normalized}`}`;
+};
 
 export const StudentClassrooms: React.FC = () => {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "assignments" | "announcements">("overview");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const selectedCourse = useMemo(
+    () => courses.find(course => course.id === selectedId) ?? null,
+    [courses, selectedId],
+  );
+
+  const loadCourses = async () => {
+    const response = await fetch(`${API_URL}/courses/`);
+    if (!response.ok) {
+      throw new Error(`Failed to load classrooms (${response.status})`);
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      throw new Error("Invalid classroom payload");
+    }
+
+    setCourses(data);
+    return data;
+  };
+
+  const loadCourseData = async (courseId: number) => {
+    const [announcementData, assignmentData] = await Promise.all([
+      fetch(`${API_URL}/announcements/${courseId}`).then(response => {
+        if (!response.ok) throw new Error(`Failed to load announcements (${response.status})`);
+        return response.json();
+      }),
+      fetch(`${API_URL}/assignments/${courseId}`).then(response => {
+        if (!response.ok) throw new Error(`Failed to load assignments (${response.status})`);
+        return response.json();
+      }),
+    ]);
+
+    setAnnouncements(Array.isArray(announcementData) ? announcementData : []);
+    setAssignments(Array.isArray(assignmentData) ? assignmentData : []);
+  };
+
+  const selectCourse = async (courseId: number) => {
+    setSelectedId(courseId);
+    setLoading(true);
+    setError(null);
+
+    try {
+      await loadCourseData(courseId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to sync selected classroom.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refresh = async () => {
+    setRefreshing(true);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const data = await loadCourses();
+      const nextSelectedId = selectedId && data.some(course => course.id === selectedId)
+        ? selectedId
+        : data[0]?.id ?? null;
+
+      if (nextSelectedId) {
+        setSelectedId(nextSelectedId);
+        await loadCourseData(nextSelectedId);
+      } else {
+        setAssignments([]);
+        setAnnouncements([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to sync classroom data.");
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const filteredCourses = courses.filter(course =>
+    `${course.code} ${course.name} ${course.batch}`.toLowerCase().includes(search.toLowerCase()),
+  );
+
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div>
-        <h1 className="text-2xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>My Classrooms</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>Access your course materials and track your progress.</p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>
+            My Classrooms
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            Live classroom data synced from the database.
+          </p>
+        </div>
+
+        <div className="flex w-full max-w-md items-center gap-3">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="form-input pl-9"
+              placeholder="Search classrooms..."
+            />
+          </div>
+          <button
+            type="button"
+            onClick={refresh}
+            className="btn btn-outline px-4"
+            aria-label="Refresh classrooms"
+          >
+            {refreshing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {myClasses.map(cls => (
-          <GlassCard key={cls.code} className="p-6 flex flex-col justify-between hover:-translate-y-1 transition-transform cursor-pointer">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                 <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg" style={{ background: cls.color }}>
-                    <BookOpen size={20} />
-                 </div>
-                 <ChevronRight className="opacity-50" />
+      {error && (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800">
+          <AlertCircle size={18} className="mt-0.5 shrink-0" />
+          <p className="text-sm font-medium">{error}</p>
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <GlassCard className="p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Courses</p>
+          <p className="mt-2 text-3xl font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+            {courses.length}
+          </p>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Assignments</p>
+          <p className="mt-2 text-3xl font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+            {assignments.length}
+          </p>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Announcements</p>
+          <p className="mt-2 text-3xl font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+            {announcements.length}
+          </p>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Progress</p>
+          <p className="mt-2 text-3xl font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+            {selectedCourse?.progress ?? 0}%
+          </p>
+        </GlassCard>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-4">
+        <div className="space-y-3 xl:col-span-1">
+          {filteredCourses.length === 0 ? (
+            <GlassCard className="p-6 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              No classrooms match your search.
+            </GlassCard>
+          ) : (
+            filteredCourses.map(course => {
+              const isSelected = course.id === selectedId;
+
+              return (
+                <GlassCard
+                  key={course.id}
+                  className={`cursor-pointer p-5 transition-all hover:-translate-y-0.5 ${
+                    isSelected ? "ring-2 ring-offset-0" : ""
+                  }`}
+                  onClick={() => void selectCourse(course.id)}
+                  style={{
+                    borderColor: isSelected ? course.color : undefined,
+                    boxShadow: isSelected ? `0 0 0 1px ${course.color}33` : undefined,
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: course.color }}>
+                        {course.code}
+                      </p>
+                      <h2 className="mt-1 truncate text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
+                        {course.name}
+                      </h2>
+                      <p className="mt-1 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                        {course.batch}
+                      </p>
+                    </div>
+                    <ChevronRight size={18} className={isSelected ? "text-blue-600" : "text-slate-400"} />
+                  </div>
+
+                  <p className="mt-4 line-clamp-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                    {course.description}
+                  </p>
+
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+                      <span style={{ color: course.color }}>{course.progress}% progress</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-200">
+                      <div className="h-2 rounded-full" style={{ width: `${course.progress}%`, background: course.color }} />
+                    </div>
+                  </div>
+                </GlassCard>
+              );
+            })
+          )}
+        </div>
+
+        <div className="space-y-6 xl:col-span-3">
+          {!selectedCourse ? (
+            <GlassCard className="p-10 text-center">
+              <BookOpen size={32} className="mx-auto text-slate-400" />
+              <p className="mt-4 text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                Select a classroom to view details
+              </p>
+            </GlassCard>
+          ) : loading ? (
+            <GlassCard className="p-10 text-center">
+              <Loader2 size={28} className="mx-auto animate-spin text-slate-400" />
+              <p className="mt-4 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                Loading live classroom data...
+              </p>
+            </GlassCard>
+          ) : (
+            <>
+              <GlassCard className="overflow-hidden">
+                <div
+                  className="p-6 text-white"
+                  style={{
+                    background: `linear-gradient(135deg, ${selectedCourse.color}, #1c3570)`,
+                  }}
+                >
+                  <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/70">
+                        {selectedCourse.code}
+                      </p>
+                      <h2 className="text-3xl font-black leading-tight">{selectedCourse.name}</h2>
+                      <p className="max-w-2xl text-sm text-white/80">{selectedCourse.description}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                      <div className="rounded-2xl bg-white/12 px-4 py-3 backdrop-blur-sm">
+                        <p className="text-[10px] uppercase tracking-[0.25em] text-white/60">Batch</p>
+                        <p className="mt-1 font-semibold">{selectedCourse.batch}</p>
+                      </div>
+                      <div className="rounded-2xl bg-white/12 px-4 py-3 backdrop-blur-sm">
+                        <p className="text-[10px] uppercase tracking-[0.25em] text-white/60">Classwork</p>
+                        <p className="mt-1 font-semibold">{assignments.length} items</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedCourse.enrollment_code && (
+                    <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold">
+                      <span className="text-white/65">Join code</span>
+                      <span>{selectedCourse.enrollment_code}</span>
+                    </div>
+                  )}
+
+                  <div className="mt-6">
+                    <div className="mb-2 flex items-center justify-between text-xs font-semibold text-white/80">
+                      <span>Course progress</span>
+                      <span>{selectedCourse.progress}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/15">
+                      <div
+                        className="h-2 rounded-full bg-white"
+                        style={{ width: `${selectedCourse.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </GlassCard>
+
+              <div className="flex flex-wrap gap-3">
+                {[
+                  ["overview", "Overview"],
+                  ["assignments", "Assignments"],
+                  ["announcements", "Announcements"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveTab(key as typeof activeTab)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                      activeTab === key ? "bg-blue-600 text-white" : "bg-white/70 text-slate-700 hover:bg-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
-              <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: cls.color }}>{cls.code}</p>
-              <h2 className="text-xl font-bold mb-1" style={{ color: "var(--color-text-primary)" }}>{cls.name}</h2>
-              <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{cls.prof}</p>
-            </div>
-            
-            <div className="mt-6 pt-4 border-t" style={{ borderColor: "var(--color-border)" }}>
-               <div className="flex justify-between text-xs mb-1 font-semibold" style={{ color: "var(--color-text-secondary)" }}>
-                  <span>Course Progress</span>
-                  <span style={{ color: cls.color }}>{cls.progress}%</span>
-               </div>
-               <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${cls.progress}%`, background: cls.color }}></div>
-               </div>
-            </div>
-          </GlassCard>
-        ))}
-      </div>
 
-      <h2 className="text-xl font-bold mt-8 mb-4 font-display" style={{ color: "var(--color-text-primary)" }}>My Assignments</h2>
-      <div className="space-y-3">
-        {myAssignments.map((ass, i) => (
-           <GlassCard key={i} className="p-4 flex items-center justify-between border-l-4" style={{ borderLeftColor: ass.status === 'pending' ? '#ef4444' : '#10b981' }}>
-             <div className="flex items-center gap-4">
-               {ass.status === 'pending' ? <Clock className="text-red-500" /> : <CheckCircle2 className="text-green-500" />}
-               <div>
-                  <h4 className="font-bold text-sm" style={{ color: "var(--color-text-primary)" }}>{ass.name}</h4>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--color-text-secondary)" }}>{ass.class} &bull; Due: {ass.due}</p>
-               </div>
-             </div>
-             <button className={`btn text-xs px-4 ${ass.status === 'pending' ? 'btn-primary' : 'bg-green-50 text-green-700 pointer-events-none'}`}>
-                {ass.status === 'pending' ? 'Submit Now' : 'Submitted'}
-             </button>
-           </GlassCard>
-        ))}
+              {activeTab === "overview" && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <GlassCard
+                    className="p-5"
+                    interactive
+                    role="button"
+                    tabIndex={0}
+                    aria-label="View upcoming assignments"
+                    onClick={() => setActiveTab("assignments")}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" || e.key === " ") setActiveTab("assignments");
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Clock className="text-blue-600" size={18} />
+                      <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                        Upcoming work
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                      Track class assignments and due dates from one place.
+                    </p>
+                  </GlassCard>
+                  <GlassCard
+                    className="p-5"
+                    interactive
+                    role="button"
+                    tabIndex={0}
+                    aria-label="View announcements"
+                    onClick={() => setActiveTab("announcements")}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" || e.key === " ") setActiveTab("announcements");
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Megaphone className="text-blue-600" size={18} />
+                      <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                        Announcements
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                      Important class updates and reminders appear here.
+                    </p>
+                  </GlassCard>
+                </div>
+              )}
+
+              {activeTab === "assignments" && (
+                <div className="grid gap-4">
+                  {assignments.length === 0 ? (
+                    <GlassCard className="p-8 text-center">
+                      <p style={{ color: "var(--color-text-secondary)" }}>No assignments have been posted yet.</p>
+                    </GlassCard>
+                  ) : (
+                    assignments.map(assignment => {
+                      const status = getAssignmentStatus(assignment.due_date);
+
+                      return (
+                        <GlassCard key={assignment.id} className="p-5">
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
+                                  {assignment.title}
+                                </p>
+                                <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-blue-700">
+                                  {status}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+                                {assignment.description}
+                              </p>
+                            </div>
+                              <div className="flex shrink-0 flex-col gap-2 text-sm">
+                                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-slate-700">
+                                  <Clock size={14} />
+                                  <span>Due {formatDueDate(assignment.due_date)}</span>
+                                </div>
+                                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-slate-700">
+                                  <CheckCircle2 size={14} />
+                                  <span>{assignment.max_points} points</span>
+                                </div>
+                                {assignment.media_path && (
+                                  <a
+                                    href={getFileUrl(assignment.media_path)}
+                                    download
+                                    className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-2 text-blue-700 transition-colors hover:bg-blue-100"
+                                  >
+                                    <Download size={14} />
+                                    <span>Download file</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </GlassCard>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {activeTab === "announcements" && (
+                <div className="grid gap-4">
+                  {announcements.length === 0 ? (
+                    <GlassCard className="p-8 text-center">
+                      <p style={{ color: "var(--color-text-secondary)" }}>No announcements available right now.</p>
+                    </GlassCard>
+                  ) : (
+                    announcements.map(announcement => (
+                      <GlassCard key={announcement.id} className="p-5">
+                        <div className="flex items-start gap-4">
+                          <div className="rounded-2xl bg-blue-50 p-3 text-blue-700">
+                            <Megaphone size={18} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-bold" style={{ color: "var(--color-text-primary)" }}>
+                                {announcement.title}
+                              </p>
+                              {announcement.pinned && (
+                                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-amber-700">
+                                  Pinned
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+                              {announcement.body}
+                            </p>
+                            {announcement.attachment_path && (
+                              <a
+                                href={getFileUrl(announcement.attachment_path)}
+                                download
+                                className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-800"
+                              >
+                                <Paperclip size={14} />
+                                <span>Download file</span>
+                              </a>
+                            )}
+                            <p className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                              {announcement.time}
+                            </p>
+                          </div>
+                        </div>
+                      </GlassCard>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

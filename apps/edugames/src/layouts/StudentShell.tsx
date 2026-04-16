@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { BookOpen, Gamepad2, LayoutDashboard, Clock, LogOut, ChevronRight, Menu, Moon, Sun, Bell, X, ShieldAlert } from "lucide-react";
+import { BookOpen, Gamepad2, LayoutDashboard, Clock, LogOut, ChevronRight, Menu } from "lucide-react";
 import logo from "../assets/logo (5).png";
-import { useTheme } from "../shared/hooks/useTheme";
 import { useAuthStore } from "../store/useAuthStore";
 
 const studentNavItems = [
@@ -15,7 +14,6 @@ const studentNavItems = [
 export const StudentShell: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
-  const { isDark, toggleTheme } = useTheme();
   const { logout, role } = useAuthStore();
   const navigate = useNavigate();
 
@@ -76,10 +74,6 @@ export const StudentShell: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
-             <button onClick={toggleTheme} className="p-2 rounded-xl transition-all hover:bg-blue-50" style={{ color: "var(--color-text-muted)" }}>
-               {isDark ? <Sun size={20} /> : <Moon size={20} />}
-             </button>
-             
              {/* Profile */}
              <div className="relative">
                <button

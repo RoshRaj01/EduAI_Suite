@@ -4,12 +4,8 @@ import { RouterProvider } from 'react-router-dom'
 import './index.css'
 import { router } from './router'
 
-import { ThemeProvider } from './shared/hooks/useTheme'
-
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider>
-      <RouterProvider router={router} />
-    </ThemeProvider>
+    <RouterProvider router={router} />
   </StrictMode>,
 )

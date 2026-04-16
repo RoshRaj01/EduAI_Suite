@@ -10,3 +10,4 @@ class Announcement(Base):
     body = Column(String)
     time = Column(String)
     pinned = Column(Boolean, default=False)
+    attachment_path = Column(String, nullable=True)
