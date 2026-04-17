@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from app.database import Base, engine
-from app.models import submission # Ensure it's imported to register the model
-from app.models.appointment import Appointment
-from app.routes import course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes
+from app.models.user import User
+from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
@@ -37,6 +36,7 @@ app.add_middleware(
 
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
+app.include_router(auth_routes.router)
 app.include_router(course_routes.router)
 app.include_router(announcement_routes.router)
 app.include_router(resource_routes.router)

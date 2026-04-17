@@ -11,15 +11,49 @@ export const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    setError("");
+
+    try {
+      if (mode === "forgot") {
+        setTimeout(() => {
+          setLoading(false);
+          setDone(true);
+        }, 1500);
+        return;
+      }
+
+      const res = await fetch("http://127.0.0.1:8000/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        localStorage.setItem("token", data.access_token);
+        // Decode token to get role (simple way for now, or just trust backend)
+        const payload = JSON.parse(atob(data.access_token.split(".")[1]));
+        localStorage.setItem("user", JSON.stringify(payload));
+        
+        if (payload.role === "admin") {
+          window.location.href = "/admin/users";
+        } else {
+          window.location.href = "/";
+        }
+      } else {
+        setError(data.detail || "Invalid email or password");
+      }
+    } catch (err) {
+      setError("Server connection failed. Please ensure the backend is running.");
+    } finally {
       setLoading(false);
-      if (mode === "forgot") { setDone(true); return; }
-      window.location.href = "/";
-    }, 1800);
+    }
   };
 
   return (
@@ -103,6 +137,12 @@ export const AuthPage: React.FC = () => {
                 <p className="text-sm mb-6" style={{ color: "var(--color-text-muted)" }}>
                   Sign in to your TeacherBuddy account.
                 </p>
+
+                {error && (
+                  <div className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-semibold animate-pulse">
+                    {error}
+                  </div>
+                )}
 
                 {/* Role Selector */}
                 <div className="flex gap-1 p-1 rounded-xl mb-6 hidden" style={{ background: "var(--color-bg-grad1)", border: "1px solid var(--color-border)" }}>
