@@ -40,7 +40,7 @@ export const ClassroomsPage: React.FC = () => {
 
   // Forms
   const [courseForm, setCourseForm] = useState({
-    code: "", name: "", batch: "2026-A", description: "", enrollment_code: "", color: "#264796", teacher_name: "Prof. Rosh"
+    code: "", name: "", batch: "2026-A", description: "", enrollment_code: "", color: "#264796", teacher_name: ""
   });
   const [isExtracting, setIsExtracting] = useState(false);
   const [coursePlanFile, setCoursePlanFile] = useState<File | null>(null);
@@ -93,7 +93,16 @@ export const ClassroomsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { fetchCourses(); }, []);
+  useEffect(() => {
+    fetchCourses();
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      if (user.name) {
+        setCourseForm(prev => ({ ...prev, teacher_name: user.name }));
+      }
+    }
+  }, []);
   useEffect(() => { if (selectedId) fetchCourseData(); }, [selectedId]);
 
   const handleApiCall = async (action: () => Promise<Response>, onSuccess: () => void) => {
@@ -117,7 +126,9 @@ export const ClassroomsPage: React.FC = () => {
   };
 
   const resetCourseForm = () => {
-    setCourseForm({ code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796", teacher_name: "Prof. Rosh" });
+    const storedUser = localStorage.getItem("user");
+    const teacherName = storedUser ? JSON.parse(storedUser).name : "";
+    setCourseForm({ code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796", teacher_name: teacherName });
     setCoursePlanFile(null);
   };
 
@@ -167,13 +178,14 @@ export const ClassroomsPage: React.FC = () => {
 
   useEffect(() => {
     if (showCourseModal) {
-      // Only auto-set if it's currently completely empty when opening
-      setCourseForm(prev => ({ 
-        ...prev, 
-        teacher_name: prev.teacher_name.trim() === "" ? "Prof. Rosh" : prev.teacher_name 
-      }));
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        if (user.name) {
+          setCourseForm(prev => ({ ...prev, teacher_name: user.name }));
+        }
+      }
     }
-    // We remove courseForm.teacher_name from deps to avoid re-triggering on deletion
   }, [showCourseModal]);
 
   const handleDeleteCourse = (id: number) => {
@@ -336,7 +348,6 @@ export const ClassroomsPage: React.FC = () => {
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Classroom Management</h1>
           <button onClick={() => {
-            setCourseForm(prev => ({ ...prev, teacher_name: prev.teacher_name || "Prof. Rosh" }));
             setShowCourseModal(true);
           }} className="btn bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 btn-sm flex items-center gap-2 rounded-xl transition-all hover:-translate-y-0.5">
             <PlusCircle size={18} /> Create New Class
@@ -398,9 +409,9 @@ export const ClassroomsPage: React.FC = () => {
                     <p className="text-white/80 text-base mb-4 leading-relaxed">{selected.description}</p>
                     <div className="flex flex-wrap gap-4 items-center">
                       {selected.teacher_name && (
-                        <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-sm">
-                          <User size={14} className="text-white/70" />
-                          <span className="text-sm font-bold text-white">{selected.teacher_name}</span>
+                        <div className="flex items-center gap-2 mb-4 bg-white/10 w-fit px-4 py-1.5 rounded-full border border-white/20">
+                          <User size={14} className="text-white/60" />
+                          <span className="text-xs font-bold tracking-wide">{selected.teacher_name}</span>
                         </div>
                       )}
                       {selected.enrollment_code && <p className="text-xs font-mono bg-white/10 px-3 py-1.5 inline-block rounded-md border border-white/10">Code: <b>{selected.enrollment_code}</b></p>}
