@@ -19,6 +19,7 @@ import {
   Menu,
   Gamepad2,
   Wrench,
+  Calendar,
 } from "lucide-react";
 import logo from "../assets/logo (5).png";
 
@@ -26,6 +27,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/", end: true, keywords: "home overview summary stats" },
   { icon: Wrench, label: "Teacher Tools", href: "/tools", keywords: "question paper generator quiz" },
   { icon: Gamepad2, label: "Game Studio", href: "/games", keywords: "gamify create play interactive" },
+  { icon: Calendar, label: "Appointments", href: "/appointments", keywords: "bookings approvals office hours" },
   { icon: BookOpen, label: "Classrooms", href: "/classrooms", keywords: "courses students assignments" },
   { icon: CheckSquare, label: "Bulk Evaluation", href: "/evaluation", keywords: "grade answers ai score" },
   { icon: FileSpreadsheet, label: "Reports", href: "/reports", keywords: "export download pdf analytics" },

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { BookOpen, Gamepad2, LayoutDashboard, Clock, LogOut, ChevronRight, Menu } from "lucide-react";
+import { BookOpen, Gamepad2, LayoutDashboard, Clock, LogOut, ChevronRight, Menu, Calendar } from "lucide-react";
 import logo from "../assets/logo (5).png";
 import { useAuthStore } from "../store/useAuthStore";
 
@@ -9,6 +9,7 @@ const studentNavItems = [
   { icon: BookOpen,        label: "My Classrooms",href: "/classroom" },
   { icon: Clock,         label: "Upcoming Exams", href: "/exams" },
   { icon: Gamepad2,        label: "EduGames",      href: "/games" },
+  { icon: Calendar,        label: "Appointments",  href: "/appointments" },
 ];
 
 export const StudentShell: React.FC = () => {

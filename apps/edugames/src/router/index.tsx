@@ -6,6 +6,7 @@ import { StudentClassrooms } from "../features/classroom/StudentClassrooms";
 import { StudentExams } from "../features/exam/StudentExams";
 import { AuthPage } from "../features/auth/AuthPage";
 import { GamesPage } from "../features/games/GamesPage";
+import { AppointmentBookingPage } from "../features/appointments/AppointmentBookingPage";
 import { ConstructionPage } from "../shared/components/ConstructionPage";
 
 export const router = createBrowserRouter([
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: "classroom",      element: <StudentClassrooms />},
       { path: "exams",          element: <StudentExams />     },
       { path: "games",          element: <GamesPage />        },
+      { path: "appointments",   element: <AppointmentBookingPage /> },
       { path: "*",              element: <ConstructionPage /> },
     ],
   },
