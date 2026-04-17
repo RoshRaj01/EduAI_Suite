@@ -116,24 +116,22 @@ export const ClassroomsPage: React.FC = () => {
     }
   };
 
+  const resetCourseForm = () => {
+    setCourseForm({ code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796", teacher_name: "Prof. Rosh" });
+    setCoursePlanFile(null);
+  };
+
   const handleCreateCourse = (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData();
-    formData.append("code", courseForm.code);
-    formData.append("name", courseForm.name);
-    formData.append("batch", courseForm.batch);
-    formData.append("color", courseForm.color);
-    formData.append("description", courseForm.description);
-    if (courseForm.enrollment_code) formData.append("enrollment_code", courseForm.enrollment_code);
-    if (courseForm.teacher_name) formData.append("teacher_name", courseForm.teacher_name);
+    Object.entries(courseForm).forEach(([key, val]) => formData.append(key, val));
     if (coursePlanFile) formData.append("file", coursePlanFile);
 
     handleApiCall(
       () => fetch(`${API_URL}/courses/`, { method: "POST", body: formData }),
       () => {
         setShowCourseModal(false);
-        setCourseForm({ code: "", name: "", batch: "2026-A", description: "", enrollment_code: "", color: "#264796", teacher_name: "Prof. Rosh" });
-        setCoursePlanFile(null);
+        resetCourseForm();
         fetchCourses();
       }
     );
@@ -157,7 +155,7 @@ export const ClassroomsPage: React.FC = () => {
           code: (data.code && data.code.trim()) || prev.code,
           name: (data.name && data.name.trim()) || prev.name,
           teacher_name: (data.teacher_name && data.teacher_name.trim()) || prev.teacher_name,
-          description: data.programmes ? `Target Programmes: ${data.programmes}` : prev.description
+          description: data.programmes ? `${data.programmes}` : prev.description
         }));
       }
     } catch (err) {
@@ -168,10 +166,15 @@ export const ClassroomsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (showCourseModal && !courseForm.teacher_name) {
-      setCourseForm(prev => ({ ...prev, teacher_name: "Prof. Rosh" }));
+    if (showCourseModal) {
+      // Only auto-set if it's currently completely empty when opening
+      setCourseForm(prev => ({ 
+        ...prev, 
+        teacher_name: prev.teacher_name.trim() === "" ? "Prof. Rosh" : prev.teacher_name 
+      }));
     }
-  }, [showCourseModal, courseForm.teacher_name]);
+    // We remove courseForm.teacher_name from deps to avoid re-triggering on deletion
+  }, [showCourseModal]);
 
   const handleDeleteCourse = (id: number) => {
     setDeleteConfirm({ type: "course", id, message: "Are you sure you want to delete this course? This action is irreversible." });
@@ -286,7 +289,7 @@ export const ClassroomsPage: React.FC = () => {
 
   const confirmDelete = () => {
     if (!deleteConfirm) return;
-    
+
     const { type, id } = deleteConfirm;
     const actionMap: Record<string, () => Promise<Response>> = {
       course: () => fetch(`${API_URL}/courses/${id}`, { method: "DELETE" }),
@@ -347,8 +350,8 @@ export const ClassroomsPage: React.FC = () => {
         {/* SIDEBAR */}
         <div className="space-y-3">
           {classrooms
-            .filter(c => 
-              c.name.toLowerCase().includes(search.toLowerCase()) || 
+            .filter(c =>
+              c.name.toLowerCase().includes(search.toLowerCase()) ||
               c.code.toLowerCase().includes(search.toLowerCase()) ||
               (c.teacher_name && c.teacher_name.toLowerCase().includes(search.toLowerCase()))
             )
@@ -460,7 +463,7 @@ export const ClassroomsPage: React.FC = () => {
                           announcements.map((a: any) => (
                             <div key={a.id} className="p-5 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-start group shadow-sm transition-all hover:shadow-md hover:border-brand-blue/30">
                               <div>
-                              <div className="flex items-center gap-3 mb-1">
+                                <div className="flex items-center gap-3 mb-1">
                                   <p className="font-bold text-base text-slate-900 ">{a.title}</p>
                                   {a.pinned && <span className="text-[10px] uppercase font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded border border-red-200">Pinned</span>}
                                 </div>
@@ -569,7 +572,7 @@ export const ClassroomsPage: React.FC = () => {
           <div className="bg-white [#111] border border-slate-200 rounded-3xl p-8 w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] [0_20px_60px_-15px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-extrabold text-2xl text-slate-800 ">Create New Class</h3>
-              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowCourseModal(false)}><X size={20} /></button>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => { setShowCourseModal(false); resetCourseForm(); }}><X size={20} /></button>
             </div>
             <form onSubmit={handleCreateCourse} className="space-y-5">
               <div><label className={premiumLabel}>Course Code</label><input required className={premiumInput} placeholder="e.g., CSC101" value={courseForm.code} onChange={e => setCourseForm({ ...courseForm, code: e.target.value })} /></div>
@@ -675,7 +678,7 @@ export const ClassroomsPage: React.FC = () => {
               <h3 className="font-extrabold text-2xl text-slate-800 ">
                 {editingAssignmentId ? "Modify Assignment" : "New Assignment Details"}
               </h3>
-               <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => { setShowAssignmentModal(false); setAssignmentFile(null); }}><X size={20} /></button>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => { setShowAssignmentModal(false); setAssignmentFile(null); }}><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveAssignment} className="space-y-4">
               <div><label className={premiumLabel}>Designation Title</label><input required className={premiumInput} placeholder="Unit 2 Worksheet" value={assignmentForm.title} onChange={e => setAssignmentForm({ ...assignmentForm, title: e.target.value })} /></div>
@@ -716,15 +719,15 @@ export const ClassroomsPage: React.FC = () => {
               </div>
               <h3 className="font-extrabold text-2xl text-slate-900 mb-2">Confirm Action</h3>
               <p className="text-slate-600 font-medium mb-8 leading-relaxed px-2">{deleteConfirm.message}</p>
-              
+
               <div className="flex gap-3 w-full">
-                <button 
+                <button
                   onClick={() => setDeleteConfirm(null)}
                   className="flex-1 py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={confirmDelete}
                   className="flex-1 py-3.5 px-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 transition-all hover:-translate-y-0.5"
                 >
@@ -743,11 +746,11 @@ export const ClassroomsPage: React.FC = () => {
               <h3 className="font-extrabold text-2xl text-slate-800 ">Student Submissions</h3>
               <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowSubmissionsModal(false)}><X size={20} /></button>
             </div>
-            
+
             <div className="space-y-4">
               {submissionsData.length === 0 ? (
                 <div className="p-12 text-center rounded-2xl bg-slate-50 border border-slate-200 ">
-                   <p className="text-slate-500 font-medium">No one has submitted work for this assignment yet.</p>
+                  <p className="text-slate-500 font-medium">No one has submitted work for this assignment yet.</p>
                 </div>
               ) : (
                 submissionsData.map((sub: any) => (
@@ -758,15 +761,15 @@ export const ClassroomsPage: React.FC = () => {
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       {sub.file_path && sub.file_path.split(',').map((path: string, idx: number) => (
-                        <a 
+                        <a
                           key={idx}
-                          href={getDownloadUrl(path)} 
-                          target="_blank" 
-                          rel="noreferrer" 
+                          href={getDownloadUrl(path)}
+                          target="_blank"
+                          rel="noreferrer"
                           className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 font-bold text-xs rounded-lg hover:bg-blue-100 transition-colors border border-blue-100"
                           title={path.split('/').pop()}
                         >
-                          <Download size={14} /> 
+                          <Download size={14} />
                           {path.split(/[\/\\]/).pop()?.replace(/^[^_]+_/, '') || `File ${idx + 1}`}
                         </a>
                       ))}

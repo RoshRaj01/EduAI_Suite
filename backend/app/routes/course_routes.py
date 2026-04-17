@@ -49,7 +49,7 @@ async def extract_course_details(file: UploadFile = File(...)):
         for page in reader.pages:
             raw_text += page.extract_text() + "\n"
         # Normalize text: collapse multiple spaces and newlines to avoid PDF-specific layout issues
-        text = re.sub(r'\s+', ' ', raw_text)
+        text = raw_text
     elif file.filename.endswith(".docx"):
         doc = docx.Document(io.BytesIO(contents))
         # Extract text from paragraphs
@@ -78,28 +78,60 @@ async def extract_course_details(file: UploadFile = File(...)):
     # Simple regex based on the image format
     # Use re.IGNORECASE and allow for various separators (colon, spaces, etc.)
     
-    # Course Code: SCI201-4L
-    code_match = re.search(r"Course Code[:\s]+([\w-]+)", text, re.IGNORECASE)
+    # Course Code: SCI202-4L
+    # Be greedy with characters typically used in codes
+    code_match = re.search(r"Course\s*Code\s*[:\-]?\s*([A-Z0-9\-]+)", text, re.IGNORECASE)
     if code_match: details["code"] = code_match.group(1).strip()
     
-    # Course Name: Linear algebra
-    name_match = re.search(r"Course Name[:\s]+([^:]+?)(?= Course Code| Course Type|$) ", text, re.IGNORECASE)
+    # Course Name: Hypothesis Testing
+    name_match = re.search(r"Course Name[:\s]+([^:]+?)(?= Course Code| Course Type| Method| Hours| Credits|$)", text, re.IGNORECASE)
     if not name_match:
         name_match = re.search(r"Course Name[:\s]+([^\n\r]+)", text, re.IGNORECASE)
     if name_match: details["name"] = name_match.group(1).strip()
     
-    # Instructor: Prof. Lian Mathew
-    # Handles "Course Instructor(s) Name:" with optional numbering like "1. Name"
-    instructor_match = re.search(r"Course Instructor\(s\) Name[:\s]+(?:\d+\.\s*)?([^:]+?)(?= Contact Details| classroom policy|$)", text, re.IGNORECASE)
-    if not instructor_match:
-        instructor_match = re.search(r"Course Instructor\(s\) Name[:\s]+(?:\d+\.\s*)?([^\n\r]+)", text, re.IGNORECASE)
-    if instructor_match: details["teacher_name"] = instructor_match.group(1).strip()
-    
-    # Programmes: BSc (Data Science / Honours / Honours with Research)
-    programme_match = re.search(r"Programme\(s\)[:\s]+([^:]+?)(?= Course Name| Course Code|$)", text, re.IGNORECASE)
-    if not programme_match:
-        programme_match = re.search(r"Programme\(s\)[:\s]+([^\n\r]+)", text, re.IGNORECASE)
-    if programme_match: details["programmes"] = programme_match.group(1).strip()
+
+    # 🔹 Instructor (handles multiple formats)
+    instructor_match = re.search(
+        r"(?:Course\s+Instructor\(s\)\s+Name|Instructor)[:\s#]+(.+)",
+        text,
+        re.IGNORECASE
+    )
+
+    if instructor_match:
+        details["teacher_name"] = instructor_match.group(1).strip()
+
+
+    # 🔹 Programmes → Description (STRICT RANGE)
+    prog_match = re.search(
+        r"OFFERED\s+PROGRAMMES[:\s]*(.*?)(?=Course\s+learning\s+Outcomes)",
+        text,
+        re.IGNORECASE | re.DOTALL
+    )
+
+    if prog_match:
+        desc = prog_match.group(1)
+
+        # 🔹 HARD CLEANING (THIS IS THE KEY FIX)
+        desc = desc.split("Course learning Outcomes")[0]
+
+        # Remove anything that looks like syllabus/lab content
+        desc = re.split(r"\n?\s*(?:Unit|U\d|Topic|Lab Programs)", desc)[0]
+
+        # Normalize spaces
+        desc = re.sub(r"\s+", " ", desc)
+
+        details["description"] = desc.strip()
+
+    else:
+        # 🔹 Fallback (single line only)
+        programme_match = re.search(
+            r"OFFERED\s+PROGRAMMES[:\s]+([^\n\r]+)",
+            text,
+            re.IGNORECASE
+        )
+        if programme_match:
+            details["description"] = programme_match.group(1).strip()
+
 
     return details
 
