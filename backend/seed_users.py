@@ -1,8 +1,9 @@
-from app.database import SessionLocal
+from app.database import SessionLocal, Base, engine
 from app.models.user import User
 from app.utils.auth import get_password_hash
 
-
+# EDIT THESE DETAILS AS PER YOUR REQUIREMENTS
+# Email must be unique for each user
 USERS_TO_SEED = [
     {
         "name": "Prof. Rosh",
@@ -21,25 +22,28 @@ USERS_TO_SEED = [
         "employee_id": "EMP002"
     },
     {
-        "name": "Aarav Gupta",
-        "email": "aarav@student.com",
-        "password": "student123",
-        "role": "student",
-        "registration_number": "REG2024001",
-        "department": "Data Science"
-    },
-    {
         "name": "Omkaar",
-        "email": "omkaar@student.com",
-        "password": "123student",
+        "email": "omkaar@eduai.com",
+        "password": "student123",
         "role": "student",
         "registration_number": "25441156",
         "department": "Computer Science"
+    },
+    # You can add student details here too
+    {
+        "name": "Aarav Gupta",
+        "email": "aarav@student.com",
+        "password": "123student",
+        "role": "student",
+        "registration_number": "REG2024001",
+        "department": "Data Science"
     }
 ]
 
-
 def seed_users():
+    # Ensure tables exist (self-healing if DB is deleted)
+    Base.metadata.create_all(bind=engine)
+    
     db = SessionLocal()
     print("--- Starting User Seeding Process ---")
     
@@ -47,19 +51,17 @@ def seed_users():
         email = user_data["email"]
         db_user = db.query(User).filter(User.email == email).first()
         
-        raw_password = user_data["password"]
+        # Truncate password to 72 chars to avoid bcrypt limit
+        raw_password = user_data.pop("password")[:72]
+        user_data["hashed_password"] = get_password_hash(raw_password)
         
-        user_dict = user_data.copy()
-        user_dict["hashed_password"] = get_password_hash(raw_password)
-        user_dict.pop("password", None)
-        
-        if db_user:
+        if db_admin := db.query(User).filter(User.email == email).first():
             print(f"Updating existing user: {email}")
-            for key, value in user_dict.items():
-                setattr(db_user, key, value)
+            for key, value in user_data.items():
+                setattr(db_admin, key, value)
         else:
             print(f"Creating new user: {email}")
-            new_user = User(**user_dict)
+            new_user = User(**user_data)
             db.add(new_user)
             
     try:
@@ -70,7 +72,6 @@ def seed_users():
         print(f"Error during seeding: {e}")
     finally:
         db.close()
-
 
 if __name__ == "__main__":
     seed_users()
