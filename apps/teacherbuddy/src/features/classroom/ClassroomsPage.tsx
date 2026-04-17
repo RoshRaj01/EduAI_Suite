@@ -33,10 +33,16 @@ export const ClassroomsPage: React.FC = () => {
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: string, id: number, message: string } | null>(null);
 
+  // Submissions State
+  const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
+  const [viewingAssignmentId, setViewingAssignmentId] = useState<number | null>(null);
+  const [submissionsData, setSubmissionsData] = useState<any[]>([]);
+
   // Forms
   const [courseForm, setCourseForm] = useState({
-    code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796"
+    code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796", teacher_name: ""
   });
+  const [coursePlanFile, setCoursePlanFile] = useState<File | null>(null);
 
   const [studentForm, setStudentForm] = useState({
     name: "", email: "", registration_number: "", student_class: "", department: DEPARTMENTS[0]
@@ -111,10 +117,24 @@ export const ClassroomsPage: React.FC = () => {
 
   const handleCreateCourse = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { ...courseForm, students: 0, progress: 0.0 };
+    const formData = new FormData();
+    formData.append("code", courseForm.code);
+    formData.append("name", courseForm.name);
+    formData.append("batch", courseForm.batch);
+    formData.append("color", courseForm.color);
+    formData.append("description", courseForm.description);
+    if (courseForm.enrollment_code) formData.append("enrollment_code", courseForm.enrollment_code);
+    if (courseForm.teacher_name) formData.append("teacher_name", courseForm.teacher_name);
+    if (coursePlanFile) formData.append("file", coursePlanFile);
+
     handleApiCall(
-      () => fetch(`${API_URL}/courses/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
-      () => { setShowCourseModal(false); setCourseForm({ code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796" }); fetchCourses(); }
+      () => fetch(`${API_URL}/courses/`, { method: "POST", body: formData }),
+      () => {
+        setShowCourseModal(false);
+        setCourseForm({ code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796", teacher_name: "" });
+        setCoursePlanFile(null);
+        fetchCourses();
+      }
     );
   };
 
@@ -212,6 +232,21 @@ export const ClassroomsPage: React.FC = () => {
 
   const handleDeleteAssignment = (id: number) => {
     setDeleteConfirm({ type: "assignment", id, message: "Are you sure you want to delete this assignment?" });
+  };
+
+  const handleViewSubmissions = async (assignment: any) => {
+    setViewingAssignmentId(assignment.id);
+    setSubmissionsData([]);
+    setShowSubmissionsModal(true);
+    try {
+      const res = await fetch(`${API_URL}/submissions/${assignment.id}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSubmissionsData(data);
+      }
+    } catch {
+      setErrorMsg("Failed to fetch submissions.");
+    }
   };
 
   const confirmDelete = () => {
@@ -415,6 +450,13 @@ export const ClassroomsPage: React.FC = () => {
                                     <span>Show file</span>
                                   </a>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleViewSubmissions(a); }}
+                                  className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 font-bold ml-2 bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-200 shadow-sm transition-all hover:bg-indigo-100"
+                                >
+                                  <Users size={14} /> View Submissions
+                                </button>
                               </div>
                             </div>
                             <div className="relative z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
@@ -481,6 +523,11 @@ export const ClassroomsPage: React.FC = () => {
                 <div><label className={premiumLabel}>Optional Code</label><input className={premiumInput} placeholder="Join Code" value={courseForm.enrollment_code} onChange={e => setCourseForm({ ...courseForm, enrollment_code: e.target.value })} /></div>
               </div>
               <div><label className={premiumLabel}>Description</label><textarea className={premiumInput} placeholder="Brief summary of syllabus..." rows={3} value={courseForm.description} onChange={e => setCourseForm({ ...courseForm, description: e.target.value })} /></div>
+              <div><label className={premiumLabel}>Teacher Name</label><input required className={premiumInput} placeholder="e.g., Prof. Smith" value={courseForm.teacher_name} onChange={e => setCourseForm({ ...courseForm, teacher_name: e.target.value })} /></div>
+              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-5 text-center mt-2 hover:bg-slate-50 transition-colors">
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">Course Plan Document (Optional)</p>
+                <input type="file" accept=".pdf,.pptx,.docx" onChange={e => setCoursePlanFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer mx-auto" />
+              </div>
               <button type="submit" className="w-full bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-brand-blue/30 py-4 rounded-xl font-bold text-lg transition-all hover:-translate-y-1">Initialize Course</button>
             </form>
           </div>
@@ -618,6 +665,49 @@ export const ClassroomsPage: React.FC = () => {
                   Yes, Confirm
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSubmissionsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-3xl p-8 w-full max-w-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] max-h-[85vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-extrabold text-2xl text-slate-800 ">Student Submissions</h3>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowSubmissionsModal(false)}><X size={20} /></button>
+            </div>
+            
+            <div className="space-y-4">
+              {submissionsData.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl bg-slate-50 border border-slate-200 ">
+                   <p className="text-slate-500 font-medium">No one has submitted work for this assignment yet.</p>
+                </div>
+              ) : (
+                submissionsData.map((sub: any) => (
+                  <div key={sub.id} className="p-4 bg-white rounded-xl border border-slate-200 flex justify-between items-center shadow-sm">
+                    <div>
+                      <p className="font-bold text-slate-900 ">{sub.student_name}</p>
+                      <p className="text-xs font-bold text-slate-500 mt-1">Submitted at {sub.submitted_at}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {sub.file_path && sub.file_path.split(',').map((path: string, idx: number) => (
+                        <a 
+                          key={idx}
+                          href={getDownloadUrl(path)} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 font-bold text-xs rounded-lg hover:bg-blue-100 transition-colors border border-blue-100"
+                          title={path.split('/').pop()}
+                        >
+                          <Download size={14} /> 
+                          {path.split(/[\/\\]/).pop()?.replace(/^[^_]+_/, '') || `File ${idx + 1}`}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

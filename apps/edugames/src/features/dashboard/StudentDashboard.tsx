@@ -1,14 +1,23 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BookOpen, Clock, Target, PlayCircle, Award, Calendar, ChevronRight } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
-const enrolledCourses = [
-  { code: "CSC401", name: "Advanced Neural Networks", assignments: 2, nextClass: "Tomorrow 2:00 PM" },
-  { code: "CSC312", name: "Data Structures & Algorithms", assignments: 0, nextClass: "Today 10:00 AM" },
-];
+const API_URL = "http://localhost:8000";
 
 export const StudentDashboard: React.FC = () => {
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    fetch(`${API_URL}/courses/`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setEnrolledCourses(data);
+      })
+      .catch(console.error);
+  }, []);
+
   return (
     <div className="space-y-7 animate-fade-in">
       <div className="flex items-start justify-between">
@@ -60,21 +69,23 @@ export const StudentDashboard: React.FC = () => {
           {/* Enrolled Courses */}
           <div>
             <h3 className="section-title text-sm mb-3">My Classrooms</h3>
+            {enrolledCourses.length === 0 && <p className="text-sm text-slate-500">You are not enrolled in any classrooms yet.</p>}
             <div className="grid sm:grid-cols-2 gap-4">
                {enrolledCourses.map(course => (
-                 <GlassCard key={course.code} className="p-5 hover:border-blue-500/30 transition-colors cursor-pointer group">
+                 <GlassCard key={course.code} onClick={() => navigate("/classrooms")} className="p-5 hover:border-blue-500/30 transition-colors cursor-pointer group">
                     <div className="flex justify-between items-start mb-4">
-                       <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white" style={{ background: course.color || '#3b82f6' }}>
                           <BookOpen size={20} />
                        </div>
                        <ChevronRight size={18} className="opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" style={{ color: 'var(--color-brand-blue)' }}/>
                     </div>
-                    <p className="text-[10px] font-bold text-blue-500">{course.code}</p>
-                    <h4 className="font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>{course.name}</h4>
+                    <p className="text-[10px] font-bold text-blue-500 uppercase">{course.code}</p>
+                    <h4 className="font-bold mb-1" style={{ color: 'var(--color-text-primary)' }}>{course.name}</h4>
+                    {course.teacher_name && <p className="text-xs mb-3 font-semibold text-slate-500">By {course.teacher_name}</p>}
                     
                     <div className="pt-3 border-t flex justify-between items-center" style={{ borderColor: 'var(--color-border)' }}>
-                       <p className="text-xs font-semibold" style={{ color: course.assignments > 0 ? '#ef4444' : 'var(--color-text-muted)' }}>
-                         {course.assignments} Due Assignment{course.assignments !== 1 ? 's' : ''}
+                       <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                         {course.students} Students &bull; Batch {course.batch}
                        </p>
                     </div>
                  </GlassCard>

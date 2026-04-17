@@ -6,10 +6,10 @@ import shutil
 import re
 
 BASE_UPLOAD_DIR = Path(__file__).resolve().parents[2] / "uploads"
-ALLOWED_FILE_EXTENSIONS = {".pdf", ".pptx", ".docx"}
+ALLOWED_FILE_EXTENSIONS = {".pdf", ".pptx", ".docx", ".png", ".jpg", ".jpeg", ".zip"}
 
 BASE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-for folder in ("assignments", "announcements"):
+for folder in ("assignments", "announcements", "courses", "submissions"):
     (BASE_UPLOAD_DIR / folder).mkdir(parents=True, exist_ok=True)
 
 

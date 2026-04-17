@@ -11,6 +11,8 @@ import {
   Paperclip,
   RefreshCw,
   Search,
+  Trash2,
+  X,
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
@@ -26,6 +28,8 @@ type Course = {
   color: string;
   description: string;
   enrollment_code?: string | null;
+  teacher_name?: string | null;
+  course_plan_path?: string | null;
 };
 
 type Assignment = {
@@ -90,6 +94,8 @@ export const StudentClassrooms: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<Record<number, File[]>>({});
+  const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState<number[]>([]);
 
   const selectedCourse = useMemo(
     () => courses.find(course => course.id === selectedId) ?? null,
@@ -124,7 +130,24 @@ export const StudentClassrooms: React.FC = () => {
     ]);
 
     setAnnouncements(Array.isArray(announcementData) ? announcementData : []);
-    setAssignments(Array.isArray(assignmentData) ? assignmentData : []);
+    
+    if (Array.isArray(assignmentData)) {
+      setAssignments(assignmentData);
+      const submissionsPromises = assignmentData.map(a => 
+         fetch(`${API_URL}/submissions/${a.id}`).then(res => res.json().catch(() => []))
+      );
+      const allSubmissions = await Promise.all(submissionsPromises);
+      const submittedIds = [];
+      assignmentData.forEach((a, i) => {
+         if (Array.isArray(allSubmissions[i]) && allSubmissions[i].some((sub: any) => sub.student_name === "Aarav (Student)")) {
+            submittedIds.push(a.id);
+         }
+      });
+      setSubmittedAssignmentIds(submittedIds);
+    } else {
+      setAssignments([]);
+      setSubmittedAssignmentIds([]);
+    }
   };
 
   const selectCourse = async (courseId: number) => {
@@ -166,6 +189,56 @@ export const StudentClassrooms: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const handleSubmitWork = async (assignmentId: number, files: File[]) => {
+    try {
+      const formData = new FormData();
+      formData.append("student_name", "Aarav (Student)"); // Mocked student identity
+      for (const file of files) {
+        formData.append("files", file);
+      }
+      
+      const response = await fetch(`${API_URL}/submissions/${assignmentId}`, {
+        method: "POST",
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to submit assignment.");
+      }
+      
+      alert("Assignment submitted successfully!");
+      setSubmittedAssignmentIds(prev => Array.from(new Set([...prev, assignmentId])));
+      setSelectedFiles(prev => {
+        const next = { ...prev };
+        delete next[assignmentId];
+        return next;
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not upload work");
+    }
+  };
+
+  const handleUnsubmit = async (assignmentId: number) => {
+    if (!window.confirm("Are you sure you want to unsubmit your work?")) return;
+    
+    try {
+      const studentName = "Aarav (Student)";
+      const response = await fetch(`${API_URL}/submissions/assignment/${assignmentId}/student/${encodeURIComponent(studentName)}`, {
+        method: "DELETE"
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to unsubmit assignment.");
+      }
+      
+      setSubmittedAssignmentIds(prev => prev.filter(id => id !== assignmentId));
+      alert("Assignment unsubmitted successfully.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not unsubmit work");
+    }
+  };
+
 
   useEffect(() => {
     refresh();
@@ -348,6 +421,18 @@ export const StudentClassrooms: React.FC = () => {
                       <span>{selectedCourse.enrollment_code}</span>
                     </div>
                   )}
+                  {selectedCourse.teacher_name && (
+                    <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold ml-2">
+                      <span className="text-white/65">Teacher</span>
+                      <span>{selectedCourse.teacher_name}</span>
+                    </div>
+                  )}
+                  {selectedCourse.course_plan_path && (
+                    <a href={getFileUrl(selectedCourse.course_plan_path)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold ml-2 hover:bg-white/20 transition-colors text-white">
+                      <BookOpen size={14} />
+                      <span>Course Plan</span>
+                    </a>
+                  )}
 
                   <div className="mt-6">
                     <div className="mb-2 flex items-center justify-between text-xs font-semibold text-white/80">
@@ -430,59 +515,158 @@ export const StudentClassrooms: React.FC = () => {
                 </div>
               )}
 
-              {activeTab === "assignments" && (
-                <div className="grid gap-4">
-                  {assignments.length === 0 ? (
-                    <GlassCard className="p-8 text-center">
-                      <p style={{ color: "var(--color-text-secondary)" }}>No assignments have been posted yet.</p>
-                    </GlassCard>
-                  ) : (
-                    assignments.map(assignment => {
-                      const status = getAssignmentStatus(assignment.due_date);
+              {activeTab === "assignments" && (() => {
+                  const pendingAssignments = assignments.filter(a => !submittedAssignmentIds.includes(a.id));
+                  const submittedAssignments = assignments.filter(a => submittedAssignmentIds.includes(a.id));
+                  
+                  return (
+                    <div className="space-y-8">
+                       {/* Pending Assignments */}
+                       <div className="grid gap-4">
+                         {pendingAssignments.length === 0 ? (
+                            <GlassCard className="p-8 text-center bg-white/40">
+                              <p className="text-slate-500 font-bold">You have zero pending assignments. Great job!</p>
+                            </GlassCard>
+                         ) : (
+                            pendingAssignments.map(assignment => {
+                              const status = getAssignmentStatus(assignment.due_date);
+        
+                              return (
+                                <GlassCard key={assignment.id} className="p-5 border-l-4 border-l-orange-400">
+                                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
+                                          {assignment.title}
+                                        </p>
+                                        <span className="rounded-full bg-orange-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-orange-700 border border-orange-200">
+                                          PENDING
+                                        </span>
+                                      </div>
+                                      <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+                                        {assignment.description}
+                                      </p>
+                                      {assignment.media_path && (
+                                        <div className="mt-4">
+                                          <a
+                                            href={getFileUrl(assignment.media_path)}
+                                            download
+                                            className="group inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 hover:border-blue-300"
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              <Paperclip size={14} className="group-hover:hidden" />
+                                              <Download size={14} className="hidden group-hover:block" />
+                                              <span className="truncate max-w-[200px]">{assignment.media_path.split(/[\/\\]/).pop()?.replace(/^[^_]+_/, '') || assignment.media_path.split(/[\/\\]/).pop()}</span>
+                                            </div>
+                                          </a>
+                                        </div>
+                                      )}
+                                    </div>
+                                      <div className="flex shrink-0 flex-col gap-2 text-sm max-w-[200px]">
+                                        <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-slate-700">
+                                          <Clock size={14} />
+                                          <span>Due {formatDueDate(assignment.due_date)}</span>
+                                        </div>
+                                        <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-slate-700">
+                                          <CheckCircle2 size={14} />
+                                          <span>{assignment.max_points} points</span>
+                                        </div>
+                                        <div className="mt-4 flex flex-col gap-3">
+                                          <div className="flex flex-wrap gap-2">
+                                            {(selectedFiles[assignment.id] || []).map((file, idx) => (
+                                              <div key={idx} className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 border border-indigo-100">
+                                                <span className="truncate max-w-[120px]">{file.name}</span>
+                                                <button 
+                                                  onClick={() => {
+                                                    setSelectedFiles(prev => ({
+                                                      ...prev,
+                                                      [assignment.id]: prev[assignment.id].filter((_, i) => i !== idx)
+                                                    }));
+                                                  }}
+                                                  className="hover:text-red-500 transition-colors"
+                                                >
+                                                  <X size={12} />
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                          
+                                          <label className="inline-flex items-center justify-center gap-2 rounded-full border border-indigo-200 bg-white px-3 py-2 text-indigo-600 transition-colors hover:bg-indigo-50 cursor-pointer text-xs font-bold w-full text-center">
+                                            <Paperclip size={14} className="shrink-0" />
+                                            <span>Add Files</span>
+                                            <input type="file" className="hidden" multiple accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip" onChange={(e) => {
+                                                if (e.target.files) {
+                                                    const files = Array.from(e.target.files);
+                                                    setSelectedFiles(prev => ({ 
+                                                       ...prev, 
+                                                       [assignment.id]: [...(prev[assignment.id] || []), ...files] 
+                                                    }));
+                                                }
+                                            }} />
+                                          </label>
+                                          
+                                          {(selectedFiles[assignment.id] || []).length > 0 && (
+                                            <button 
+                                              onClick={() => handleSubmitWork(assignment.id, selectedFiles[assignment.id])}
+                                              className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-3 py-2 text-white transition-colors hover:bg-indigo-700 shadow-md shadow-indigo-500/20 font-bold text-xs w-full text-center truncate"
+                                            >
+                                              <span>Submit {selectedFiles[assignment.id].length} File(s)</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </GlassCard>
+                              );
+                            })
+                         )}
+                       </div>
 
-                      return (
-                        <GlassCard key={assignment.id} className="p-5">
-                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
-                                  {assignment.title}
-                                </p>
-                                <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-blue-700">
-                                  {status}
-                                </span>
-                              </div>
-                              <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-                                {assignment.description}
-                              </p>
+                       {/* Submitted Assignments */}
+                       {submittedAssignments.length > 0 && (
+                         <div className="pt-6 border-t border-slate-200/50">
+                            <h3 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-wider px-2">Submitted Assignments</h3>
+                            <div className="grid gap-4 opacity-75">
+                              {submittedAssignments.map(assignment => {
+                                return (
+                                  <GlassCard key={assignment.id} className="p-5 border-l-4 border-l-green-400 bg-white/40 grayscale-[0.3]">
+                                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
+                                            {assignment.title}
+                                          </p>
+                                          <span className="rounded-full bg-green-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-green-700 border border-green-200 flex items-center gap-1">
+                                            <CheckCircle2 size={10}/> SUBMITTED
+                                          </span>
+                                        </div>
+                                        <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+                                          {assignment.description}
+                                        </p>
+                                      </div>
+                                      <div className="flex shrink-0 flex-col gap-2 text-sm">
+                                          <div className="inline-flex items-center justify-center gap-2 rounded-full bg-green-100 text-green-800 px-4 py-2 font-bold opacity-100 shadow-sm">
+                                            <CheckCircle2 size={16} />
+                                            <span>Work Submitted</span>
+                                          </div>
+                                          <button 
+                                            onClick={() => handleUnsubmit(assignment.id)}
+                                            className="inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-red-600 text-xs font-bold hover:bg-red-100 transition-all shadow-sm"
+                                          >
+                                            <Trash2 size={14} />
+                                            <span>Unsubmit</span>
+                                          </button>
+                                      </div>
+                                    </div>
+                                  </GlassCard>
+                                )
+                              })}
                             </div>
-                              <div className="flex shrink-0 flex-col gap-2 text-sm">
-                                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-slate-700">
-                                  <Clock size={14} />
-                                  <span>Due {formatDueDate(assignment.due_date)}</span>
-                                </div>
-                                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-slate-700">
-                                  <CheckCircle2 size={14} />
-                                  <span>{assignment.max_points} points</span>
-                                </div>
-                                {assignment.media_path && (
-                                  <a
-                                    href={getFileUrl(assignment.media_path)}
-                                    download
-                                    className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-2 text-blue-700 transition-colors hover:bg-blue-100"
-                                  >
-                                    <Download size={14} />
-                                    <span>Download file</span>
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                          </GlassCard>
-                      );
-                    })
-                  )}
-                </div>
-              )}
+                         </div>
+                       )}
+                    </div>
+                  );
+              })()}
 
               {activeTab === "announcements" && (
                 <div className="grid gap-4">

@@ -9,6 +9,7 @@ class CourseBase(BaseModel):
     progress: float
     color: str
     description: str
+    teacher_name: Optional[str] = None
 
 class CourseCreate(CourseBase):
     enrollment_code: Optional[str] = None
@@ -26,6 +27,7 @@ class CourseUpdate(BaseModel):
 class CourseResponse(CourseBase):
     id: int
     enrollment_code: Optional[str] = None
+    course_plan_path: Optional[str] = None
 
     class Config:
         from_attributes = True

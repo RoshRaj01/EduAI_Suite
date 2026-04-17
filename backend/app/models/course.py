@@ -13,3 +13,5 @@ class Course(Base):
     color = Column(String)
     description = Column(String)
     enrollment_code = Column(String, unique=True, index=True, nullable=True)
+    teacher_name = Column(String, nullable=True)
+    course_plan_path = Column(String, nullable=True)
