@@ -142,7 +142,7 @@ def create_course(
     name: str = Form(...),
     batch: str = Form(...),
     color: str = Form(...),
-    description: str = Form(...),
+    description: str = Form(""),
     enrollment_code: Optional[str] = Form(None),
     teacher_name: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),

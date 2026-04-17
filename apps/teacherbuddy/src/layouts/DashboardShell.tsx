@@ -52,6 +52,17 @@ export const DashboardShell: React.FC = () => {
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    } else {
+      // If no user, redirect to login
+      navigate("/login");
+    }
+  }, [navigate]);
 
   // Filter nav items based on search query
   const searchResults = searchQuery.trim()
@@ -246,10 +257,10 @@ export const DashboardShell: React.FC = () => {
             >
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow"
                 style={{ background: "linear-gradient(135deg,#264796,#3460c4)" }}>
-                JD
+                {user?.name?.charAt(0) || "U"}
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>Prof. John</p>
+                <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "User"}</p>
               </div>
             </button>
 
@@ -258,11 +269,11 @@ export const DashboardShell: React.FC = () => {
               <div className="absolute right-0 top-12 w-52 rounded-xl z-50 overflow-hidden animate-fade-in py-1 border shadow-lg"
                 style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)" }}>
                 <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                  <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Prof. John Doe</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>john.doe@christ.in</p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "EduAI User"}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{user?.sub || "user@eduai.com"}</p>
                 </div>
                 <div className="border-t mt-1" style={{ borderColor: 'var(--color-border)' }}>
-                  <button onClick={() => navigate("/login")}
+                  <button onClick={() => { localStorage.clear(); navigate("/login"); }}
                     className="w-full text-left px-4 py-2.5 text-sm text-red-500 transition-colors"
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
