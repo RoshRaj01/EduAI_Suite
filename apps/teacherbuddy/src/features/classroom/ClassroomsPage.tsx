@@ -155,7 +155,7 @@ export const ClassroomsPage: React.FC = () => {
           code: (data.code && data.code.trim()) || prev.code,
           name: (data.name && data.name.trim()) || prev.name,
           teacher_name: (data.teacher_name && data.teacher_name.trim()) || prev.teacher_name,
-          description: data.programmes ? `${data.programmes}` : prev.description
+          description: (data.description || data.programmes) ? `${data.description || data.programmes}` : prev.description
         }));
       }
     } catch (err) {

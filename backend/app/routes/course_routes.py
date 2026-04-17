@@ -49,7 +49,8 @@ async def extract_course_details(file: UploadFile = File(...)):
         for page in reader.pages:
             raw_text += page.extract_text() + "\n"
         # Normalize text: collapse multiple spaces and newlines to avoid PDF-specific layout issues
-        text = raw_text
+        text = raw_text  # normalize newlines
+
     elif file.filename.endswith(".docx"):
         doc = docx.Document(io.BytesIO(contents))
         # Extract text from paragraphs
@@ -73,7 +74,7 @@ async def extract_course_details(file: UploadFile = File(...)):
         "name": "",
         "teacher_name": "",
         "programmes": ""
-    }
+    }   
     
     # Simple regex based on the image format
     # Use re.IGNORECASE and allow for various separators (colon, spaces, etc.)
@@ -101,39 +102,39 @@ async def extract_course_details(file: UploadFile = File(...)):
         details["teacher_name"] = instructor_match.group(1).strip()
 
 
-    # 🔹 Programmes → Description (STRICT RANGE)
-    prog_match = re.search(
-        r"OFFERED\s+PROGRAMMES[:\s]*(.*?)(?=Course\s+learning\s+Outcomes)",
-        text,
-        re.IGNORECASE | re.DOTALL
-    )
+    # 🔹 Programmes → Description (ROBUST FIX)
 
-    if prog_match:
-        desc = prog_match.group(1)
+    lines = raw_text.split("\n")
 
-        # 🔹 HARD CLEANING (THIS IS THE KEY FIX)
-        desc = desc.split("Course learning Outcomes")[0]
+    desc_lines = []
+    capture = False
 
-        # Remove anything that looks like syllabus/lab content
-        desc = re.split(r"\n?\s*(?:Unit|U\d|Topic|Lab Programs)", desc)[0]
+    for line in lines:
+        l = line.strip().lower()
 
-        # Normalize spaces
-        desc = re.sub(r"\s+", " ", desc)
+        # START condition
+        if "offered programme" in l:
+            capture = True
+            continue
 
-        details["description"] = desc.strip()
+        # STOP condition
+        if any(x in l for x in [
+            "course learning outcome",
+            "outcome reference",
+            "course credit",
+            "unit",
+            "syllabus"
+        ]):
+            break
 
-    else:
-        # 🔹 Fallback (single line only)
-        programme_match = re.search(
-            r"OFFERED\s+PROGRAMMES[:\s]+([^\n\r]+)",
-            text,
-            re.IGNORECASE
-        )
-        if programme_match:
-            details["description"] = programme_match.group(1).strip()
+        if capture:
+            if line.strip():
+                desc_lines.append(line.strip())
 
+    details["description"] = " ".join(desc_lines).strip()
 
     return details
+
 
 @router.post("/", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
 def create_course(
