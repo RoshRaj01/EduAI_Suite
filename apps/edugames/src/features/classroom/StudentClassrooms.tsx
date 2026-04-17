@@ -13,6 +13,7 @@ import {
   Search,
   Trash2,
   X,
+  User,
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
@@ -96,6 +97,9 @@ export const StudentClassrooms: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Record<number, File[]>>({});
   const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState<number[]>([]);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
 
   const selectedCourse = useMemo(
     () => courses.find(course => course.id === selectedId) ?? null,
@@ -219,23 +223,40 @@ export const StudentClassrooms: React.FC = () => {
     }
   };
 
-  const handleUnsubmit = async (assignmentId: number) => {
-    if (!window.confirm("Are you sure you want to unsubmit your work?")) return;
-    
+  const handleJoinByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (joinCode.length !== 6) {
+      alert("Please enter a valid 6-character code.");
+      return;
+    }
+
+    setIsJoining(true);
     try {
-      const studentName = "Aarav (Student)";
-      const response = await fetch(`${API_URL}/submissions/assignment/${assignmentId}/student/${encodeURIComponent(studentName)}`, {
-        method: "DELETE"
+      const response = await fetch(`${API_URL}/students/enroll/code?enrollment_code=${joinCode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Aarav (Student)",
+          email: "aarav.student@university.edu",
+          registration_number: "S12345",
+          student_class: "Batch 2026-A",
+          department: "Computer Science"
+        })
       });
-      
+
       if (!response.ok) {
-        throw new Error("Failed to unsubmit assignment.");
+        const errData = await response.json().catch(() => ({ detail: "Failed to join class." }));
+        throw new Error(errData.detail);
       }
-      
-      setSubmittedAssignmentIds(prev => prev.filter(id => id !== assignmentId));
-      alert("Assignment unsubmitted successfully.");
+
+      alert("Successfully joined the class!");
+      setShowJoinModal(false);
+      setJoinCode("");
+      refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not unsubmit work");
+      alert(err instanceof Error ? err.message : "Error joining class.");
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -245,7 +266,7 @@ export const StudentClassrooms: React.FC = () => {
   }, []);
 
   const filteredCourses = courses.filter(course =>
-    `${course.code} ${course.name} ${course.batch}`.toLowerCase().includes(search.toLowerCase()),
+    `${course.code} ${course.name} ${course.batch} ${course.teacher_name || ""}`.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -270,6 +291,13 @@ export const StudentClassrooms: React.FC = () => {
               placeholder="Search classrooms..."
             />
           </div>
+          <button
+            type="button"
+            onClick={() => setShowJoinModal(true)}
+            className="btn bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 px-6 flex items-center gap-2"
+          >
+            <BookOpen size={18} /> Join a Class
+          </button>
           <button
             type="button"
             onClick={refresh}
@@ -348,6 +376,10 @@ export const StudentClassrooms: React.FC = () => {
                       <p className="mt-1 text-xs" style={{ color: "var(--color-text-secondary)" }}>
                         {course.batch}
                       </p>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <User size={12} className="text-slate-400" />
+                        <p className="text-[11px] font-medium text-slate-500 truncate">{course.teacher_name || "Unassigned"}</p>
+                      </div>
                     </div>
                     <ChevronRight size={18} className={isSelected ? "text-blue-600" : "text-slate-400"} />
                   </div>
@@ -422,13 +454,14 @@ export const StudentClassrooms: React.FC = () => {
                     </div>
                   )}
                   {selectedCourse.teacher_name && (
-                    <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold ml-2">
-                      <span className="text-white/65">Teacher</span>
+                    <div className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/12 px-4 py-2 text-xs font-bold backdrop-blur-md shadow-sm">
+                      <User size={14} className="text-white/70" />
+                      <span className="text-white/65 uppercase tracking-wider">Instructor:</span>
                       <span>{selectedCourse.teacher_name}</span>
                     </div>
                   )}
                   {selectedCourse.course_plan_path && (
-                    <a href={getFileUrl(selectedCourse.course_plan_path)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold ml-2 hover:bg-white/20 transition-colors text-white">
+                    <a href={getFileUrl(selectedCourse.course_plan_path)} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/12 px-4 py-2 text-xs font-bold ml-3 hover:bg-white/20 transition-all text-white backdrop-blur-md shadow-sm">
                       <BookOpen size={14} />
                       <span>Course Plan</span>
                     </a>
@@ -719,6 +752,38 @@ export const StudentClassrooms: React.FC = () => {
           )}
         </div>
       </div>
+      {showJoinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-3xl p-8 w-full max-w-sm shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-extrabold text-2xl text-slate-800">Join Classroom</h3>
+              <button className="text-slate-400 hover:text-slate-800 bg-slate-100 p-2 rounded-full transition-colors" onClick={() => setShowJoinModal(false)}><X size={20} /></button>
+            </div>
+            
+            <form onSubmit={handleJoinByCode} className="space-y-6">
+              <div className="text-center">
+                <p className="text-sm text-slate-600 mb-4">Enter the 6-character code provided by your teacher to enroll instantly.</p>
+                <input 
+                  type="text" 
+                  maxLength={6}
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="EX: BK92X1"
+                  className="w-full text-center text-3xl font-black tracking-[0.2em] bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 outline-none transition-all placeholder:text-slate-300 uppercase"
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={isJoining || joinCode.length !== 6}
+                className="w-full bg-brand-blue hover:bg-blue-700 disabled:bg-slate-300 text-white shadow-xl shadow-blue-500/30 py-4 rounded-2xl font-bold text-lg transition-all hover:-translate-y-1 flex items-center justify-center gap-2"
+              >
+                {isJoining ? <Loader2 size={24} className="animate-spin" /> : "Verify & Enroll"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

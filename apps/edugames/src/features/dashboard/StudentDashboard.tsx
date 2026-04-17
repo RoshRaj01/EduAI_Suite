@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BookOpen, Clock, Target, PlayCircle, Award, Calendar, ChevronRight } from "lucide-react";
+import { BookOpen, Clock, Target, PlayCircle, Award, Calendar, ChevronRight, User } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -81,7 +81,10 @@ export const StudentDashboard: React.FC = () => {
                     </div>
                     <p className="text-[10px] font-bold text-blue-500 uppercase">{course.code}</p>
                     <h4 className="font-bold mb-1" style={{ color: 'var(--color-text-primary)' }}>{course.name}</h4>
-                    {course.teacher_name && <p className="text-xs mb-3 font-semibold text-slate-500">By {course.teacher_name}</p>}
+                    <div className="flex items-center gap-1.5 mb-3">
+                       <User size={10} className="text-slate-400" />
+                       <p className="text-xs font-semibold text-slate-500">{course.teacher_name || "Unassigned"}</p>
+                    </div>
                     
                     <div className="pt-3 border-t flex justify-between items-center" style={{ borderColor: 'var(--color-border)' }}>
                        <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>

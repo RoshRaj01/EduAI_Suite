@@ -8,6 +8,12 @@ from app.models.assignment import Assignment
 from app.models.announcement import Announcement
 from app.schemas.course import CourseCreate, CourseResponse, CourseUpdate
 from app.utils.file_uploads import save_optional_upload
+import random
+import string
+import PyPDF2
+import docx
+import io
+import re
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
 
@@ -29,6 +35,74 @@ def get_course(course_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Course not found")
     return course
 
+def generate_unique_code():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+@router.post("/extract_details")
+async def extract_course_details(file: UploadFile = File(...)):
+    contents = await file.read()
+    text = ""
+    
+    if file.filename.endswith(".pdf"):
+        reader = PyPDF2.PdfReader(io.BytesIO(contents))
+        raw_text = ""
+        for page in reader.pages:
+            raw_text += page.extract_text() + "\n"
+        # Normalize text: collapse multiple spaces and newlines to avoid PDF-specific layout issues
+        text = re.sub(r'\s+', ' ', raw_text)
+    elif file.filename.endswith(".docx"):
+        doc = docx.Document(io.BytesIO(contents))
+        # Extract text from paragraphs
+        paragraphs_text = "\n".join([para.text for para in doc.paragraphs])
+        # Extract text from tables (many course plans use tables for metadata)
+        tables_text = ""
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    tables_text += "\n" + cell.text
+        text = paragraphs_text + "\n" + tables_text
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported file format. Please upload PDF or DOCX.")
+
+    # Parsing logic based on the provided sample image structure
+    # Expected fields: Course Code, Course Name, Course Instructor(s) Name, Programme(s)
+    
+    # regex matches for labels in the document
+    details = {
+        "code": "",
+        "name": "",
+        "teacher_name": "",
+        "programmes": ""
+    }
+    
+    # Simple regex based on the image format
+    # Use re.IGNORECASE and allow for various separators (colon, spaces, etc.)
+    
+    # Course Code: SCI201-4L
+    code_match = re.search(r"Course Code[:\s]+([\w-]+)", text, re.IGNORECASE)
+    if code_match: details["code"] = code_match.group(1).strip()
+    
+    # Course Name: Linear algebra
+    name_match = re.search(r"Course Name[:\s]+([^:]+?)(?= Course Code| Course Type|$) ", text, re.IGNORECASE)
+    if not name_match:
+        name_match = re.search(r"Course Name[:\s]+([^\n\r]+)", text, re.IGNORECASE)
+    if name_match: details["name"] = name_match.group(1).strip()
+    
+    # Instructor: Prof. Lian Mathew
+    # Handles "Course Instructor(s) Name:" with optional numbering like "1. Name"
+    instructor_match = re.search(r"Course Instructor\(s\) Name[:\s]+(?:\d+\.\s*)?([^:]+?)(?= Contact Details| classroom policy|$)", text, re.IGNORECASE)
+    if not instructor_match:
+        instructor_match = re.search(r"Course Instructor\(s\) Name[:\s]+(?:\d+\.\s*)?([^\n\r]+)", text, re.IGNORECASE)
+    if instructor_match: details["teacher_name"] = instructor_match.group(1).strip()
+    
+    # Programmes: BSc (Data Science / Honours / Honours with Research)
+    programme_match = re.search(r"Programme\(s\)[:\s]+([^:]+?)(?= Course Name| Course Code|$)", text, re.IGNORECASE)
+    if not programme_match:
+        programme_match = re.search(r"Programme\(s\)[:\s]+([^\n\r]+)", text, re.IGNORECASE)
+    if programme_match: details["programmes"] = programme_match.group(1).strip()
+
+    return details
+
 @router.post("/", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
 def create_course(
     code: str = Form(...),
@@ -42,6 +116,9 @@ def create_course(
     db: Session = Depends(get_db)
 ):
     course_plan_path = save_optional_upload(file, "courses")
+    # If no enrollment_code is provided by the system/user, generate a unique 6-char key
+    final_code = enrollment_code if enrollment_code else generate_unique_code()
+    
     new_course = Course(
         code=code,
         name=name,
@@ -50,7 +127,7 @@ def create_course(
         progress=0.0,
         color=color,
         description=description,
-        enrollment_code=enrollment_code,
+        enrollment_code=final_code,
         teacher_name=teacher_name,
         course_plan_path=course_plan_path
     )

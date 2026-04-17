@@ -2,7 +2,7 @@ import React from "react";
 import {
   Users, BrainCircuit, AlertTriangle, TrendingUp, BookOpen,
   Clock, ArrowRight, Activity, Star, Calendar, CheckCircle2,
-  Zap, BarChart2,
+  Zap, BarChart2, User,
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { Link } from "react-router-dom";
@@ -15,10 +15,10 @@ const stats = [
 ];
 
 const classrooms = [
-  { code: "CSC401", name: "Advanced Neural Networks", batch: "Batch 2026-A", students: 42, time: "2:00 PM", progress: 68 },
-  { code: "CSC312", name: "Data Structures & Algorithms", batch: "Batch 2025-B", students: 38, time: "10:00 AM", progress: 82 },
-  { code: "CSC501", name: "Cloud Computing & DevOps", batch: "Batch 2026-A", students: 35, time: "3:30 PM", progress: 45 },
-  { code: "CSC220", name: "Database Management Systems", batch: "Batch 2025-C", students: 50, time: "8:00 AM", progress: 91 },
+  { code: "CSC401", name: "Advanced Neural Networks", batch: "Batch 2026-A", students: 42, time: "2:00 PM", progress: 68, teacher: "Prof. Alan Turing" },
+  { code: "CSC312", name: "Data Structures & Algorithms", batch: "Batch 2025-B", students: 38, time: "10:00 AM", progress: 82, teacher: "Dr. Grace Hopper" },
+  { code: "CSC501", name: "Cloud Computing & DevOps", batch: "Batch 2026-A", students: 35, time: "3:30 PM", progress: 45, teacher: "Prof. Ken Thompson" },
+  { code: "CSC220", name: "Database Management Systems", batch: "Batch 2025-C", students: 50, time: "8:00 AM", progress: 91, teacher: "Dr. E.F. Codd" },
 ];
 
 const riskAlerts = [
@@ -109,6 +109,10 @@ export const DashboardPage: React.FC = () => {
                     <div>
                       <p className="text-white text-[10px] font-semibold uppercase tracking-widest opacity-70">{cls.code}</p>
                       <h3 className="text-white font-bold text-sm leading-snug mt-0.5">{cls.name}</h3>
+                      <div className="flex items-center gap-1.5 mt-2 opacity-80">
+                         <User size={10} className="text-white" />
+                         <span className="text-white text-[10px] font-medium">{cls.teacher}</span>
+                      </div>
                     </div>
                   </div>
                   <div className="space-y-3">

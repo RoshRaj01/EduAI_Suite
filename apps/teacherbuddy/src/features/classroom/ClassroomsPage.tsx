@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle, Edit2, AlertTriangle, Download } from "lucide-react";
+import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle, Edit2, AlertTriangle, Download, User } from "lucide-react";
 
 const API_URL = "http://localhost:8000";
 
@@ -40,8 +40,9 @@ export const ClassroomsPage: React.FC = () => {
 
   // Forms
   const [courseForm, setCourseForm] = useState({
-    code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796", teacher_name: ""
+    code: "", name: "", batch: "2026-A", description: "", enrollment_code: "", color: "#264796", teacher_name: "Prof. Rosh"
   });
+  const [isExtracting, setIsExtracting] = useState(false);
   const [coursePlanFile, setCoursePlanFile] = useState<File | null>(null);
 
   const [studentForm, setStudentForm] = useState({
@@ -131,12 +132,46 @@ export const ClassroomsPage: React.FC = () => {
       () => fetch(`${API_URL}/courses/`, { method: "POST", body: formData }),
       () => {
         setShowCourseModal(false);
-        setCourseForm({ code: "", name: "", batch: "", description: "", enrollment_code: "", color: "#264796", teacher_name: "" });
+        setCourseForm({ code: "", name: "", batch: "2026-A", description: "", enrollment_code: "", color: "#264796", teacher_name: "Prof. Rosh" });
         setCoursePlanFile(null);
         fetchCourses();
       }
     );
   };
+
+  const handleExtractDetails = async (file: File) => {
+    setIsExtracting(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`${API_URL}/courses/extract_details`, {
+        method: "POST",
+        body: formData
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Raw Extracted Data:", data);
+        setCourseForm(prev => ({
+          ...prev,
+          code: (data.code && data.code.trim()) || prev.code,
+          name: (data.name && data.name.trim()) || prev.name,
+          teacher_name: (data.teacher_name && data.teacher_name.trim()) || prev.teacher_name,
+          description: data.programmes ? `Target Programmes: ${data.programmes}` : prev.description
+        }));
+      }
+    } catch (err) {
+      console.error("Extraction failed", err);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showCourseModal && !courseForm.teacher_name) {
+      setCourseForm(prev => ({ ...prev, teacher_name: "Prof. Rosh" }));
+    }
+  }, [showCourseModal, courseForm.teacher_name]);
 
   const handleDeleteCourse = (id: number) => {
     setDeleteConfirm({ type: "course", id, message: "Are you sure you want to delete this course? This action is irreversible." });
@@ -297,7 +332,10 @@ export const ClassroomsPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Classroom Management</h1>
-          <button onClick={() => setShowCourseModal(true)} className="btn bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 btn-sm flex items-center gap-2 rounded-xl transition-all hover:-translate-y-0.5">
+          <button onClick={() => {
+            setCourseForm(prev => ({ ...prev, teacher_name: prev.teacher_name || "Prof. Rosh" }));
+            setShowCourseModal(true);
+          }} className="btn bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 btn-sm flex items-center gap-2 rounded-xl transition-all hover:-translate-y-0.5">
             <PlusCircle size={18} /> Create New Class
           </button>
         </div>
@@ -309,7 +347,11 @@ export const ClassroomsPage: React.FC = () => {
         {/* SIDEBAR */}
         <div className="space-y-3">
           {classrooms
-            .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase()))
+            .filter(c => 
+              c.name.toLowerCase().includes(search.toLowerCase()) || 
+              c.code.toLowerCase().includes(search.toLowerCase()) ||
+              (c.teacher_name && c.teacher_name.toLowerCase().includes(search.toLowerCase()))
+            )
             .map(c => (
               <div
                 key={c.id}
@@ -319,6 +361,12 @@ export const ClassroomsPage: React.FC = () => {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest mb-1 text-brand-gold-dark">{c.code}</p>
                   <p className="font-bold text-lg leading-tight text-slate-900 ">{c.name}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="p-1 bg-slate-100 rounded text-slate-500">
+                      <User size={12} />
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600 truncate max-w-[150px]">{c.teacher_name || "Unassigned"}</p>
+                  </div>
                   <p className="text-xs font-bold mt-2 text-brand-blue ">{c.students} Enrolled</p>
                 </div>
                 <button
@@ -345,7 +393,15 @@ export const ClassroomsPage: React.FC = () => {
                     <span className="text-xs font-bold tracking-widest uppercase text-white/50 mb-2 block">Active Dashboard</span>
                     <h2 className="text-4xl font-black tracking-tight mb-2">{selected.name}</h2>
                     <p className="text-white/80 text-base mb-4 leading-relaxed">{selected.description}</p>
-                    {selected.enrollment_code && <p className="text-xs font-mono bg-white/10 px-3 py-1.5 inline-block rounded-md border border-white/10">Code: <b>{selected.enrollment_code}</b></p>}
+                    <div className="flex flex-wrap gap-4 items-center">
+                      {selected.teacher_name && (
+                        <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-sm">
+                          <User size={14} className="text-white/70" />
+                          <span className="text-sm font-bold text-white">{selected.teacher_name}</span>
+                        </div>
+                      )}
+                      {selected.enrollment_code && <p className="text-xs font-mono bg-white/10 px-3 py-1.5 inline-block rounded-md border border-white/10">Code: <b>{selected.enrollment_code}</b></p>}
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-3 shrink-0">
                     <button onClick={() => { setEditingAssignmentId(null); setAssignmentForm({ title: "", description: "", dueDate: "", maxPoints: 100 }); setAssignmentFile(null); setShowAssignmentModal(true); }} className="btn bg-white text-black border-none font-bold hover:bg-black hover:text-white shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1">
@@ -520,13 +576,23 @@ export const ClassroomsPage: React.FC = () => {
               <div><label className={premiumLabel}>Course Name</label><input required className={premiumInput} placeholder="e.g., Advance Algorithms" value={courseForm.name} onChange={e => setCourseForm({ ...courseForm, name: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div><label className={premiumLabel}>Batch</label><input className={premiumInput} placeholder="2026-A" value={courseForm.batch} onChange={e => setCourseForm({ ...courseForm, batch: e.target.value })} /></div>
-                <div><label className={premiumLabel}>Optional Code</label><input className={premiumInput} placeholder="Join Code" value={courseForm.enrollment_code} onChange={e => setCourseForm({ ...courseForm, enrollment_code: e.target.value })} /></div>
+                <div><label className={premiumLabel}>Join Code</label><input className={`${premiumInput} bg-slate-50 cursor-not-allowed`} disabled placeholder="Auto-generated" value={courseForm.enrollment_code} /></div>
               </div>
               <div><label className={premiumLabel}>Description</label><textarea className={premiumInput} placeholder="Brief summary of syllabus..." rows={3} value={courseForm.description} onChange={e => setCourseForm({ ...courseForm, description: e.target.value })} /></div>
               <div><label className={premiumLabel}>Teacher Name</label><input required className={premiumInput} placeholder="e.g., Prof. Smith" value={courseForm.teacher_name} onChange={e => setCourseForm({ ...courseForm, teacher_name: e.target.value })} /></div>
-              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-5 text-center mt-2 hover:bg-slate-50 transition-colors">
-                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">Course Plan Document (Optional)</p>
-                <input type="file" accept=".pdf,.pptx,.docx" onChange={e => setCoursePlanFile(e.target.files ? e.target.files[0] : null)} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer mx-auto" />
+              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-5 text-center mt-2 hover:bg-slate-50 transition-colors relative">
+                {isExtracting && (
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-2xl">
+                    <div className="w-8 h-8 border-4 border-brand-blue border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <p className="text-xs font-bold text-brand-blue">Extracting details...</p>
+                  </div>
+                )}
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">AI Detail Extraction (PDF/DOCX)</p>
+                <input type="file" accept=".pdf,.docx" onChange={e => {
+                  const file = e.target.files ? e.target.files[0] : null;
+                  setCoursePlanFile(file);
+                  if (file) handleExtractDetails(file);
+                }} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20 cursor-pointer mx-auto" />
               </div>
               <button type="submit" className="w-full bg-brand-blue hover:bg-blue-700 text-white shadow-lg shadow-brand-blue/30 py-4 rounded-xl font-bold text-lg transition-all hover:-translate-y-1">Initialize Course</button>
             </form>
