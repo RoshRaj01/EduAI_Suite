@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.models import submission # Ensure it's imported to register the model
-from app.routes import course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes
+from app.models.appointment import Appointment
+from app.routes import course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
@@ -42,7 +43,24 @@ app.include_router(resource_routes.router)
 app.include_router(student_routes.router)
 app.include_router(assignment_routes.router)
 app.include_router(submission_routes.router)
+app.include_router(appointment_routes.router)
 
 @app.get("/")
 def root():
     return {"message": "EduAI Backend Running"}
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy", "service": "main_api"}
+
+@app.post("/api/auth/login")
+def login():
+    return {"token": "mock-jwt-token"}
+
+@app.post("/api/ai/evaluate")
+def evaluate_answers():
+    return {"ai_score": 85.5, "confidence": 0.9}
+
+@app.get("/api/risk/classroom/{classroom_id}")
+def get_risk_score(classroom_id: str):
+    return {"students_at_risk": 3}
