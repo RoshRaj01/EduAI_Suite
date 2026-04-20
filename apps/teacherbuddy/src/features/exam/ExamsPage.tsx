@@ -5,6 +5,7 @@ import {
   FileText, Layers,
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
+import { ExamCreator } from "./ExamCreator";
 
 type ExamView = "list" | "take" | "review";
 
@@ -85,6 +86,23 @@ export const ExamsPage: React.FC = () => {
   const [currentReview, setCurrentReview] = useState(pendingReviews[0]);
   const [scoreInput, setScoreInput] = useState<Record<string, string>>({});
   const [reviewDone, setReviewDone] = useState<Record<string, boolean>>({});
+  const [showCreator, setShowCreator] = useState(false);
+
+  const handleSaveExam = async (examData: any) => {
+    try {
+      const response = await fetch("http://localhost:8000/exams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(examData),
+      });
+      if (response.ok) {
+        setShowCreator(false);
+        // In a real app we'd refresh the list
+      }
+    } catch (err) {
+      console.error("Save failed", err);
+    }
+  };
 
   useEffect(() => {
     if (activeTab !== "take") return;
@@ -108,10 +126,17 @@ export const ExamsPage: React.FC = () => {
             Create, manage, review AI evaluations, and track student submissions.
           </p>
         </div>
-        <button className="btn btn-primary text-sm">
+        <button onClick={() => setShowCreator(true)} className="btn btn-primary text-sm">
           <Plus size={15} /> Create Exam
         </button>
       </div>
+
+      {showCreator && (
+        <ExamCreator 
+          onClose={() => setShowCreator(false)} 
+          onSave={handleSaveExam}
+        />
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

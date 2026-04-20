@@ -1,6 +1,8 @@
 import React from "react";
 import { Clock, CheckCircle2, PlayCircle, AlertCircle, FileText } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
+import { ExamPlayer } from "./ExamPlayer";
+import { useState } from "react";
 
 const myExams = [
   { id: 1, title: "Neural Networks Mid-Term", course: "CSC401", date: "Apr 20, 2026", time: "10:00 AM", duration: 90, status: "upcoming" },
@@ -9,6 +11,38 @@ const myExams = [
 ];
 
 export const StudentExams: React.FC = () => {
+  const [activeExam, setActiveExam] = useState<any>(null);
+
+  const startExam = async (examId: number) => {
+    try {
+      const response = await fetch(`http://localhost:8000/exams/${examId}`);
+      const data = await response.json();
+      setActiveExam(data);
+    } catch (err) {
+      console.error("Failed to load exam", err);
+      // Fallback for demo
+      setActiveExam({
+        id: examId,
+        title: "Neural Networks Mid-Term",
+        time_limit: 90,
+        questions: [
+            { id: 1, question_text: "What is backpropagation?", choices: [{id: 1, choice_text: "Algorithm"}, {id: 2, choice_text: "Data"}] },
+            { id: 2, question_text: "What is ReLU?", choices: [{id: 3, choice_text: "Activation"}, {id: 4, choice_text: "Optimizer"}] }
+        ]
+      });
+    }
+  };
+
+  if (activeExam) {
+     return (
+       <ExamPlayer 
+         exam={activeExam} 
+         onClose={() => setActiveExam(null)} 
+         onComplete={() => setActiveExam(null)} 
+       />
+     );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div>
@@ -36,7 +70,14 @@ export const StudentExams: React.FC = () => {
                 </div>
                 
                 <div className="text-right">
-                  {exam.status === 'upcoming' && <button className="btn btn-primary text-xs px-5 shadow-lg"><PlayCircle size={16} className="mr-1"/> Take Exam</button>}
+                  {exam.status === 'upcoming' && (
+                    <button 
+                      onClick={() => startExam(exam.id)}
+                      className="btn btn-primary text-xs px-5 shadow-lg"
+                    >
+                      <PlayCircle size={16} className="mr-1"/> Take Exam
+                    </button>
+                  )}
                   {exam.status === 'completed' && <div><p className="text-xs text-green-600 font-semibold mb-1">Final Score</p><p className="text-2xl font-black text-green-700">{exam.score}</p></div>}
                   {exam.status === 'pending_review' && <p className="text-xs text-orange-600 font-semibold flex items-center"><AlertCircle size={14} className="mr-1"/> Under AI Review</p>}
                 </div>
