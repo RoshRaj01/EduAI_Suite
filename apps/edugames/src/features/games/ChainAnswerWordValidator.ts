@@ -1,7 +1,7 @@
-import {
+import type {
   WordValidationRequest,
   WordValidationResponse,
-} from "./ChainAnswerTypes.ts";
+} from "./types";
 
 // Word validation service
 export class WordValidator {

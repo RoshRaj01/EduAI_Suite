@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChainGameState, ChainGameActions } from "./useChainGameState.ts";
+import type { ChainGameState, ChainGameActions } from "./types";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, AlertCircle, Send } from "lucide-react";

@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
-import {
+import type {
   GameSession,
   GamePlayer,
   GameWord,
   ChainVariation,
   GameStatus,
   PlayerStatus,
-} from "./ChainAnswerTypes.ts";
+} from "./types";
 
 export interface ChainGameState {
   session: GameSession | null;
