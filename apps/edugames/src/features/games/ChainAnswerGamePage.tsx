@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ChainGameBoard } from "./ChainGameBoard";
 import { useChainGameState } from "./useChainGameState";
+import { useAuthStore } from "../../store/useAuthStore";
 import type { ChainVariation } from "./types";
 import { motion } from "framer-motion";
-import { Play, Plus, Trash2, Users } from "lucide-react";
+import { Play, Plus, Trash2, Users, Lock } from "lucide-react";
 
 interface PlayerSetup {
   id: string;
@@ -13,6 +14,7 @@ interface PlayerSetup {
 
 export const ChainAnswerGamePage: React.FC = () => {
   try {
+    const { role } = useAuthStore();
     const [gameStarted, setGameStarted] = useState(false);
     const [gameConfig, setGameConfig] = useState({
       name: "New Game",
@@ -52,6 +54,69 @@ export const ChainAnswerGamePage: React.FC = () => {
     const handleRemovePlayer = (id: string) => {
       setPlayers(players.filter((p) => p.id !== id));
     };
+
+    // If student, show game board directly
+    if (role === "student") {
+      if (gameStarted && gameState.gameStatus !== "completed") {
+        return (
+          <ChainGameBoard
+            gameState={gameState}
+            actions={actions}
+            currentPlayerId={gameState.players[gameState.currentPlayerIndex]?.id}
+          />
+        );
+      }
+      
+      // Student join screen
+      return (
+        <div className="space-y-8">
+          <div>
+            <h1
+              className="text-4xl font-bold font-display"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              Chain Answer Game
+            </h1>
+            <p style={{ color: "var(--color-text-secondary)" }} className="mt-2">
+              Join a game and test your word chain skills
+            </p>
+          </div>
+
+          <GlassCard className="p-8">
+            <div className="text-center">
+              <Play size={48} className="mx-auto mb-4" style={{ color: "var(--color-accent)" }} />
+              <p style={{ color: "var(--color-text-primary)" }} className="mb-4 text-lg">
+                Waiting for a game to join...
+              </p>
+              <p style={{ color: "var(--color-text-secondary)" }} className="text-sm">
+                Your teacher will set up a game and invite you to play.
+              </p>
+            </div>
+          </GlassCard>
+        </div>
+      );
+    }
+
+    // Teacher setup page
+    if (!role || role !== "teacher") {
+      return (
+        <div className="space-y-8">
+          <GlassCard className="p-8 border-red-200 bg-red-50">
+            <div className="flex items-center gap-4">
+              <Lock size={32} style={{ color: "var(--color-error)" }} />
+              <div>
+                <h2 style={{ color: "var(--color-error)" }} className="font-bold text-lg">
+                  Access Denied
+                </h2>
+                <p style={{ color: "var(--color-text-secondary)" }}>
+                  Only teachers can set up games. Please log in as a teacher.
+                </p>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      );
+    }
 
     // Show game board if started
     if (gameStarted && gameState.gameStatus !== "completed") {
