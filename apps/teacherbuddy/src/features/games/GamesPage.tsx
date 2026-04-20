@@ -1,56 +1,85 @@
 import React, { useState } from "react";
-import { Gamepad2, Brain, Users, BarChart, FlaskConical, Target, HardHat } from "lucide-react";
+import {
+  Gamepad2,
+  Users,
+  BarChart,
+  FlaskConical,
+  Target,
+  HardHat,
+} from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTheme } from "../../shared/hooks/useTheme";
 
 const gameCategories = [
   {
-    id: "competitive",
-    title: "Competitive Live Quizzes",
-    description: "High-energy classroom engagement with leaderboards (Kahoot!, Blooket style).",
+    id: "chain-answer",
+    title: "Chain Answer Game",
+    description:
+      "One student starts an answer, the next continues it. Build collaborative responses chain by chain.",
     icon: Target,
     color: "from-orange-400 to-red-500",
   },
   {
-    id: "strategic",
-    title: "Strategic Quizzes",
-    description: "Strategy-based quizzes with in-game currency and upgrades (Gimkit style).",
-    icon: Gamepad2,
-    color: "from-blue-400 to-indigo-500",
-  },
-  {
-    id: "participatory",
-    title: "Real-time Participation",
-    description: "Polls, word clouds, and Q&A for real-time engagement (Mentimeter, Slido style).",
+    id: "word-cloud-battle",
+    title: "Live Word Cloud Battle",
+    description:
+      "Ask open-ended questions and watch words appear live in an interactive word cloud powered by Mentimeter.",
     icon: BarChart,
     color: "from-emerald-400 to-teal-500",
   },
   {
-    id: "collaborative",
-    title: "Collaborative Workspaces",
-    description: "Infinite canvas for brainstorming and co-creation (Miro, Padlet style).",
+    id: "quiz-battle-royale",
+    title: "Quiz Battle Royale",
+    description:
+      "Students answer MCQs in real time. Points = speed + accuracy. Live leaderboard with Kahoot-style gameplay.",
+    icon: Gamepad2,
+    color: "from-blue-400 to-indigo-500",
+  },
+  {
+    id: "team-puzzle",
+    title: "Team Puzzle Challenge",
+    description:
+      "Split the class into teams. Each member gets partial info. Collaborate to solve the complete puzzle.",
     icon: Users,
     color: "from-pink-400 to-rose-500",
   },
   {
-    id: "experiential",
-    title: "Experiential Simulations",
-    description: "Hands-on virtual experiments and lab simulations (PhET, Labster style).",
-    icon: FlaskConical,
+    id: "slido-polling",
+    title: "Slido — Live Polling & Q&A",
+    description:
+      "Live polling and Q&A integrated into presentations. Engage students in real-time feedback.",
+    icon: BarChart,
     color: "from-purple-400 to-violet-500",
+  },
+  {
+    id: "padlet-board",
+    title: "Padlet — Shared Visual Board",
+    description:
+      "Students post ideas, media, and responses on a shared visual board for collaborative ideation.",
+    icon: Users,
+    color: "from-cyan-400 to-blue-500",
+  },
+  {
+    id: "trello-projects",
+    title: "Trello — Project Management",
+    description:
+      "Kanban-style boards for managing group projects and tasks. Organize work with cards and columns.",
+    icon: FlaskConical,
+    color: "from-red-400 to-orange-500",
   },
 ];
 
 export const GamesPage: React.FC = () => {
-  const { isDark } = useTheme();
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>
+        <h1
+          className="text-2xl font-bold font-display"
+          style={{ color: "var(--color-text-primary)" }}
+        >
           EduGames Hub
         </h1>
         <p className="mt-1" style={{ color: "var(--color-text-secondary)" }}>
@@ -78,10 +107,16 @@ export const GamesPage: React.FC = () => {
                 >
                   <category.icon size={24} />
                 </div>
-                <h3 className="text-lg font-bold mb-2" style={{ color: "var(--color-text-primary)" }}>
+                <h3
+                  className="text-lg font-bold mb-2"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
                   {category.title}
                 </h3>
-                <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
                   {category.description}
                 </p>
               </div>
@@ -107,21 +142,39 @@ export const GamesPage: React.FC = () => {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-lg"
             >
-              <GlassCard className="p-8 text-center border-t-4" style={{ borderTopColor: "var(--color-brand-gold)" }}>
+              <GlassCard
+                className="p-8 text-center border-t-4"
+                style={{ borderTopColor: "var(--color-brand-gold)" }}
+              >
                 <div className="mx-auto w-20 h-20 bg-yellow-500/20 text-yellow-500 rounded-full flex items-center justify-center mb-6">
                   <HardHat size={40} />
                 </div>
-                <h2 className="text-2xl font-bold font-display mb-3" style={{ color: "var(--color-text-primary)" }}>
+                <h2
+                  className="text-2xl font-bold font-display mb-3"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
                   Module Under Construction
                 </h2>
-                <p className="mb-8 leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-                  The <strong>{gameCategories.find(c => c.id === selectedGame)?.title}</strong> module is currently being built by our engineering team. Please check back later for updates.
+                <p
+                  className="mb-8 leading-relaxed"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  The{" "}
+                  <strong>
+                    {gameCategories.find((c) => c.id === selectedGame)?.title}
+                  </strong>{" "}
+                  module is currently being built by our engineering team.
+                  Please check back later for updates.
                 </p>
                 <div className="flex gap-4 justify-center">
                   <button
                     onClick={() => setSelectedGame(null)}
                     className="px-6 py-2.5 rounded-xl font-semibold text-white transition-transform hover:scale-105 active:scale-95"
-                    style={{ background: "linear-gradient(135deg, var(--color-brand-blue), #3460c4)", boxShadow: "0 4px 15px rgba(38,71,150,0.3)" }}
+                    style={{
+                      background:
+                        "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                      boxShadow: "0 4px 15px rgba(38,71,150,0.3)",
+                    }}
                   >
                     Go Back
                   </button>
@@ -131,7 +184,6 @@ export const GamesPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-
     </div>
   );
 };

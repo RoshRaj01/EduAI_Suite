@@ -5,6 +5,7 @@ from app.models.announcement import Announcement
 from app.models.student import Student
 from app.models.assignment import Assignment
 from app.models.appointment import Appointment
+from seed_users import USERS_TO_SEED
 
 if os.path.exists("eduV2.db"):
     # Delete to recreate fresh tables with new fields
@@ -17,6 +18,15 @@ Base.metadata.create_all(bind=engine)
 
 db = SessionLocal()
 
+# 🔹 Extract real teachers from USERS_TO_SEED
+teachers = [user for user in USERS_TO_SEED if user.get("role") == "teacher"]
+
+# Get teacher names
+teacher1_name = teachers[0]["name"] if len(teachers) > 0 else "Prof. Default"
+teacher2_name = teachers[1]["name"] if len(teachers) > 1 else "Dr. Default"
+teacher3_name = teachers[0]["name"] if len(
+    teachers) > 0 else "Prof. Default"  # Reuse first teacher
+
 # 🔹 Add courses
 course1 = Course(
     code="CSC401",
@@ -26,7 +36,7 @@ course1 = Course(
     progress=88,
     color="#264796",
     description="Deep learning architectures",
-    teacher_name="Dr. Maya Rao"
+    teacher_name=teacher1_name
 )
 
 course2 = Course(
@@ -37,7 +47,7 @@ course2 = Course(
     progress=82,
     color="#d0ae61",
     description="DSA fundamentals",
-    teacher_name="Prof. Ananya Iyer"
+    teacher_name=teacher2_name
 )
 
 course3 = Course(
@@ -48,7 +58,7 @@ course3 = Course(
     progress=76,
     color="#5b8def",
     description="Logic, proofs, and combinatorics",
-    teacher_name="Dr. Kabir Khan"
+    teacher_name=teacher3_name
 )
 
 db.add_all([course1, course2, course3])
@@ -109,134 +119,141 @@ db.add_all([
     )
 ])
 
-# 🔹 Students
-db.add_all([
-    Student(
-        course_id=course1.id,
-        name="Arjun Mehta",
-        email="arjun@example.com",
-        registration_number="S4121",
-        student_class="2026-A",
-        department="Computer Science",
-        attendance=95,
-        avg_score=92
-    ),
-    Student(
-        course_id=course1.id,
-        name="Sneha Patil",
-        email="sneha@example.com",
-        registration_number="S4135",
-        student_class="2026-A",
-        department="Computer Science",
-        attendance=90,
-        avg_score=88
-    ),
-    Student(
-        course_id=course2.id,
-        name="Aarav S.",
-        email="aarav.s@christuniversity.in",
-        registration_number="S4210",
-        student_class="2025-B",
-        department="Computer Science",
-        attendance=93,
-        avg_score=86
-    ),
-    Student(
-        course_id=course2.id,
-        name="Diya Patel",
-        email="diya.patel@example.com",
-        registration_number="S4218",
-        student_class="2025-B",
-        department="Computer Science",
-        attendance=89,
-        avg_score=91
-    ),
-    Student(
-        course_id=course3.id,
-        name="Rohan Menon",
-        email="rohan.menon@example.com",
-        registration_number="S4302",
-        student_class="2025-A",
-        department="Mathematics",
-        attendance=96,
-        avg_score=84
-    ),
-    Student(
-        course_id=course3.id,
-        name="Neha Gupta",
-        email="neha.gupta@example.com",
-        registration_number="S4307",
-        student_class="2025-A",
-        department="Mathematics",
-        attendance=91,
-        avg_score=89
-    )
-])
+# 🔹 Students - Using real student data from USERS_TO_SEED
+students_from_seed = [
+    user for user in USERS_TO_SEED if user.get("role") == "student"]
 
-# 🔹 Appointments
-db.add_all([
-    Appointment(
-        student_name="Aarav S.",
-        student_email="aarav.s@christuniversity.in",
-        teacher_name="Prof. Ananya Iyer",
-        teacher_department="Computer Science",
-        meeting_mode="In-person",
-        time_slot="2026-04-18 10:30 AM",
-        topic="Clarify linked list implementation for the assignment.",
-        status="pending",
-        requested_at="2026-04-17T09:10"
-    ),
-    Appointment(
-        student_name="Aarav S.",
-        student_email="aarav.s@christuniversity.in",
-        teacher_name="Dr. Maya Rao",
-        teacher_department="Computer Science",
-        meeting_mode="Online",
-        time_slot="2026-04-19 03:00 PM",
-        topic="Review project proposal and model selection.",
-        status="approved",
-        requested_at="2026-04-16T14:25",
-        reviewed_at="2026-04-16T18:05",
-        reviewed_by="Dr. Maya Rao",
-        notes="Approved for a 20-minute slot."
-    ),
-    Appointment(
-        student_name="Diya Patel",
-        student_email="diya.patel@example.com",
-        teacher_name="Dr. Kabir Khan",
-        teacher_department="Mathematics",
-        meeting_mode="Online",
-        time_slot="2026-04-18 01:00 PM",
-        topic="Need help with proof strategies for combinatorics.",
-        status="pending",
-        requested_at="2026-04-17T10:45"
-    ),
-    Appointment(
-        student_name="Rohan Menon",
-        student_email="rohan.menon@example.com",
-        teacher_name="Prof. Ananya Iyer",
-        teacher_department="Computer Science",
-        meeting_mode="In-person",
-        time_slot="2026-04-17 04:00 PM",
-        topic="Discuss runtime complexity for the assignment.",
-        status="rejected",
-        requested_at="2026-04-15T11:15",
-        reviewed_at="2026-04-15T15:20",
-        reviewed_by="Prof. Ananya Iyer",
-        notes="Try the office hours on Friday instead."
-    ),
-    Appointment(
-        student_name="Neha Gupta",
-        student_email="neha.gupta@example.com",
-        teacher_name="Dr. Maya Rao",
-        teacher_department="Computer Science",
-        meeting_mode="Online",
-        time_slot="2026-04-20 11:00 AM",
-        topic="Discuss data preprocessing for the neural network project.",
-        status="pending",
-        requested_at="2026-04-17T08:30"
-    )
-])
+student_data = [
+    {
+        "course_id": course1.id,
+        "name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Arjun Mehta",
+        "email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "arjun@example.com",
+        "registration_number": students_from_seed[0].get("registration_number", "S4121") if len(students_from_seed) > 0 else "S4121",
+        "student_class": "2026-A",
+        "department": students_from_seed[0].get("department", "Computer Science") if len(students_from_seed) > 0 else "Computer Science",
+        "attendance": 95,
+        "avg_score": 92
+    },
+    {
+        "course_id": course1.id,
+        "name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Sneha Patil",
+        "email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "sneha@example.com",
+        "registration_number": students_from_seed[1].get("registration_number", "S4135") if len(students_from_seed) > 1 else "S4135",
+        "student_class": "2026-A",
+        "department": students_from_seed[1].get("department", "Computer Science") if len(students_from_seed) > 1 else "Computer Science",
+        "attendance": 90,
+        "avg_score": 88
+    },
+    {
+        "course_id": course2.id,
+        "name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Aarav S.",
+        "email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "aarav.s@christuniversity.in",
+        "registration_number": students_from_seed[0].get("registration_number", "S4210") if len(students_from_seed) > 0 else "S4210",
+        "student_class": "2025-B",
+        "department": students_from_seed[0].get("department", "Computer Science") if len(students_from_seed) > 0 else "Computer Science",
+        "attendance": 93,
+        "avg_score": 86
+    },
+    {
+        "course_id": course2.id,
+        "name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Diya Patel",
+        "email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "diya.patel@example.com",
+        "registration_number": students_from_seed[1].get("registration_number", "S4218") if len(students_from_seed) > 1 else "S4218",
+        "student_class": "2025-B",
+        "department": students_from_seed[1].get("department", "Computer Science") if len(students_from_seed) > 1 else "Computer Science",
+        "attendance": 89,
+        "avg_score": 91
+    },
+    {
+        "course_id": course3.id,
+        "name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Rohan Menon",
+        "email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "rohan.menon@example.com",
+        "registration_number": students_from_seed[0].get("registration_number", "S4302") if len(students_from_seed) > 0 else "S4302",
+        "student_class": "2025-A",
+        "department": students_from_seed[0].get("department", "Mathematics") if len(students_from_seed) > 0 else "Mathematics",
+        "attendance": 96,
+        "avg_score": 84
+    },
+    {
+        "course_id": course3.id,
+        "name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Neha Gupta",
+        "email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "neha.gupta@example.com",
+        "registration_number": students_from_seed[1].get("registration_number", "S4307") if len(students_from_seed) > 1 else "S4307",
+        "student_class": "2025-A",
+        "department": students_from_seed[1].get("department", "Mathematics") if len(students_from_seed) > 1 else "Mathematics",
+        "attendance": 91,
+        "avg_score": 89
+    }
+]
+
+db.add_all([Student(**s) for s in student_data])
+
+# 🔹 Appointments - Using real student and teacher data
+appointments_data = [
+    {
+        "student_name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Aarav S.",
+        "student_email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "aarav.s@christuniversity.in",
+        "teacher_name": teacher2_name,
+        "teacher_department": teachers[1]["department"] if len(teachers) > 1 else "Computer Science",
+        "meeting_mode": "In-person",
+        "time_slot": "2026-04-18 10:30 AM",
+        "topic": "Clarify linked list implementation for the assignment.",
+        "status": "pending",
+        "requested_at": "2026-04-17T09:10"
+    },
+    {
+        "student_name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Aarav S.",
+        "student_email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "aarav.s@christuniversity.in",
+        "teacher_name": teacher1_name,
+        "teacher_department": teachers[0]["department"] if len(teachers) > 0 else "Computer Science",
+        "meeting_mode": "Online",
+        "time_slot": "2026-04-19 03:00 PM",
+        "topic": "Review project proposal and model selection.",
+        "status": "approved",
+        "requested_at": "2026-04-16T14:25",
+        "reviewed_at": "2026-04-16T18:05",
+        "reviewed_by": teacher1_name,
+        "notes": "Approved for a 20-minute slot."
+    },
+    {
+        "student_name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Diya Patel",
+        "student_email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "diya.patel@example.com",
+        "teacher_name": teacher3_name,
+        "teacher_department": teachers[0]["department"] if len(teachers) > 0 else "Mathematics",
+        "meeting_mode": "Online",
+        "time_slot": "2026-04-18 01:00 PM",
+        "topic": "Need help with proof strategies for combinatorics.",
+        "status": "pending",
+        "requested_at": "2026-04-17T10:45"
+    },
+    {
+        "student_name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Rohan Menon",
+        "student_email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "rohan.menon@example.com",
+        "teacher_name": teacher2_name,
+        "teacher_department": teachers[1]["department"] if len(teachers) > 1 else "Computer Science",
+        "meeting_mode": "In-person",
+        "time_slot": "2026-04-17 04:00 PM",
+        "topic": "Discuss runtime complexity for the assignment.",
+        "status": "rejected",
+        "requested_at": "2026-04-15T11:15",
+        "reviewed_at": "2026-04-15T15:20",
+        "reviewed_by": teacher2_name,
+        "notes": "Try the office hours on Friday instead."
+    },
+    {
+        "student_name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Neha Gupta",
+        "student_email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "neha.gupta@example.com",
+        "teacher_name": teacher1_name,
+        "teacher_department": teachers[0]["department"] if len(teachers) > 0 else "Computer Science",
+        "meeting_mode": "Online",
+        "time_slot": "2026-04-20 11:00 AM",
+        "topic": "Discuss data preprocessing for the neural network project.",
+        "status": "pending",
+        "requested_at": "2026-04-17T08:30"
+    }
+]
+
+db.add_all([Appointment(**a) for a in appointments_data])
 
 db.commit()
 db.close()
