@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { gameAPI, GameResponse } from "../utils/gameAPI";
+import { gameAPI, GameResponse } from "../../shared/utils/gameAPI";
 
 interface GameUpdateMessage {
   type: string;
