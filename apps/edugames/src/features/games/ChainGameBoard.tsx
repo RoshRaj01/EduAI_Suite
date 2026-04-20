@@ -100,8 +100,8 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     }
   };
 
-  const gameName = gameState.name || gameState.game?.name || "Chain Answer Game";
-  const gameStatus = gameState.gameStatus || gameState.game?.status || "active";
+  const gameName = gameState?.name || gameState?.game?.name || "Chain Answer Game";
+  const gameStatus = gameState?.gameStatus || gameState?.game?.status || "active";
 
   return (
     <div className="space-y-6">
