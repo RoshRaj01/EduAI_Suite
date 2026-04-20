@@ -119,7 +119,7 @@ export const ChainAnswerGameCreation: React.FC<
                   onChange={(e) =>
                     setGameConfig({ ...gameConfig, name: e.target.value })
                   }
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-gray-900 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="Enter game name"
                 />
               </div>
@@ -140,7 +140,7 @@ export const ChainAnswerGameCreation: React.FC<
                       chainVariation: e.target.value as ChainVariation,
                     })
                   }
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 >
                   <option value="standard">
                     Standard (Last letter → First letter)
@@ -196,18 +196,20 @@ export const ChainAnswerGameCreation: React.FC<
                 </label>
                 <div className="flex gap-3">
                   {(["easy", "medium", "hard"] as const).map((level) => (
-                    <button
+                    <motion.button
                       key={level}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() =>
                         setGameConfig({
                           ...gameConfig,
                           difficulty: level,
                         })
                       }
-                      className={`px-4 py-2 rounded-lg font-semibold transition-all capitalize ${
+                      className={`px-5 py-3 rounded-lg font-semibold transition-all capitalize flex-1 ${
                         gameConfig.difficulty === level
-                          ? "text-white"
-                          : "bg-gray-200 dark:bg-gray-700"
+                          ? "text-white shadow-lg"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                       }`}
                       style={{
                         background:
@@ -217,7 +219,7 @@ export const ChainAnswerGameCreation: React.FC<
                       }}
                     >
                       {level}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
@@ -239,7 +241,7 @@ export const ChainAnswerGameCreation: React.FC<
                       startingWord: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-gray-900 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="Enter starting word (e.g., Apple)"
                 />
               </div>
@@ -263,7 +265,7 @@ export const ChainAnswerGameCreation: React.FC<
                       timePerTurn: parseInt(e.target.value),
                     })
                   }
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-gray-900 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
             </div>
@@ -290,14 +292,14 @@ export const ChainAnswerGameCreation: React.FC<
                 value={newPlayerName}
                 onChange={(e) => setNewPlayerName(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleAddPlayer()}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-gray-900 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Student name"
               />
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleAddPlayer}
-                className="w-full px-4 py-2 rounded-lg text-white font-semibold flex items-center justify-center gap-2 transition-all"
+                className="w-full px-4 py-3 rounded-lg text-white font-semibold flex items-center justify-center gap-2 transition-all"
                 style={{
                   background:
                     "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
@@ -353,16 +355,20 @@ export const ChainAnswerGameCreation: React.FC<
 
           {/* Create Game Button */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={players.length >= 2 ? { scale: 1.05 } : {}}
+            whileTap={players.length >= 2 ? { scale: 0.95 } : {}}
             onClick={handleCreateGame}
             disabled={players.length < 2}
-            className="w-full px-6 py-3 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-6 py-4 rounded-xl text-white font-bold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             style={{
               background:
                 players.length < 2
-                  ? "#ccc"
+                  ? "#9ca3af"
                   : "linear-gradient(135deg, #10b981, #059669)",
+              boxShadow:
+                players.length < 2
+                  ? "none"
+                  : "0 10px 25px rgba(16, 185, 129, 0.3)",
             }}
           >
             <Play size={20} />
