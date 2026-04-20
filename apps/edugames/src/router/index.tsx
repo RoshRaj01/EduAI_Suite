@@ -22,6 +22,7 @@ export const router = createBrowserRouter([
       { index: true, element: <StudentDashboard /> },
       { path: "classroom", element: <StudentClassrooms /> },
       { path: "exams", element: <StudentExams /> },
+      { path: "games/chain-answer/:sessionId", element: <ChainAnswerGamePage /> },
       { path: "games/chain-answer", element: <ChainAnswerGamePage /> },
       { path: "games", element: <GamesPage /> },
       { path: "appointments", element: <AppointmentBookingPage /> },

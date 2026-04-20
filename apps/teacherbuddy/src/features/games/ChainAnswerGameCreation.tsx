@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion } from "framer-motion";
-import { Play, Plus, Trash2, Users, ArrowLeft, Loader } from "lucide-react";
+import { Play, Plus, Trash2, Users, ArrowLeft, Loader, Copy, Share2, Check } from "lucide-react";
 import { gameAPI } from "../../shared/utils/gameAPI";
 
 type ChainVariation =
@@ -42,6 +42,8 @@ export const ChainAnswerGameCreation: React.FC<
   const [newPlayerName, setNewPlayerName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createdGame, setCreatedGame] = useState<{ id: number; session_id: string } | null>(null);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
 
   const handleAddPlayer = () => {
     if (newPlayerName.trim()) {
@@ -83,19 +85,13 @@ export const ChainAnswerGameCreation: React.FC<
         })),
       };
 
-      const createdGame = await gameAPI.createGame(gameData);
+      const game = await gameAPI.createGame(gameData);
       
       // Start the game automatically
-      await gameAPI.startGame(createdGame.id);
+      await gameAPI.startGame(game.id);
 
-      // Callback to parent
-      if (onGameCreated) {
-        onGameCreated(createdGame.id, createdGame.session_id);
-      } else {
-        // Show success message
-        alert(`Game created successfully! Session ID: ${createdGame.session_id}`);
-        onBack();
-      }
+      // Show success screen
+      setCreatedGame({ id: game.id, session_id: game.session_id });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create game";
       setError(errorMessage);
@@ -106,6 +102,213 @@ export const ChainAnswerGameCreation: React.FC<
   };
 
   const categories = ["Animals", "Objects", "Countries", "Food", "Sports"];
+
+  const copySessionToClipboard = () => {
+    if (createdGame?.session_id) {
+      navigator.clipboard.writeText(createdGame.session_id);
+      setCopiedToClipboard(true);
+      setTimeout(() => setCopiedToClipboard(false), 2000);
+    }
+  };
+
+  const getGameLink = () => {
+    if (createdGame?.session_id) {
+      return `${window.location.origin}/games/chain-answer/${createdGame.session_id}`;
+    }
+    return "";
+  };
+
+  // Success screen after game creation
+  if (createdGame) {
+    return (
+      <div className="space-y-8">
+        <GlassCard className="p-12 text-center border-2" style={{ borderColor: "var(--color-brand-blue)" }}>
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 100 }}
+            className="mb-6"
+          >
+            <Play
+              size={64}
+              className="mx-auto"
+              style={{ color: "var(--color-brand-blue)" }}
+            />
+          </motion.div>
+          <h2
+            className="text-3xl font-bold mb-4 font-display"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            Game Created Successfully! 🎉
+          </h2>
+          <p
+            style={{ color: "var(--color-text-secondary)" }}
+            className="text-lg mb-6"
+          >
+            {gameConfig.name}
+          </p>
+
+          {/* Session ID Display */}
+          <div className="mb-8 p-6 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+            <p
+              style={{ color: "var(--color-text-secondary)" }}
+              className="text-sm mb-3 font-semibold"
+            >
+              SESSION ID
+            </p>
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <code
+                className="text-2xl font-bold font-mono px-4 py-2 rounded-lg"
+                style={{
+                  background: "var(--color-bg-secondary)",
+                  color: "var(--color-brand-blue)",
+                }}
+              >
+                {createdGame.session_id}
+              </code>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={copySessionToClipboard}
+                className="p-2 rounded-lg transition-all"
+                style={{
+                  background: copiedToClipboard
+                    ? "#10b981"
+                    : "var(--color-bg-secondary)",
+                  color: copiedToClipboard ? "white" : "var(--color-text-primary)",
+                }}
+              >
+                {copiedToClipboard ? <Check size={20} /> : <Copy size={20} />}
+              </motion.button>
+            </div>
+            <p style={{ color: "var(--color-text-secondary)" }} className="text-xs">
+              Students will enter this code to join the game
+            </p>
+          </div>
+
+          {/* Game Link */}
+          <div className="mb-8 p-6 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+            <p
+              style={{ color: "var(--color-text-secondary)" }}
+              className="text-sm mb-3 font-semibold"
+            >
+              OR SHARE THIS LINK
+            </p>
+            <div className="flex items-center justify-center gap-2 overflow-hidden">
+              <input
+                type="text"
+                value={getGameLink()}
+                readOnly
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-mono"
+                style={{
+                  background: "var(--color-bg-secondary)",
+                  color: "var(--color-text-secondary)",
+                  border: "1px solid var(--color-border)",
+                }}
+              />
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  navigator.clipboard.writeText(getGameLink());
+                  setCopiedToClipboard(true);
+                  setTimeout(() => setCopiedToClipboard(false), 2000);
+                }}
+                className="p-2 rounded-lg transition-all"
+                style={{
+                  background: "var(--color-brand-blue)",
+                  color: "white",
+                }}
+              >
+                <Share2 size={18} />
+              </motion.button>
+            </div>
+          </div>
+
+          {/* Game Info */}
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="p-4 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+              <p
+                style={{ color: "var(--color-text-secondary)" }}
+                className="text-xs mb-1"
+              >
+                Variation
+              </p>
+              <p
+                style={{ color: "var(--color-text-primary)" }}
+                className="font-bold"
+              >
+                {gameConfig.chainVariation}
+              </p>
+            </div>
+            <div className="p-4 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+              <p
+                style={{ color: "var(--color-text-secondary)" }}
+                className="text-xs mb-1"
+              >
+                Players
+              </p>
+              <p
+                style={{ color: "var(--color-text-primary)" }}
+                className="font-bold"
+              >
+                {players.length}
+              </p>
+            </div>
+            <div className="p-4 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+              <p
+                style={{ color: "var(--color-text-secondary)" }}
+                className="text-xs mb-1"
+              >
+                Time/Turn
+              </p>
+              <p
+                style={{ color: "var(--color-text-primary)" }}
+                className="font-bold"
+              >
+                {gameConfig.timePerTurn}s
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                setCreatedGame(null);
+                onBack();
+              }}
+              className="flex-1 py-3 rounded-lg font-semibold"
+              style={{
+                background: "var(--color-bg-tertiary)",
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Back to Games
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                if (onGameCreated) {
+                  onGameCreated(createdGame.id, createdGame.session_id);
+                }
+              }}
+              className="flex-1 py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-2"
+              style={{
+                background: "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+              }}
+            >
+              <Play size={20} />
+              Monitor Game
+            </motion.button>
+          </div>
+        </GlassCard>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

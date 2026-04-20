@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ChainGameBoard } from "./ChainGameBoard";
 import { useChainGameState } from "./useChainGameState";
 import { useAuthStore } from "../../store/useAuthStore";
+import { ChainAnswerGameJoinPage } from "./ChainAnswerGameJoinPage";
 import type { ChainVariation } from "./types";
 import { motion } from "framer-motion";
 import { Play, Plus, Trash2, Users, Lock } from "lucide-react";
@@ -14,8 +16,12 @@ interface PlayerSetup {
 
 export const ChainAnswerGamePage: React.FC = () => {
   try {
+    const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>();
     const { role } = useAuthStore();
     const [gameStarted, setGameStarted] = useState(false);
+    const [gameInProgress, setGameInProgress] = useState(false);
+    const [joinedSessionId, setJoinedSessionId] = useState<string | null>(null);
+    
     const [gameConfig, setGameConfig] = useState({
       name: "New Game",
       chainVariation: "standard" as ChainVariation,
@@ -55,45 +61,42 @@ export const ChainAnswerGamePage: React.FC = () => {
       setPlayers(players.filter((p) => p.id !== id));
     };
 
-    // If student, show game board directly
-    if (role === "student") {
-      if (gameStarted && gameState.gameStatus !== "completed") {
-        return (
-          <ChainGameBoard
-            gameState={gameState}
-            actions={actions}
-            currentPlayerId={gameState.players[gameState.currentPlayerIndex]?.id}
-          />
-        );
-      }
-      
-      // Student join screen
-      return (
-        <div className="space-y-8">
-          <div>
-            <h1
-              className="text-4xl font-bold font-display"
-              style={{ color: "var(--color-text-primary)" }}
-            >
-              Chain Answer Game
-            </h1>
-            <p style={{ color: "var(--color-text-secondary)" }} className="mt-2">
-              Join a game and test your word chain skills
-            </p>
-          </div>
+    // If student and has sessionId (from URL or joined), show game board with WebSocket sync
+    if (role === "student" && (urlSessionId || joinedSessionId)) {
+      const sessionId = urlSessionId || joinedSessionId;
+      const playerId = `student_${Date.now()}`;
+      const playerName = `Student ${Math.floor(Math.random() * 1000)}`;
 
-          <GlassCard className="p-8">
-            <div className="text-center">
-              <Play size={48} className="mx-auto mb-4" style={{ color: "var(--color-accent)" }} />
-              <p style={{ color: "var(--color-text-primary)" }} className="mb-4 text-lg">
-                Waiting for a game to join...
-              </p>
-              <p style={{ color: "var(--color-text-secondary)" }} className="text-sm">
-                Your teacher will set up a game and invite you to play.
-              </p>
-            </div>
-          </GlassCard>
-        </div>
+      return (
+        <ChainGameBoard
+          gameId={0}
+          sessionId={sessionId}
+          playerId={playerId}
+          playerName={playerName}
+          userType="student"
+        />
+      );
+    }
+
+    // If student without sessionId, show join form
+    if (role === "student" && !urlSessionId) {
+      return (
+        <ChainAnswerGameJoinPage
+          onJoined={(sessionId) => {
+            setJoinedSessionId(sessionId);
+          }}
+        />
+      );
+    }
+
+    // Show game board if started
+    if (gameStarted && gameState.gameStatus !== "completed") {
+      return (
+        <ChainGameBoard
+          gameState={gameState}
+          actions={actions}
+          currentPlayerId={gameState.players[gameState.currentPlayerIndex]?.id}
+        />
       );
     }
 
@@ -115,17 +118,6 @@ export const ChainAnswerGamePage: React.FC = () => {
             </div>
           </GlassCard>
         </div>
-      );
-    }
-
-    // Show game board if started
-    if (gameStarted && gameState.gameStatus !== "completed") {
-      return (
-        <ChainGameBoard
-          gameState={gameState}
-          actions={actions}
-          currentPlayerId={gameState.players[gameState.currentPlayerIndex]?.id}
-        />
       );
     }
 
