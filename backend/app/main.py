@@ -1,10 +1,7 @@
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.models.user import User
-from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes
-from app.models.exam import Exam # Ensure models are loaded for DDL
-from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer, ChainAnswerGameWord
-from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, game_routes, websocket_routes
+from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
@@ -47,9 +44,6 @@ app.include_router(student_routes.router)
 app.include_router(assignment_routes.router)
 app.include_router(submission_routes.router)
 app.include_router(appointment_routes.router)
-app.include_router(exam_routes.router)
-app.include_router(game_routes.router)
-app.include_router(websocket_routes.ws_router)
 
 @app.get("/")
 def root():

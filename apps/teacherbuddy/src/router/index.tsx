@@ -12,7 +12,6 @@ import { GamesPage } from "../features/games/GamesPage";
 import { TeacherAppointmentsPage } from "../features/appointments/TeacherAppointmentsPage";
 import { TeacherToolsPage } from "../features/tools/TeacherToolsPage";
 import { ClassroomsPage } from "../features/classroom/ClassroomsPage";
-import { ExamsPage } from "../features/exam/ExamsPage";
 import { ConstructionPage } from "../shared/components/ConstructionPage";
 
 export const router = createBrowserRouter([
@@ -36,7 +35,7 @@ export const router = createBrowserRouter([
       { path: "wellbeing",      element: <WellbeingPage />   },
       { path: "chat",           element: <AIChatPage />      },
       { path: "settings",       element: <ConstructionPage />},
-      { path: "exams",          element: <ExamsPage />},
+      { path: "exams",          element: <ConstructionPage />},
       { path: "*",              element: <ConstructionPage />},
     ],
   },
