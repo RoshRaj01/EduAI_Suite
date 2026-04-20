@@ -137,15 +137,15 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           <div className="flex items-center justify-end gap-2 text-lg font-bold">
             <Clock size={24} />
             <span
-              className={gameState.timer < 5 ? "text-red-500" : ""}
+              className={(gameState?.timer || 0) < 5 ? "text-red-500" : ""}
               style={{
                 color:
-                  gameState.timer < 5
+                  (gameState?.timer || 0) < 5
                     ? "var(--color-status-danger)"
                     : "var(--color-text-primary)",
               }}
             >
-              {gameState.timer || "30"}s
+              {gameState?.timer || "30"}s
             </span>
           </div>
         </div>
