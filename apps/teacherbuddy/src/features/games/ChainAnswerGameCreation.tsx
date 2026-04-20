@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion } from "framer-motion";
-import { Play, Plus, Trash2, Users, ArrowLeft } from "lucide-react";
+import { Play, Plus, Trash2, Users, ArrowLeft, Loader } from "lucide-react";
+import { gameAPI } from "../../shared/utils/gameAPI";
 
 type ChainVariation =
   | "standard"
@@ -17,11 +18,12 @@ interface PlayerSetup {
 
 interface ChainAnswerGameCreationProps {
   onBack: () => void;
+  onGameCreated?: (gameId: number, sessionId: string) => void;
 }
 
 export const ChainAnswerGameCreation: React.FC<
   ChainAnswerGameCreationProps
-> = ({ onBack }) => {
+> = ({ onBack, onGameCreated }) => {
   const [gameConfig, setGameConfig] = useState({
     name: "New Game",
     chainVariation: "standard" as ChainVariation,
@@ -38,6 +40,8 @@ export const ChainAnswerGameCreation: React.FC<
   ]);
 
   const [newPlayerName, setNewPlayerName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAddPlayer = () => {
     if (newPlayerName.trim()) {
@@ -53,18 +57,52 @@ export const ChainAnswerGameCreation: React.FC<
     setPlayers(players.filter((p) => p.id !== id));
   };
 
-  const handleCreateGame = () => {
+  const handleCreateGame = async () => {
     if (players.length < 2) {
-      alert("At least 2 players required to start a game!");
+      setError("At least 2 players required to start a game!");
       return;
     }
-    // TODO: Save game to backend and redirect
-    console.log(
-      "Creating game with config:",
-      gameConfig,
-      "and players:",
-      players,
-    );
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Create the game via backend API
+      const gameData = {
+        name: gameConfig.name,
+        chain_variation: gameConfig.chainVariation,
+        category: gameConfig.chainVariation === "category" ? gameConfig.category : undefined,
+        difficulty_level: gameConfig.difficulty,
+        language: gameConfig.language,
+        starting_word: gameConfig.startingWord,
+        time_per_turn: gameConfig.timePerTurn,
+        penalty_on_invalid: false,
+        players: players.map((p) => ({
+          student_id: p.id,
+          name: p.name,
+        })),
+      };
+
+      const createdGame = await gameAPI.createGame(gameData);
+      
+      // Start the game automatically
+      await gameAPI.startGame(createdGame.id);
+
+      // Callback to parent
+      if (onGameCreated) {
+        onGameCreated(createdGame.id, createdGame.session_id);
+      } else {
+        // Show success message
+        alert(`Game created successfully! Session ID: ${createdGame.session_id}`);
+        onBack();
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to create game";
+      setError(errorMessage);
+      console.error("Error creating game:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const categories = ["Animals", "Objects", "Countries", "Food", "Sports"];
@@ -353,26 +391,49 @@ export const ChainAnswerGameCreation: React.FC<
             )}
           </GlassCard>
 
+          {/* Error Message */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-4 bg-red-500/20 border border-red-500 rounded-lg"
+            >
+              <p style={{ color: "var(--color-error)" }} className="font-semibold">
+                ❌ {error}
+              </p>
+            </motion.div>
+          )}
+
           {/* Create Game Button */}
           <motion.button
-            whileHover={players.length >= 2 ? { scale: 1.05 } : {}}
-            whileTap={players.length >= 2 ? { scale: 0.95 } : {}}
+            whileHover={players.length >= 2 && !isLoading ? { scale: 1.05 } : {}}
+            whileTap={players.length >= 2 && !isLoading ? { scale: 0.95 } : {}}
             onClick={handleCreateGame}
-            disabled={players.length < 2}
+            disabled={players.length < 2 || isLoading}
             className="w-full px-6 py-4 rounded-xl text-white font-bold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             style={{
               background:
-                players.length < 2
+                players.length < 2 || isLoading
                   ? "#9ca3af"
                   : "linear-gradient(135deg, #10b981, #059669)",
               boxShadow:
-                players.length < 2
+                players.length < 2 || isLoading
                   ? "none"
                   : "0 10px 25px rgba(16, 185, 129, 0.3)",
             }}
           >
-            <Play size={20} />
-            Create & Start Game
+            {isLoading ? (
+              <>
+                <Loader size={20} className="animate-spin" />
+                Creating & Starting Game...
+              </>
+            ) : (
+              <>
+                <Play size={20} />
+                Create & Start Game
+              </>
+            )}
           </motion.button>
         </div>
       </div>
