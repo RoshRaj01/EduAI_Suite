@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ChainGameState, ChainGameActions } from "./useChainGameState";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, AlertCircle, CheckCircle, Send } from "lucide-react";
+import { Clock, AlertCircle, Send } from "lucide-react";
 
 interface ChainGameBoardProps {
   gameState: ChainGameState;
@@ -101,7 +101,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
         >
           Next word must start with:{" "}
           <strong style={{ fontSize: "1.2em" }}>
-            {lastWord?.charAt(lastWord.length - 1)?.toUpperCase()}
+            {lastWord ? lastWord.charAt(lastWord.length - 1).toUpperCase() : "?"}
           </strong>
         </p>
       </GlassCard>
@@ -144,7 +144,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
               type="text"
               value={inputWord}
               onChange={(e) => setInputWord(e.target.value)}
-              placeholder={`Enter a word starting with "${lastWord?.charAt(lastWord.length - 1)?.toUpperCase()}"`}
+              placeholder={`Enter a word starting with "${lastWord ? lastWord.charAt(lastWord.length - 1).toUpperCase() : "?"}"`}
               className="flex-1 px-4 py-3 rounded-lg border-2 focus:outline-none focus:border-blue-500"
               style={{
                 borderColor: "var(--color-border)",
