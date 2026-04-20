@@ -12,71 +12,68 @@ interface PlayerSetup {
 }
 
 export const ChainAnswerGamePage: React.FC = () => {
-  const [gameStarted, setGameStarted] = useState(false);
-  const [gameConfig, setGameConfig] = useState({
-    name: "New Game",
-    chainVariation: "standard" as ChainVariation,
-    category: "",
-    difficulty: "medium" as "easy" | "medium" | "hard",
-    language: "en",
-    startingWord: "Apple",
-  });
-  const [players, setPlayers] = useState<PlayerSetup[]>([
-    { id: "1", name: "Student 1" },
-    { id: "2", name: "Student 2" },
-  ]);
-  const [newPlayerName, setNewPlayerName] = useState("");
-
-  const [gameState, actions] = useChainGameState();
-
-  const handleStartGame = () => {
-    // Initialize game session
-    actions.initializeGame("session_1", gameConfig);
-
-    // Add players
-    players.forEach((player) => {
-      actions.addPlayer(player.id, player.name);
+  try {
+    const [gameStarted, setGameStarted] = useState(false);
+    const [gameConfig, setGameConfig] = useState({
+      name: "New Game",
+      chainVariation: "standard" as ChainVariation,
+      category: "",
+      difficulty: "medium" as "easy" | "medium" | "hard",
+      language: "en",
+      startingWord: "Apple",
     });
+    const [players, setPlayers] = useState<PlayerSetup[]>([
+      { id: "1", name: "Student 1" },
+      { id: "2", name: "Student 2" },
+    ]);
+    const [newPlayerName, setNewPlayerName] = useState("");
 
-    // Start the game
-    actions.startGame();
-    setGameStarted(true);
-  };
+    const [gameState, actions] = useChainGameState();
 
-  const handleAddPlayer = () => {
-    if (newPlayerName.trim()) {
-      setPlayers([
-        ...players,
-        { id: `player_${Date.now()}`, name: newPlayerName },
-      ]);
-      setNewPlayerName("");
+    const handleStartGame = () => {
+      actions.initializeGame("session_1", gameConfig);
+      players.forEach((player) => {
+        actions.addPlayer(player.id, player.name);
+      });
+      actions.startGame();
+      setGameStarted(true);
+    };
+
+    const handleAddPlayer = () => {
+      if (newPlayerName.trim()) {
+        setPlayers([
+          ...players,
+          { id: `player_${Date.now()}`, name: newPlayerName },
+        ]);
+        setNewPlayerName("");
+      }
+    };
+
+    const handleRemovePlayer = (id: string) => {
+      setPlayers(players.filter((p) => p.id !== id));
+    };
+
+    // Show game board if started
+    if (gameStarted && gameState.gameStatus !== "completed") {
+      return (
+        <ChainGameBoard
+          gameState={gameState}
+          actions={actions}
+          currentPlayerId={gameState.players[gameState.currentPlayerIndex]?.id}
+        />
+      );
     }
-  };
 
-  const handleRemovePlayer = (id: string) => {
-    setPlayers(players.filter((p) => p.id !== id));
-  };
-
-  if (gameStarted && gameState.gameStatus !== "completed") {
+    // Show setup page
     return (
-      <ChainGameBoard
-        gameState={gameState}
-        actions={actions}
-        currentPlayerId={gameState.players[gameState.currentPlayerIndex]?.id}
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div>
-        <h1
-          className="text-4xl font-bold font-display"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          Chain Answer Game Setup
-        </h1>
+      <div className="space-y-8">
+        <div>
+          <h1
+            className="text-4xl font-bold font-display"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            Chain Answer Game Setup
+          </h1>
         <p style={{ color: "var(--color-text-secondary)" }} className="mt-2">
           Configure your game and invite students to play
         </p>
@@ -337,5 +334,14 @@ export const ChainAnswerGamePage: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+      );
+  } catch (error) {
+    console.error('ChainAnswerGamePage Error:', error);
+    return (
+      <div style={{ color: 'red', padding: '20px', fontSize: '16px' }}>
+        <h2>❌ Error Loading Chain Answer Game</h2>
+        <p>{String(error)}</p>
+      </div>
+    );
+  }
 };
