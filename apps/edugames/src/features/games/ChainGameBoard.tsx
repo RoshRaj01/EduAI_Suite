@@ -71,33 +71,6 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
   const actions = propsActions;
   const currentPlayerId = playerId || propsCurrentPlayerId;
 
-  useEffect(() => {
-    if (gameState?.gameStatus === "active" || gameState?.game?.status === "active") {
-      setStartTime(Date.now());
-    }
-  }, [gameState?.currentPlayerIndex, gameState?.gameStatus, gameState?.game?.status]);
-
-  if (!gameState) {
-    return (
-      <GlassCard className="p-8 text-center">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <WifiOff size={20} style={{ color: "var(--color-error)" }} />
-          <p style={{ color: "var(--color-text-primary)" }} className="font-semibold">
-            Loading game...
-          </p>
-        </div>
-      </GlassCard>
-    );
-  }
-
-  const currentPlayer = gameState.players?.[gameState.currentPlayerIndex] || 
-                        gameState.players?.[0];
-  const isCurrentPlayerTurn = currentPlayerId === currentPlayer?.id;
-  const lastWord =
-    gameState.chain?.length > 0
-      ? gameState.chain[gameState.chain.length - 1].word
-      : gameState.starting_word || "";
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPlayerId || !inputWord.trim()) return;
@@ -229,7 +202,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
 
       {/* Word Input */}
       <AnimatePresence>
-        {isCurrentPlayerTurn && gameState.gameStatus === "active" && (
+        {isCurrentPlayerTurn && (gameState?.gameStatus === "active" || gameState?.game?.status === "active") && (
           <motion.form
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -269,7 +242,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
 
       {/* Error Message */}
       <AnimatePresence>
-        {gameState.errorMessage && (
+        {gameState?.errorMessage && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -281,7 +254,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
             }}
           >
             <AlertCircle size={20} className="flex-shrink-0" />
-            <p>{gameState.errorMessage}</p>
+            <p>{gameState?.errorMessage}</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -292,10 +265,10 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           style={{ color: "var(--color-text-primary)" }}
           className="font-bold mb-4"
         >
-          Word Chain ({gameState.chain.length})
+          Word Chain ({gameState?.chain?.length || 0})
         </h3>
         <div className="flex flex-wrap gap-2">
-          {gameState.chain.map((word, index) => (
+          {(gameState?.chain || []).map((word, index) => (
             <motion.div
               key={word.id}
               initial={{ scale: 0.8, opacity: 0 }}
@@ -303,11 +276,11 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
               className="px-3 py-2 rounded-full text-sm font-semibold"
               style={{
                 background:
-                  index === gameState.chain.length - 1
+                  index === (gameState?.chain?.length || 0) - 1
                     ? "var(--color-brand-blue)"
                     : "var(--color-bg-tertiary)",
                 color:
-                  index === gameState.chain.length - 1
+                  index === (gameState?.chain?.length || 0) - 1
                     ? "white"
                     : "var(--color-text-primary)",
               }}
@@ -327,13 +300,13 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           Scores
         </h3>
         <div className="space-y-2">
-          {gameState.players.map((player, index) => (
+          {(gameState?.players || []).map((player, index) => (
             <div
               key={player.id}
               className="flex justify-between items-center p-3 rounded-lg"
               style={{
                 background:
-                  index === gameState.currentPlayerIndex
+                  index === gameState?.currentPlayerIndex
                     ? "var(--color-bg-tertiary)"
                     : "transparent",
               }}
