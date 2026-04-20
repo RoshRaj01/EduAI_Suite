@@ -20,6 +20,7 @@ import {
   Gamepad2,
   Wrench,
   Calendar,
+  ClipboardList,
 } from "lucide-react";
 import logo from "../assets/logo (5).png";
 
@@ -29,6 +30,7 @@ const navItems = [
   { icon: Gamepad2, label: "Game Studio", href: "/games", keywords: "gamify create play interactive" },
   { icon: Calendar, label: "Appointments", href: "/appointments", keywords: "bookings approvals office hours" },
   { icon: BookOpen, label: "Classrooms", href: "/classrooms", keywords: "courses students assignments" },
+  { icon: ClipboardList, label: "Exams", href: "/exams", keywords: "mcq test assessment quiz" },
   { icon: CheckSquare, label: "Bulk Evaluation", href: "/evaluation", keywords: "grade answers ai score" },
   { icon: FileSpreadsheet, label: "Reports", href: "/reports", keywords: "export download pdf analytics" },
   { icon: FileSignature, label: "Form Automation", href: "/forms", keywords: "template auto-fill document" },
