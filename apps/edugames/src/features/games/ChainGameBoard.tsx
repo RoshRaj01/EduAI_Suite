@@ -1,52 +1,134 @@
 import React, { useState, useEffect } from "react";
 import type { ChainGameState, ChainGameActions } from "./types";
 import { GlassCard } from "../../shared/components/GlassCard";
+import { useGameSync } from "./useGameSync";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, AlertCircle, Send } from "lucide-react";
+import { Clock, AlertCircle, Send, Wifi, WifiOff } from "lucide-react";
 
 interface ChainGameBoardProps {
-  gameState: ChainGameState;
-  actions: ChainGameActions;
+  gameState?: ChainGameState;
+  actions?: ChainGameActions;
   currentPlayerId?: string;
+  // For real-time sync mode
+  gameId?: number;
+  sessionId?: string;
+  playerId?: string;
+  playerName?: string;
+  userType?: "teacher" | "student";
 }
 
 export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
-  gameState,
-  actions,
-  currentPlayerId,
+  gameState: propsGameState,
+  actions: propsActions,
+  currentPlayerId: propsCurrentPlayerId,
+  gameId,
+  sessionId,
+  playerId,
+  playerName,
+  userType = "teacher",
 }) => {
   const [inputWord, setInputWord] = useState("");
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [syncedGameState, setSyncedGameState] = useState<any>(null);
+
+  // Use WebSocket sync if sessionId is provided
+  const { 
+    isConnected, 
+    gameState: wsGameState, 
+    submitWord, 
+    startGame, 
+    endGame 
+  } = useGameSync({
+    sessionId: sessionId || "",
+    gameId: gameId || 0,
+    playerId: playerId || "",
+    userType,
+    onGameUpdate: (message) => {
+      if (message.type === "initial_state") {
+        setSyncedGameState(message);
+      } else if (message.type === "word_submitted") {
+        // Refresh game state
+        setSyncedGameState(prev => ({
+          ...prev,
+          chain: [...(prev?.chain || []), message.word],
+        }));
+      } else if (message.type === "game_started") {
+        setSyncedGameState(prev => ({
+          ...prev,
+          game: { ...prev?.game, status: "active" },
+        }));
+      } else if (message.type === "game_ended") {
+        setSyncedGameState(prev => ({
+          ...prev,
+          game: { ...prev?.game, status: "completed" },
+        }));
+      }
+    },
+  });
+
+  // Use either synced state (real-time) or props state (local)
+  const gameState = wsGameState || syncedGameState || propsGameState;
+  const actions = propsActions;
+  const currentPlayerId = playerId || propsCurrentPlayerId;
 
   useEffect(() => {
-    if (gameState.gameStatus === "active") {
+    if (gameState?.gameStatus === "active" || gameState?.game?.status === "active") {
       setStartTime(Date.now());
     }
-  }, [gameState.currentPlayerIndex, gameState.gameStatus]);
+  }, [gameState?.currentPlayerIndex, gameState?.gameStatus, gameState?.game?.status]);
 
-  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+  if (!gameState) {
+    return (
+      <GlassCard className="p-8 text-center">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <WifiOff size={20} style={{ color: "var(--color-error)" }} />
+          <p style={{ color: "var(--color-text-primary)" }} className="font-semibold">
+            Loading game...
+          </p>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  const currentPlayer = gameState.players?.[gameState.currentPlayerIndex] || 
+                        gameState.players?.[0];
   const isCurrentPlayerTurn = currentPlayerId === currentPlayer?.id;
   const lastWord =
-    gameState.chain.length > 0
+    gameState.chain?.length > 0
       ? gameState.chain[gameState.chain.length - 1].word
-      : "";
+      : gameState.starting_word || "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPlayerId || !inputWord.trim()) return;
 
     const responseTime = startTime ? (Date.now() - startTime) / 1000 : 0;
-    const success = await actions.submitWord(
-      currentPlayerId,
-      inputWord,
-      responseTime,
-    );
 
-    if (success) {
+    try {
+      if (sessionId && playerId) {
+        // Real-time mode: use WebSocket
+        submitWord(inputWord);
+      } else if (actions) {
+        // Local mode: use state actions
+        const success = await actions.submitWord(
+          currentPlayerId,
+          inputWord,
+          responseTime
+        );
+        if (success) {
+          setInputWord("");
+          setStartTime(Date.now());
+        }
+      }
       setInputWord("");
       setStartTime(Date.now());
+    } catch (error) {
+      console.error("Error submitting word:", error);
     }
   };
+
+  const gameName = gameState.name || gameState.game?.name || "Chain Answer Game";
+  const gameStatus = gameState.gameStatus || gameState.game?.status || "active";
 
   return (
     <div className="space-y-6">
@@ -57,14 +139,29 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
             className="text-3xl font-bold font-display"
             style={{ color: "var(--color-text-primary)" }}
           >
-            Chain Answer Game
+            {gameName}
           </h1>
           <p style={{ color: "var(--color-text-secondary)" }}>
-            Variation: <strong>{gameState.session?.chainVariation}</strong>
+            {sessionId ? `Session: ${sessionId}` : "Local Game"}
           </p>
         </div>
-        <div className="text-right">
-          <div className="flex items-center gap-2 text-lg font-bold">
+        <div className="text-right space-y-2">
+          {sessionId && (
+            <div className="flex items-center justify-end gap-2 text-sm">
+              {isConnected ? (
+                <>
+                  <Wifi size={16} style={{ color: "#10b981" }} />
+                  <span style={{ color: "#10b981" }}>Connected</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff size={16} style={{ color: "var(--color-error)" }} />
+                  <span style={{ color: "var(--color-error)" }}>Offline (Polling)</span>
+                </>
+              )}
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-2 text-lg font-bold">
             <Clock size={24} />
             <span
               className={gameState.timer < 5 ? "text-red-500" : ""}
@@ -75,7 +172,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
                     : "var(--color-text-primary)",
               }}
             >
-              {gameState.timer}s
+              {gameState.timer || "30"}s
             </span>
           </div>
         </div>
