@@ -1,52 +1,115 @@
 import React, { useState, useEffect } from "react";
 import type { ChainGameState, ChainGameActions } from "./types";
 import { GlassCard } from "../../shared/components/GlassCard";
+import { useGameSync } from "./useGameSync";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, AlertCircle, Send } from "lucide-react";
+import { Clock, AlertCircle, Send, Wifi, WifiOff } from "lucide-react";
 
 interface ChainGameBoardProps {
-  gameState: ChainGameState;
-  actions: ChainGameActions;
+  gameState?: ChainGameState;
+  actions?: ChainGameActions;
   currentPlayerId?: string;
+  // For real-time sync mode
+  gameId?: number;
+  sessionId?: string;
+  playerId?: string;
+  playerName?: string;
+  userType?: "teacher" | "student";
 }
 
 export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
-  gameState,
-  actions,
-  currentPlayerId,
+  gameState: propsGameState,
+  actions: propsActions,
+  currentPlayerId: propsCurrentPlayerId,
+  gameId,
+  sessionId,
+  playerId,
+  playerName,
+  userType = "teacher",
 }) => {
   const [inputWord, setInputWord] = useState("");
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [syncedGameState, setSyncedGameState] = useState<any>(null);
 
-  useEffect(() => {
-    if (gameState.gameStatus === "active") {
-      setStartTime(Date.now());
-    }
-  }, [gameState.currentPlayerIndex, gameState.gameStatus]);
+  // Use WebSocket sync if sessionId is provided
+  const { 
+    isConnected, 
+    gameState: wsGameState, 
+    submitWord, 
+    startGame, 
+    endGame 
+  } = useGameSync({
+    sessionId: sessionId || "",
+    gameId: gameId || 0,
+    playerId: playerId || "",
+    userType,
+    onGameUpdate: (message) => {
+      if (message.type === "initial_state") {
+        setSyncedGameState(message);
+      } else if (message.type === "word_submitted") {
+        // Refresh game state
+        setSyncedGameState(prev => ({
+          ...prev,
+          chain: [...(prev?.chain || []), message.word],
+        }));
+      } else if (message.type === "game_started") {
+        setSyncedGameState(prev => ({
+          ...prev,
+          game: { ...prev?.game, status: "active" },
+        }));
+      } else if (message.type === "game_ended") {
+        setSyncedGameState(prev => ({
+          ...prev,
+          game: { ...prev?.game, status: "completed" },
+        }));
+      }
+    },
+  });
 
-  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-  const isCurrentPlayerTurn = currentPlayerId === currentPlayer?.id;
-  const lastWord =
-    gameState.chain.length > 0
-      ? gameState.chain[gameState.chain.length - 1].word
-      : "";
+  // Use either synced state (real-time) or props state (local)
+  const gameState = wsGameState || syncedGameState || propsGameState;
+  const actions = propsActions;
+  const currentPlayerId = playerId || propsCurrentPlayerId;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPlayerId || !inputWord.trim()) return;
 
     const responseTime = startTime ? (Date.now() - startTime) / 1000 : 0;
-    const success = await actions.submitWord(
-      currentPlayerId,
-      inputWord,
-      responseTime,
-    );
 
-    if (success) {
+    try {
+      if (sessionId && playerId) {
+        // Real-time mode: use WebSocket
+        submitWord(inputWord);
+      } else if (actions) {
+        // Local mode: use state actions
+        const success = await actions.submitWord(
+          currentPlayerId,
+          inputWord,
+          responseTime
+        );
+        if (success) {
+          setInputWord("");
+          setStartTime(Date.now());
+        }
+      }
       setInputWord("");
       setStartTime(Date.now());
+    } catch (error) {
+      console.error("Error submitting word:", error);
     }
   };
+
+  const gameName = gameState?.name || gameState?.game?.name || "Chain Answer Game";
+  const gameStatus = gameState?.gameStatus || gameState?.game?.status || "active";
+
+  const currentPlayer = gameState?.players?.[gameState?.currentPlayerIndex || 0] || 
+                        gameState?.players?.[0];
+  const isCurrentPlayerTurn = currentPlayerId === currentPlayer?.id;
+  const lastWord =
+    gameState?.chain?.length > 0
+      ? gameState?.chain[gameState?.chain.length - 1]?.word
+      : gameState?.starting_word || "";
 
   return (
     <div className="space-y-6">
@@ -57,25 +120,40 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
             className="text-3xl font-bold font-display"
             style={{ color: "var(--color-text-primary)" }}
           >
-            Chain Answer Game
+            {gameName}
           </h1>
           <p style={{ color: "var(--color-text-secondary)" }}>
-            Variation: <strong>{gameState.session?.chainVariation}</strong>
+            {sessionId ? `Session: ${sessionId}` : "Local Game"}
           </p>
         </div>
-        <div className="text-right">
-          <div className="flex items-center gap-2 text-lg font-bold">
+        <div className="text-right space-y-2">
+          {sessionId && (
+            <div className="flex items-center justify-end gap-2 text-sm">
+              {isConnected ? (
+                <>
+                  <Wifi size={16} style={{ color: "#10b981" }} />
+                  <span style={{ color: "#10b981" }}>Connected</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff size={16} style={{ color: "var(--color-error)" }} />
+                  <span style={{ color: "var(--color-error)" }}>Offline (Polling)</span>
+                </>
+              )}
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-2 text-lg font-bold">
             <Clock size={24} />
             <span
-              className={gameState.timer < 5 ? "text-red-500" : ""}
+              className={(gameState?.timer || 0) < 5 ? "text-red-500" : ""}
               style={{
                 color:
-                  gameState.timer < 5
+                  (gameState?.timer || 0) < 5
                     ? "var(--color-status-danger)"
                     : "var(--color-text-primary)",
               }}
             >
-              {gameState.timer}s
+              {gameState?.timer || "30"}s
             </span>
           </div>
         </div>
@@ -132,7 +210,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
 
       {/* Word Input */}
       <AnimatePresence>
-        {isCurrentPlayerTurn && gameState.gameStatus === "active" && (
+        {isCurrentPlayerTurn && (gameState?.gameStatus === "active" || gameState?.game?.status === "active") && (
           <motion.form
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -172,7 +250,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
 
       {/* Error Message */}
       <AnimatePresence>
-        {gameState.errorMessage && (
+        {gameState?.errorMessage && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -184,7 +262,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
             }}
           >
             <AlertCircle size={20} className="flex-shrink-0" />
-            <p>{gameState.errorMessage}</p>
+            <p>{gameState?.errorMessage}</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -195,10 +273,10 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           style={{ color: "var(--color-text-primary)" }}
           className="font-bold mb-4"
         >
-          Word Chain ({gameState.chain.length})
+          Word Chain ({gameState?.chain?.length || 0})
         </h3>
         <div className="flex flex-wrap gap-2">
-          {gameState.chain.map((word, index) => (
+          {(gameState?.chain || []).map((word, index) => (
             <motion.div
               key={word.id}
               initial={{ scale: 0.8, opacity: 0 }}
@@ -206,11 +284,11 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
               className="px-3 py-2 rounded-full text-sm font-semibold"
               style={{
                 background:
-                  index === gameState.chain.length - 1
+                  index === (gameState?.chain?.length || 0) - 1
                     ? "var(--color-brand-blue)"
                     : "var(--color-bg-tertiary)",
                 color:
-                  index === gameState.chain.length - 1
+                  index === (gameState?.chain?.length || 0) - 1
                     ? "white"
                     : "var(--color-text-primary)",
               }}
@@ -230,13 +308,13 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           Scores
         </h3>
         <div className="space-y-2">
-          {gameState.players.map((player, index) => (
+          {(gameState?.players || []).map((player, index) => (
             <div
               key={player.id}
               className="flex justify-between items-center p-3 rounded-lg"
               style={{
                 background:
-                  index === gameState.currentPlayerIndex
+                  index === gameState?.currentPlayerIndex
                     ? "var(--color-bg-tertiary)"
                     : "transparent",
               }}

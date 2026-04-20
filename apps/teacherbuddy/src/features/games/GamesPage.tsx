@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion, AnimatePresence } from "framer-motion";
+import { ChainAnswerGameCreation } from "./ChainAnswerGameCreation";
 
 const gameCategories = [
   {
@@ -18,6 +19,7 @@ const gameCategories = [
       "One student starts an answer, the next continues it. Build collaborative responses chain by chain.",
     icon: Target,
     color: "from-orange-400 to-red-500",
+    hasImplementation: true,
   },
   {
     id: "word-cloud-battle",
@@ -71,6 +73,26 @@ const gameCategories = [
 
 export const GamesPage: React.FC = () => {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [showCreation, setShowCreation] = useState(false);
+
+  const handleGameSelect = (gameId: string) => {
+    const game = gameCategories.find((g) => g.id === gameId);
+    if (game?.hasImplementation) {
+      setShowCreation(true);
+    }
+    setSelectedGame(gameId);
+  };
+
+  if (showCreation && selectedGame === "chain-answer") {
+    return (
+      <ChainAnswerGameCreation
+        onBack={() => {
+          setShowCreation(false);
+          setSelectedGame(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -94,7 +116,7 @@ export const GamesPage: React.FC = () => {
             key={category.id}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => setSelectedGame(category.id)}
+            onClick={() => handleGameSelect(category.id)}
             className="cursor-pointer"
           >
             <GlassCard className="h-full relative overflow-hidden group">
@@ -112,6 +134,11 @@ export const GamesPage: React.FC = () => {
                   style={{ color: "var(--color-text-primary)" }}
                 >
                   {category.title}
+                  {category.hasImplementation && (
+                    <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full ml-2">
+                      Ready
+                    </span>
+                  )}
                 </h3>
                 <p
                   className="text-sm"
@@ -127,7 +154,7 @@ export const GamesPage: React.FC = () => {
 
       {/* Under Construction Modal */}
       <AnimatePresence>
-        {selectedGame && (
+        {selectedGame && !showCreation && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
             <motion.div
               initial={{ opacity: 0 }}

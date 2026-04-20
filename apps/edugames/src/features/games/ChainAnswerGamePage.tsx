@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ChainGameBoard } from "./ChainGameBoard";
 import { useChainGameState } from "./useChainGameState";
+import { useAuthStore } from "../../store/useAuthStore";
+import { ChainAnswerGameJoinPage } from "./ChainAnswerGameJoinPage";
 import type { ChainVariation } from "./types";
 import { motion } from "framer-motion";
-import { Play, Plus, Trash2, Users } from "lucide-react";
+import { Play, Plus, Trash2, Users, Lock } from "lucide-react";
 
 interface PlayerSetup {
   id: string;
@@ -13,7 +16,12 @@ interface PlayerSetup {
 
 export const ChainAnswerGamePage: React.FC = () => {
   try {
+    const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>();
+    const { role } = useAuthStore();
     const [gameStarted, setGameStarted] = useState(false);
+    const [gameInProgress, setGameInProgress] = useState(false);
+    const [joinedSessionId, setJoinedSessionId] = useState<string | null>(null);
+    
     const [gameConfig, setGameConfig] = useState({
       name: "New Game",
       chainVariation: "standard" as ChainVariation,
@@ -53,6 +61,119 @@ export const ChainAnswerGamePage: React.FC = () => {
       setPlayers(players.filter((p) => p.id !== id));
     };
 
+    // If student and has sessionId (from URL or joined), show game board with WebSocket sync
+    if (role === "student" && (urlSessionId || joinedSessionId)) {
+      const sessionId = urlSessionId || joinedSessionId;
+      const playerId = `student_${Date.now()}`;
+      const playerName = `Student ${Math.floor(Math.random() * 1000)}`;
+
+      return (
+        <ChainGameBoard
+          gameId={0}
+          sessionId={sessionId}
+          playerId={playerId}
+          playerName={playerName}
+          userType="student"
+        />
+      );
+    }
+
+    // If student without sessionId, show join form
+    if (role === "student" && !urlSessionId) {
+      return (
+        <ChainAnswerGameJoinPage
+          onJoined={(sessionId) => {
+            setJoinedSessionId(sessionId);
+          }}
+        />
+      );
+    }
+
+    // If role is not set, show role selector
+    if (!role) {
+      return (
+        <div className="space-y-8">
+          <div>
+            <h1
+              className="text-4xl font-bold font-display"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              Chain Answer Game
+            </h1>
+            <p style={{ color: "var(--color-text-secondary)" }} className="mt-2">
+              Select your role to continue
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
+            {/* Teacher Option */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                const { setRole } = useAuthStore.getState();
+                setRole("teacher");
+              }}
+              className="cursor-pointer"
+            >
+              <GlassCard className="p-8 h-full text-center hover:shadow-lg transition-shadow">
+                <Users size={48} className="mx-auto mb-4" style={{ color: "var(--color-brand-blue)" }} />
+                <h3
+                  className="text-xl font-bold mb-2 font-display"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  Teacher
+                </h3>
+                <p style={{ color: "var(--color-text-secondary)" }} className="text-sm mb-4">
+                  Create and manage games
+                </p>
+                <button
+                  className="px-6 py-2 rounded-lg font-semibold text-white"
+                  style={{
+                    background: "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                  }}
+                >
+                  Enter as Teacher
+                </button>
+              </GlassCard>
+            </motion.div>
+
+            {/* Student Option */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                const { setRole } = useAuthStore.getState();
+                setRole("student");
+              }}
+              className="cursor-pointer"
+            >
+              <GlassCard className="p-8 h-full text-center hover:shadow-lg transition-shadow">
+                <Play size={48} className="mx-auto mb-4" style={{ color: "var(--color-brand-blue)" }} />
+                <h3
+                  className="text-xl font-bold mb-2 font-display"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  Student
+                </h3>
+                <p style={{ color: "var(--color-text-secondary)" }} className="text-sm mb-4">
+                  Join a game
+                </p>
+                <button
+                  className="px-6 py-2 rounded-lg font-semibold text-white"
+                  style={{
+                    background: "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                  }}
+                >
+                  Join Game
+                </button>
+              </GlassCard>
+            </motion.div>
+          </div>
+        </div>
+      );
+    }
+
     // Show game board if started
     if (gameStarted && gameState.gameStatus !== "completed") {
       return (
@@ -61,6 +182,27 @@ export const ChainAnswerGamePage: React.FC = () => {
           actions={actions}
           currentPlayerId={gameState.players[gameState.currentPlayerIndex]?.id}
         />
+      );
+    }
+
+    // Teacher setup page
+    if (!role || role !== "teacher") {
+      return (
+        <div className="space-y-8">
+          <GlassCard className="p-8 border-red-200 bg-red-50">
+            <div className="flex items-center gap-4">
+              <Lock size={32} style={{ color: "var(--color-error)" }} />
+              <div>
+                <h2 style={{ color: "var(--color-error)" }} className="font-bold text-lg">
+                  Access Denied
+                </h2>
+                <p style={{ color: "var(--color-text-secondary)" }}>
+                  Only teachers can set up games. Please log in as a teacher.
+                </p>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
       );
     }
 
