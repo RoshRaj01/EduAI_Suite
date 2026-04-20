@@ -89,6 +89,91 @@ export const ChainAnswerGamePage: React.FC = () => {
       );
     }
 
+    // If role is not set, show role selector
+    if (!role) {
+      return (
+        <div className="space-y-8">
+          <div>
+            <h1
+              className="text-4xl font-bold font-display"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              Chain Answer Game
+            </h1>
+            <p style={{ color: "var(--color-text-secondary)" }} className="mt-2">
+              Select your role to continue
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
+            {/* Teacher Option */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                const { setRole } = useAuthStore.getState();
+                setRole("teacher");
+              }}
+              className="cursor-pointer"
+            >
+              <GlassCard className="p-8 h-full text-center hover:shadow-lg transition-shadow">
+                <Users size={48} className="mx-auto mb-4" style={{ color: "var(--color-brand-blue)" }} />
+                <h3
+                  className="text-xl font-bold mb-2 font-display"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  Teacher
+                </h3>
+                <p style={{ color: "var(--color-text-secondary)" }} className="text-sm mb-4">
+                  Create and manage games
+                </p>
+                <button
+                  className="px-6 py-2 rounded-lg font-semibold text-white"
+                  style={{
+                    background: "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                  }}
+                >
+                  Enter as Teacher
+                </button>
+              </GlassCard>
+            </motion.div>
+
+            {/* Student Option */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                const { setRole } = useAuthStore.getState();
+                setRole("student");
+              }}
+              className="cursor-pointer"
+            >
+              <GlassCard className="p-8 h-full text-center hover:shadow-lg transition-shadow">
+                <Play size={48} className="mx-auto mb-4" style={{ color: "var(--color-brand-blue)" }} />
+                <h3
+                  className="text-xl font-bold mb-2 font-display"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  Student
+                </h3>
+                <p style={{ color: "var(--color-text-secondary)" }} className="text-sm mb-4">
+                  Join a game
+                </p>
+                <button
+                  className="px-6 py-2 rounded-lg font-semibold text-white"
+                  style={{
+                    background: "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                  }}
+                >
+                  Join Game
+                </button>
+              </GlassCard>
+            </motion.div>
+          </div>
+        </div>
+      );
+    }
+
     // Show game board if started
     if (gameStarted && gameState.gameStatus !== "completed") {
       return (
