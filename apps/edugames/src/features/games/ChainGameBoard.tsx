@@ -103,6 +103,14 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
   const gameName = gameState?.name || gameState?.game?.name || "Chain Answer Game";
   const gameStatus = gameState?.gameStatus || gameState?.game?.status || "active";
 
+  const currentPlayer = gameState?.players?.[gameState?.currentPlayerIndex || 0] || 
+                        gameState?.players?.[0];
+  const isCurrentPlayerTurn = currentPlayerId === currentPlayer?.id;
+  const lastWord =
+    gameState?.chain?.length > 0
+      ? gameState?.chain[gameState?.chain.length - 1]?.word
+      : gameState?.starting_word || "";
+
   return (
     <div className="space-y-6">
       {/* Game Header */}
