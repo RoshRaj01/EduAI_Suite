@@ -2,381 +2,464 @@ import React, { useState, useEffect } from "react";
 import {
   ClipboardList, Clock, Users, Plus, CheckCircle2, AlertCircle,
   Play, ChevronRight, BrainCircuit, Eye, Check, X, Timer,
-  FileText, Layers,
+  FileText, Layers, Trash2, PlusCircle, FileUp, Save
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
-type ExamView = "list" | "take" | "review";
+const API_URL = "http://localhost:8000";
 
-const exams = [
-  {
-    id: 1, title: "Neural Networks Mid-Term",          course: "CSC401", type: "HYBRID",
-    date: "Apr 20, 2026", time: "10:00 AM", duration: 90, totalMarks: 100,
-    submissions: 38, total: 42, status: "upcoming", pendingReview: 0,
-  },
-  {
-    id: 2, title: "DSA Internal Assessment II",        course: "CSC312", type: "MCQ",
-    date: "Apr 15, 2026", time: "9:00 AM",  duration: 60, totalMarks: 50,
-    submissions: 38, total: 38, status: "completed", pendingReview: 0,
-  },
-  {
-    id: 3, title: "Cloud Computing Assignment Exam",   course: "CSC501", type: "SUBJECTIVE",
-    date: "Apr 14, 2026", time: "2:00 PM",  duration: 120, totalMarks: 75,
-    submissions: 30, total: 35, status: "ongoing", pendingReview: 24,
-  },
-  {
-    id: 4, title: "DBMS End Semester Examination",     course: "CSC220", type: "HYBRID",
-    date: "May 5, 2026",  time: "9:00 AM",  duration: 180, totalMarks: 100,
-    submissions: 0,  total: 50, status: "draft", pendingReview: 0,
-  },
-];
+interface Option {
+  option_text: string;
+  is_correct: bool;
+  id?: number;
+}
 
-const mcqQuestions = [
-  {
-    id: 1,
-    q: "In a neural network, which activation function is most commonly used in hidden layers for deep learning models?",
-    opts: ["Sigmoid", "Tanh", "ReLU", "Softmax"],
-    correct: 2,
-  },
-  {
-    id: 2,
-    q: "What is the primary purpose of dropout regularization in neural networks?",
-    opts: ["Speed up training", "Prevent overfitting", "Increase model accuracy", "Reduce memory usage"],
-    correct: 1,
-  },
-  {
-    id: 3,
-    q: "During backpropagation, which algorithm is most commonly used to update weights?",
-    opts: ["Gradient Descent", "Genetic Algorithm", "Simulated Annealing", "A* Search"],
-    correct: 0,
-  },
-];
+interface Question {
+  id?: number;
+  question_text: string;
+  points: number;
+  options: Option[];
+}
 
-const pendingReviews = [
-  {
-    id: "sub-001", student: "Arjun Mehta", roll: "2226CSC100",
-    question: "Explain the vanishing gradient problem in deep neural networks and describe two techniques used to mitigate it.",
-    answer: "The vanishing gradient problem occurs when the gradients of the loss function become extremely small as they propagate backward through many layers. This causes early layers to learn very slowly or not at all. Two techniques to mitigate this are: (1) Using ReLU activation functions instead of sigmoid/tanh, since ReLU has a gradient of 1 for positive inputs, preventing gradient decay. (2) Batch Normalization, which normalizes layer inputs and helps maintain healthy gradient magnitudes throughout training.",
-    aiScore: 78, confidence: 0.85, rubricMatched: ["vanishing gradient definition", "ReLU mention", "batch normalization"],
-    maxScore: 100, status: "pending",
-  },
-  {
-    id: "sub-002", student: "Priya Sharma", roll: "2226CSC101",
-    question: "Explain the vanishing gradient problem in deep neural networks and describe two techniques used to mitigate it.",
-    answer: "Vanishing gradient is when gradients get very small during backpropagation. We can fix this using LSTM networks for sequence models and residual connections (skip connections) in architectures like ResNet to allow gradients to flow directly.",
-    aiScore: 62, confidence: 0.72, rubricMatched: ["vanishing gradient definition", "LSTM mention"],
-    maxScore: 100, status: "pending",
-  },
-];
-
-const statusStyle: Record<string, { color: string; bg: string; label: string }> = {
-  upcoming:  { color: "#264796", bg: "rgba(38,71,150,0.1)",  label: "Upcoming"  },
-  ongoing:   { color: "#d97706", bg: "rgba(217,119,6,0.1)",  label: "Ongoing"   },
-  completed: { color: "#16a34a", bg: "rgba(22,163,74,0.1)",  label: "Completed" },
-  draft:     { color: "#64748b", bg: "rgba(100,116,139,0.1)", label: "Draft"    },
-};
+interface Exam {
+  id: number;
+  course_id: number;
+  title: string;
+  description: string;
+  time_limit: number;
+  max_attempts: number;
+  randomize_questions: boolean;
+  created_at: string;
+  questions?: Question[];
+}
 
 export const ExamsPage: React.FC = () => {
-  const [view, setView] = useState<ExamView>("list");
-  const [selectedExam, setSelectedExam] = useState(exams[2]);
-  const [activeTab, setActiveTab] = useState<"overview" | "take" | "review">("overview");
-  const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [timeLeft, setTimeLeft] = useState(90 * 60);
-  const [currentReview, setCurrentReview] = useState(pendingReviews[0]);
-  const [scoreInput, setScoreInput] = useState<Record<string, string>>({});
-  const [reviewDone, setReviewDone] = useState<Record<string, boolean>>({});
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
+  const [activeTab, setActiveTab] = useState<"overview" | "questions" | "results">("overview");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Create Exam Form State
+  const [examForm, setExamForm] = useState({
+    title: "",
+    course_id: 0,
+    description: "",
+    time_limit: 60,
+    max_attempts: 1,
+    randomize_questions: false,
+    questions: [] as Question[]
+  });
+
+  const fetchExams = async () => {
+    try {
+      const res = await fetch(`${API_URL}/courses/`);
+      const courseData = await res.json();
+      setCourses(courseData);
+      
+      if (courseData.length > 0) {
+        const examRes = await fetch(`${API_URL}/exams/course/${courseData[0].id}`);
+        const examData = await examRes.json();
+        setExams(examData);
+        if (examData.length > 0) {
+          fetchExamDetail(examData[0].id);
+        }
+      }
+    } catch (err) {
+      setErrorMsg("Failed to fetch data from server.");
+    }
+  };
+
+  const fetchExamDetail = async (id: number) => {
+    try {
+      const res = await fetch(`${API_URL}/exams/${id}`);
+      const data = await res.json();
+      setSelectedExam(data);
+      setSelectedId(id);
+    } catch (err) {
+      console.error("Failed to fetch exam detail");
+    }
+  };
 
   useEffect(() => {
-    if (activeTab !== "take") return;
-    const t = setInterval(() => setTimeLeft(s => s > 0 ? s - 1 : 0), 1000);
-    return () => clearInterval(t);
-  }, [activeTab]);
+    fetchExams();
+  }, []);
 
-  const fmt = (s: number) =>
-    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  const handleCreateExam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!examForm.course_id) {
+        setErrorMsg("Please select a course");
+        return;
+    }
+    if (examForm.questions.length === 0) {
+        setErrorMsg("Please add at least one question");
+        return;
+    }
 
-  const timerColor = timeLeft < 600 ? "#dc2626" : timeLeft < 1800 ? "#d97706" : "#264796";
+    try {
+      const res = await fetch(`${API_URL}/exams/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(examForm)
+      });
+      if (res.ok) {
+        setShowCreateModal(false);
+        setExamForm({
+            title: "", course_id: 0, description: "", time_limit: 60, max_attempts: 1, randomize_questions: false, questions: []
+        });
+        fetchExams();
+      } else {
+        const err = await res.json();
+        setErrorMsg(err.detail || "Failed to create exam");
+      }
+    } catch (err) {
+      setErrorMsg("Server error during exam creation");
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsExtracting(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`${API_URL}/exams/extract-questions`, {
+        method: "POST",
+        body: formData
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setExamForm(prev => ({
+          ...prev,
+          questions: [...prev.questions, ...data.questions]
+        }));
+      }
+    } catch (err) {
+      console.error("Extraction failed");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const addQuestion = () => {
+    const newQ: Question = {
+      question_text: "",
+      points: 1,
+      options: [
+        { option_text: "", is_correct: true },
+        { option_text: "", is_correct: false },
+        { option_text: "", is_correct: false },
+        { option_text: "", is_correct: false }
+      ]
+    };
+    setExamForm(prev => ({ ...prev, questions: [...prev.questions, newQ] }));
+  };
+
+  const updateQuestion = (index: number, text: string) => {
+    const qs = [...examForm.questions];
+    qs[index].question_text = text;
+    setExamForm({ ...examForm, questions: qs });
+  };
+
+  const updateOption = (qIndex: number, oIndex: number, text: string) => {
+    const qs = [...examForm.questions];
+    qs[qIndex].options[oIndex].option_text = text;
+    setExamForm({ ...examForm, questions: qs });
+  };
+
+  const setCorrectOption = (qIndex: number, oIndex: number) => {
+    const qs = [...examForm.questions];
+    qs[qIndex].options = qs[qIndex].options.map((opt, i) => ({
+      ...opt,
+      is_correct: i === oIndex
+    }));
+    setExamForm({ ...examForm, questions: qs });
+  };
+
+  const removeQuestion = (index: number) => {
+    const qs = [...examForm.questions];
+    qs.splice(index, 1);
+    setExamForm({ ...examForm, questions: qs });
+  };
+
+  const statusStyle: Record<string, { color: string; bg: string; label: string }> = {
+    upcoming:  { color: "#264796", bg: "rgba(38,71,150,0.1)",  label: "Upcoming"  },
+    ongoing:   { color: "#d97706", bg: "rgba(217,119,6,0.1)",  label: "Ongoing"   },
+    completed: { color: "#16a34a", bg: "rgba(22,163,74,0.1)",  label: "Completed" },
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
-            Examinations
+            Examinations Control
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
-            Create, manage, review AI evaluations, and track student submissions.
+            Design MCQ quizzes, set time limits, and automate student evaluations.
           </p>
         </div>
-        <button className="btn btn-primary text-sm">
+        <button onClick={() => setShowCreateModal(true)} className="btn btn-primary text-sm flex items-center gap-2">
           <Plus size={15} /> Create Exam
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "Total Exams",      value: "4",  icon: ClipboardList, color: "#264796" },
-          { label: "Pending AI Review",value: "24", icon: BrainCircuit,  color: "#d97706" },
-          { label: "Submissions Today",value: "30", icon: CheckCircle2,  color: "#16a34a" },
-          { label: "Avg Completion",   value: "91%",icon: Users,         color: "#7c3aed" },
-        ].map(s => (
-          <GlassCard key={s.label} padding="sm" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: `${s.color}18` }}>
-              <s.icon size={19} style={{ color: s.color }} />
-            </div>
-            <div>
-              <p className="text-xl font-bold" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>{s.value}</p>
-              <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{s.label}</p>
-            </div>
-          </GlassCard>
-        ))}
-      </div>
+      {errorMsg && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm flex items-center gap-2">
+            <AlertCircle size={16} /> {errorMsg}
+            <button className="ml-auto" onClick={() => setErrorMsg(null)}><X size={14}/></button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Exam List */}
         <div className="space-y-3">
-          {exams.map(exam => {
-            const s = statusStyle[exam.status];
-            return (
+          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2 pl-1">Recent Exams</h3>
+          {exams.length === 0 ? (
+            <p className="text-sm text-slate-400 p-8 text-center bg-white rounded-2xl border-2 border-dashed border-slate-200">No exams created yet.</p>
+          ) : (
+            exams.map(exam => (
               <div
                 key={exam.id}
-                onClick={() => setSelectedExam(exam)}
+                onClick={() => fetchExamDetail(exam.id)}
                 className={`glass-card p-4 cursor-pointer transition-all hover:shadow-md border-l-4 ${
-                  selectedExam.id === exam.id ? "border-l-[#264796] shadow-lg" : "border-l-transparent"
+                  selectedId === exam.id ? "border-l-[#264796] shadow-lg bg-blue-50/30" : "border-l-transparent"
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="min-w-0">
                     <p className="font-semibold text-sm leading-snug" style={{ color: "var(--color-text-primary)" }}>{exam.title}</p>
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>{exam.course}</p>
+                    <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>{exam.description?.substring(0, 50)}...</p>
                   </div>
-                  <span className="badge shrink-0 text-[9px] px-2 py-0.5" style={{ color: s.color, background: s.bg }}>
-                    {s.label}
-                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
-                  <span className="flex items-center gap-1"><Clock size={10} /> {exam.duration}m</span>
-                  <span className="flex items-center gap-1"><Users size={10} /> {exam.submissions}/{exam.total}</span>
-                  <span className="flex items-center gap-1"><Layers size={10} /> {exam.type}</span>
+                  <span className="flex items-center gap-1"><Clock size={10} /> {exam.time_limit}m</span>
+                  <span className="flex items-center gap-1"><Users size={10} /> {exam.max_attempts} Attempt(s)</span>
+                  <span className="flex items-center gap-1"><Layers size={10} /> MCQ</span>
                 </div>
-                {exam.pendingReview > 0 && (
-                  <div className="mt-2">
-                    <span className="badge badge-orange text-[9px]">
-                      <AlertCircle size={9} /> {exam.pendingReview} pending AI review
-                    </span>
-                  </div>
-                )}
               </div>
-            );
-          })}
+            ))
+          )}
         </div>
 
         {/* Exam Detail */}
         <div className="xl:col-span-2">
-          <GlassCard padding="none">
-            {/* Hero */}
-            <div className="gradient-blue rounded-t-2xl p-5 text-white">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="badge text-[9px] px-2" style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
-                      {selectedExam.type}
-                    </span>
-                    <span className="badge text-[9px] px-2" style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
-                      {selectedExam.course}
-                    </span>
-                  </div>
-                  <h2 className="text-lg font-bold">{selectedExam.title}</h2>
-                  <p className="text-white/70 text-sm mt-1">{selectedExam.date} · {selectedExam.time}</p>
+          {selectedExam ? (
+            <GlassCard padding="none" className="overflow-hidden">
+                <div className="gradient-blue p-6 text-white">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h2 className="text-xl font-bold">{selectedExam.title}</h2>
+                            <p className="text-white/70 text-sm mt-1">{selectedExam.description}</p>
+                        </div>
+                        <div className="text-right">
+                             <div className="text-2xl font-black">{selectedExam.time_limit}</div>
+                             <div className="text-[10px] uppercase font-bold text-white/50">Minutes</div>
+                        </div>
+                    </div>
+                    <div className="flex gap-4 mt-6">
+                        <div className="px-3 py-1 bg-white/10 rounded-lg text-xs font-bold border border-white/10">
+                            {selectedExam.randomize_questions ? "Randomized" : "Sequential Order"}
+                        </div>
+                        <div className="px-3 py-1 bg-white/10 rounded-lg text-xs font-bold border border-white/10">
+                            {selectedExam.max_attempts} Allowed Attempts
+                        </div>
+                    </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-3xl font-black">{selectedExam.totalMarks}</p>
-                  <p className="text-white/60 text-xs">Total Marks</p>
-                </div>
-              </div>
-              <div className="flex gap-6 mt-4 pt-4 border-t border-white/15 text-xs text-white/75">
-                <span className="flex items-center gap-1.5"><Timer size={12} /> {selectedExam.duration} minutes</span>
-                <span className="flex items-center gap-1.5"><Users size={12} /> {selectedExam.submissions}/{selectedExam.total} submitted</span>
-              </div>
-            </div>
 
-            {/* Tabs */}
-            <div className="flex border-b" style={{ borderColor: "rgba(38,71,150,0.1)" }}>
-              {(["overview", "take", "review"] as const).map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)}
-                  className={`px-5 py-3.5 text-sm font-semibold capitalize transition-colors flex items-center gap-1.5 ${
-                    activeTab === tab ? "border-b-2 border-[#264796] text-[#264796]" : "text-slate-400 hover:text-slate-600"
-                  }`}>
-                  {tab === "take" && <Play size={13} />}
-                  {tab === "review" && <Eye size={13} />}
-                  {tab} {tab === "review" && selectedExam.pendingReview > 0 && (
-                    <span className="badge badge-orange text-[9px] px-1.5">{selectedExam.pendingReview}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <div className="p-5">
-              {/* Overview */}
-              {activeTab === "overview" && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: "Submission Rate", value: `${Math.round((selectedExam.submissions / selectedExam.total) * 100)}%` },
-                      { label: "Pending Review",  value: `${selectedExam.pendingReview}` },
-                      { label: "Avg. Time Taken", value: "72 min" },
-                      { label: "Avg. Score",      value: "68/100" },
-                    ].map(item => (
-                      <div key={item.label} className="p-3 rounded-xl text-center"
-                        style={{ background: "rgba(38,71,150,0.05)", border: "1px solid rgba(38,71,150,0.1)" }}>
-                        <p className="text-xl font-bold" style={{ color: "var(--color-brand-blue)" }}>{item.value}</p>
-                        <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>{item.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => setActiveTab("review")} className="btn btn-primary flex-1 text-sm">
-                      <BrainCircuit size={14} /> Review AI Evaluations ({selectedExam.pendingReview})
-                    </button>
-                    <button className="btn btn-outline text-sm flex-1">
-                      <FileText size={14} /> Export Results
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Take Exam (Student View) */}
-              {activeTab === "take" && (
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between p-3 rounded-xl"
-                    style={{ background: `${timerColor}12`, border: `1.5px solid ${timerColor}30` }}>
-                    <span className="text-sm font-semibold" style={{ color: timerColor }}>Time Remaining</span>
-                    <span className="timer-display" style={{ color: timerColor }}>{fmt(timeLeft)}</span>
-                  </div>
-                  {mcqQuestions.map((q, qi) => (
-                    <div key={q.id} className="space-y-3">
-                      <p className="font-semibold text-sm leading-relaxed" style={{ color: "var(--color-text-primary)" }}>
-                        Q{qi + 1}. {q.q}
-                      </p>
-                      <div className="space-y-2">
-                        {q.opts.map((opt, oi) => (
-                          <button
-                            key={oi}
-                            onClick={() => setAnswers(a => ({ ...a, [q.id]: oi }))}
-                            className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all border ${
-                              answers[q.id] === oi
-                                ? "border-[#264796] bg-blue-50 text-[#264796] font-semibold"
-                                : "border-slate-200 hover:border-blue-200 hover:bg-blue-50/50"
+                <div className="flex border-b border-slate-100">
+                    {["overview", "questions", "results"].map(tab => (
+                        <button 
+                            key={tab}
+                            onClick={() => setActiveTab(tab as any)}
+                            className={`px-6 py-4 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                                activeTab === tab ? "border-brand-blue text-brand-blue" : "border-transparent text-slate-400 hover:text-slate-600"
                             }`}
-                          >
-                            <span className="font-bold mr-2">{String.fromCharCode(65 + oi)}.</span> {opt}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  <button className="btn btn-gold w-full text-sm font-bold py-3">
-                    <CheckCircle2 size={15} /> Submit Exam Answers
-                  </button>
-                </div>
-              )}
-
-              {/* AI Review */}
-              {activeTab === "review" && pendingReviews.length > 0 && (
-                <div className="space-y-5">
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {pendingReviews.map(r => (
-                      <button
-                        key={r.id}
-                        onClick={() => setCurrentReview(r)}
-                        className={`px-3 py-2 rounded-lg text-xs font-semibold shrink-0 transition-all ${
-                          currentReview.id === r.id
-                            ? "bg-[#264796] text-white"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        }`}
-                      >
-                        {r.student}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-xl" style={{ background: "rgba(38,71,150,0.05)", border: "1px solid rgba(38,71,150,0.12)" }}>
-                      <p className="text-xs font-semibold mb-2" style={{ color: "var(--color-text-muted)" }}>QUESTION</p>
-                      <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-primary)" }}>{currentReview.question}</p>
-                    </div>
-
-                    <div className="p-4 rounded-xl" style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(38,71,150,0.1)" }}>
-                      <p className="text-xs font-semibold mb-2" style={{ color: "var(--color-text-muted)" }}>STUDENT ANSWER — {currentReview.student}</p>
-                      <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{currentReview.answer}</p>
-                    </div>
-
-                    <div className="p-4 rounded-xl" style={{ background: "rgba(208,174,97,0.1)", border: "1px solid rgba(208,174,97,0.25)" }}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <BrainCircuit size={16} style={{ color: "var(--color-brand-gold-dark)" }} />
-                          <span className="text-sm font-bold" style={{ color: "var(--color-brand-gold-dark)" }}>AI Evaluation</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                            Confidence: {Math.round(currentReview.confidence * 100)}%
-                          </span>
-                          <span className="badge badge-gold text-xs">AI Score: {currentReview.aiScore}/{currentReview.maxScore}</span>
-                        </div>
-                      </div>
-                      <p className="text-xs font-medium mb-2" style={{ color: "var(--color-text-secondary)" }}>Rubric Items Matched:</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {currentReview.rubricMatched.map(r => (
-                          <span key={r} className="badge badge-green text-[10px]">
-                            <Check size={9} /> {r}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1">
-                        <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--color-text-secondary)" }}>
-                          Final Score (/{currentReview.maxScore})
-                        </label>
-                        <input
-                          type="number"
-                          className="form-input text-sm"
-                          placeholder={`${currentReview.aiScore}`}
-                          value={scoreInput[currentReview.id] || ""}
-                          onChange={e => setScoreInput(s => ({ ...s, [currentReview.id]: e.target.value }))}
-                          min="0" max={currentReview.maxScore}
-                        />
-                      </div>
-                      <div className="flex gap-2 mt-5">
-                        <button
-                          onClick={() => setReviewDone(s => ({ ...s, [currentReview.id]: true }))}
-                          className="btn btn-primary text-sm"
                         >
-                          <Check size={14} /> Confirm
+                            {tab}
                         </button>
-                        <button className="btn btn-danger text-sm">
-                          <X size={14} /> Reject
-                        </button>
-                      </div>
-                    </div>
-
-                    {reviewDone[currentReview.id] && (
-                      <div className="p-3 rounded-xl flex items-center gap-2 animate-fade-in"
-                        style={{ background: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.2)" }}>
-                        <CheckCircle2 size={15} className="text-green-600" />
-                        <p className="text-sm text-green-700 font-semibold">Score confirmed and saved. Student will be notified.</p>
-                      </div>
-                    )}
-                  </div>
+                    ))}
                 </div>
-              )}
+
+                <div className="p-6">
+                    {activeTab === "overview" && (
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                                <p className="text-3xl font-black text-brand-blue">{selectedExam.questions?.length || 0}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Questions</p>
+                            </div>
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                                <p className="text-3xl font-black text-brand-blue">0</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Submissions</p>
+                            </div>
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                                <p className="text-3xl font-black text-brand-blue">--</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Avg Score</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === "questions" && (
+                        <div className="space-y-6">
+                            {selectedExam.questions?.map((q, idx) => (
+                                <div key={q.id} className="pb-6 border-b border-slate-100 last:border-0">
+                                    <p className="font-bold text-slate-800 mb-3 flex items-start gap-3">
+                                        <span className="w-6 h-6 bg-blue-100 text-brand-blue rounded flex items-center justify-center shrink-0 text-xs">{idx + 1}</span>
+                                        {q.question_text}
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-9">
+                                        {q.options.map((opt, oidx) => (
+                                            <div key={opt.id} className={`p-3 rounded-xl text-xs flex items-center justify-between border ${
+                                                opt.is_correct ? "bg-green-50 border-green-200 text-green-700" : "bg-white border-slate-200 text-slate-600"
+                                            }`}>
+                                                <span className="flex items-center gap-2">
+                                                    <span className="font-bold">{String.fromCharCode(65 + oidx)}.</span>
+                                                    {opt.option_text}
+                                                </span>
+                                                {opt.is_correct && <Check size={14} />}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </GlassCard>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center p-12 bg-white rounded-3xl border-2 border-dashed border-slate-200 opacity-50">
+                <ClipboardList size={48} className="text-slate-300 mb-4" />
+                <p className="font-bold text-slate-400">Select an exam to view details</p>
             </div>
-          </GlassCard>
+          )}
         </div>
       </div>
+
+      {/* CREATE EXAM MODAL */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+              <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+                  <h3 className="text-xl font-bold text-slate-800">Compose New Examination</h3>
+                  <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20}/></button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-8 bg-white">
+                  <form className="space-y-8">
+                      {/* Basic Settings */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">Exam Title</label>
+                                    <input type="text" className="form-input" placeholder="e.g. Unit 3 Quiz" value={examForm.title} onChange={e => setExamForm({...examForm, title: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">Course</label>
+                                    <select className="form-input" value={examForm.course_id} onChange={e => setExamForm({...examForm, course_id: parseInt(e.target.value)})}>
+                                        <option value={0}>Select Course</option>
+                                        {courses.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
+                                    </select>
+                                </div>
+                           </div>
+                           <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">Time Limit (Min)</label>
+                                    <input type="number" className="form-input" value={examForm.time_limit} onChange={e => setExamForm({...examForm, time_limit: parseInt(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">Attempts</label>
+                                    <input type="number" className="form-input" value={examForm.max_attempts} onChange={e => setExamForm({...examForm, max_attempts: parseInt(e.target.value)})} />
+                                </div>
+                                <div className="col-span-2 flex items-center gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    <input type="checkbox" id="rand" checked={examForm.randomize_questions} onChange={e => setExamForm({...examForm, randomize_questions: e.target.checked})} className="w-5 h-5 rounded border-slate-300 text-brand-blue" />
+                                    <label htmlFor="rand" className="text-sm font-bold text-slate-700 cursor-pointer">Randomize Question Order for Students</label>
+                                </div>
+                           </div>
+                      </div>
+
+                      <hr className="border-slate-100"/>
+
+                      {/* Question Section */}
+                      <div className="space-y-6">
+                           <div className="flex items-center justify-between">
+                                <h4 className="font-extrabold text-blue-900 border-l-4 border-brand-blue pl-3">Question Bank</h4>
+                                <div className="flex gap-2">
+                                     <label className="btn btn-outline btn-sm cursor-pointer flex items-center gap-2">
+                                         <FileUp size={14}/> {isExtracting ? "Extracting..." : "AI Import (PDF/DOCX)"}
+                                         <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleFileUpload} disabled={isExtracting} />
+                                     </label>
+                                     <button type="button" onClick={addQuestion} className="btn btn-primary btn-sm flex items-center gap-2">
+                                         <PlusCircle size={14}/> Add Manually
+                                     </button>
+                                </div>
+                           </div>
+
+                           <div className="space-y-4">
+                                {examForm.questions.map((q, qidx) => (
+                                    <div key={qidx} className="p-6 bg-slate-50 rounded-2xl border border-slate-200 relative group animate-fade-in">
+                                        <button type="button" onClick={() => removeQuestion(qidx)} className="absolute top-4 right-4 text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={18}/></button>
+                                        
+                                        <div className="mb-4">
+                                             <label className="text-[10px] font-bold text-blue-500 uppercase mb-1 block">Question {qidx + 1}</label>
+                                             <input 
+                                                type="text" 
+                                                className="form-input font-semibold" 
+                                                placeholder="Enter question text here..."
+                                                value={q.question_text}
+                                                onChange={e => updateQuestion(qidx, e.target.value)}
+                                             />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {q.options.map((opt, oidx) => (
+                                                <div key={oidx} className="flex items-center gap-2">
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setCorrectOption(qidx, oidx)}
+                                                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold transition-all ${
+                                                            opt.is_correct ? "bg-green-500 text-white shadow-lg" : "bg-white text-slate-300 border border-slate-200 hover:border-green-300"
+                                                        }`}
+                                                    >
+                                                        {opt.is_correct ? <Check size={16}/> : String.fromCharCode(65 + oidx)}
+                                                    </button>
+                                                    <input 
+                                                        type="text" 
+                                                        className={`flex-1 text-sm p-3 rounded-xl border transition-all ${
+                                                            opt.is_correct ? "bg-green-50 border-green-200 text-green-800 font-medium" : "bg-white border-slate-200 text-slate-600 focus:border-brand-blue"
+                                                        }`}
+                                                        placeholder={`Option ${String.fromCharCode(65 + oidx)}`}
+                                                        value={opt.option_text}
+                                                        onChange={e => updateOption(qidx, oidx, e.target.value)}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                                {examForm.questions.length === 0 && (
+                                    <div className="py-20 text-center bg-blue-50/30 rounded-3xl border-2 border-dashed border-blue-100">
+                                         <BrainCircuit size={40} className="text-blue-200 mx-auto mb-3" />
+                                         <p className="text-blue-400 font-medium font-display">Click 'Add Manually' or use'AI Import' to populate questions</p>
+                                    </div>
+                                )}
+                           </div>
+                      </div>
+                  </form>
+              </div>
+
+              <div className="p-6 border-t bg-white flex justify-end gap-3 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+                  <button onClick={() => setShowCreateModal(false)} className="btn btn-outline px-8">Discard</button>
+                  <button onClick={handleCreateExam} className="btn btn-primary px-10 shadow-lg shadow-blue-500/30"><Save size={18} className="mr-2"/> Deploy Examination</button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
