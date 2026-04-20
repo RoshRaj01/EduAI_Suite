@@ -6,7 +6,7 @@ import {
   ChainVariation,
   GameStatus,
   PlayerStatus,
-} from "./ChainAnswerTypes";
+} from "./ChainAnswerTypes.ts";
 
 export interface ChainGameState {
   session: GameSession | null;

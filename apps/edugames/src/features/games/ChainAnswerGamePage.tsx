@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { GlassCard } from "../../shared/components/GlassCard";
-import { ChainGameBoard } from "./ChainGameBoard";
-import { useChainGameState } from "./useChainGameState";
-import { ChainVariation } from "./ChainAnswerTypes";
+import { ChainGameBoard } from "./ChainGameBoard.tsx";
+import { useChainGameState } from "./useChainGameState.ts";
+import { ChainVariation } from "./ChainAnswerTypes.ts";
 import { motion } from "framer-motion";
 import { Play, Plus, Trash2, Users } from "lucide-react";
 
