@@ -6,18 +6,18 @@ import {
 import { GlassCard } from "../../shared/components/GlassCard";
 
 interface Choice {
-  id: int;
+  id: number;
   choice_text: string;
 }
 
 interface Question {
-  id: int;
+  id: number;
   question_text: string;
   choices: Choice[];
 }
 
 interface Exam {
-  id: int;
+  id: number;
   title: string;
   time_limit: number;
   questions: Question[];
@@ -95,6 +95,19 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
+
+  if (!exam || !exam.questions || exam.questions.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white flex items-center justify-center p-6">
+        <GlassCard className="max-w-md w-full text-center p-8 space-y-4">
+          <AlertTriangle className="mx-auto text-orange-500" size={48} />
+          <h2 className="text-xl font-bold">No Questions Found</h2>
+          <p className="text-slate-500">This exam doesn't seem to have any questions. Please contact your instructor.</p>
+          <button onClick={onClose} className="btn btn-outline w-full">Go Back</button>
+        </GlassCard>
+      </div>
+    );
+  }
 
   const currentQuestion = exam.questions[currentIdx];
   const progress = ((currentIdx + 1) / exam.questions.length) * 100;
