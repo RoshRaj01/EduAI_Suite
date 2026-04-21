@@ -15,6 +15,7 @@ interface ChainGameBoardProps {
   playerId?: string;
   playerName?: string;
   userType?: "teacher" | "student";
+  onError?: (error: string) => void;
 }
 
 export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
@@ -26,48 +27,27 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
   playerId,
   playerName,
   userType = "teacher",
+  onError,
 }) => {
   const [inputWord, setInputWord] = useState("");
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [syncedGameState, setSyncedGameState] = useState<any>(null);
-
   // Use WebSocket sync if sessionId is provided
-  const { 
-    isConnected, 
-    gameState: wsGameState, 
-    submitWord, 
-    startGame, 
-    endGame 
+  const {
+    isConnected,
+    gameState: wsGameState,
+    submitWord,
+    startGame,
+    endGame,
   } = useGameSync({
     sessionId: sessionId || "",
     gameId: gameId || 0,
     playerId: playerId || "",
     userType,
-    onGameUpdate: (message) => {
-      if (message.type === "initial_state") {
-        setSyncedGameState(message);
-      } else if (message.type === "word_submitted") {
-        // Refresh game state
-        setSyncedGameState(prev => ({
-          ...prev,
-          chain: [...(prev?.chain || []), message.word],
-        }));
-      } else if (message.type === "game_started") {
-        setSyncedGameState(prev => ({
-          ...prev,
-          game: { ...prev?.game, status: "active" },
-        }));
-      } else if (message.type === "game_ended") {
-        setSyncedGameState(prev => ({
-          ...prev,
-          game: { ...prev?.game, status: "completed" },
-        }));
-      }
-    },
+    onError,
   });
 
   // Use either synced state (real-time) or props state (local)
-  const gameState = wsGameState || syncedGameState || propsGameState;
+  const gameState = wsGameState || propsGameState;
   const actions = propsActions;
   const currentPlayerId = playerId || propsCurrentPlayerId;
 
@@ -86,7 +66,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
         const success = await actions.submitWord(
           currentPlayerId,
           inputWord,
-          responseTime
+          responseTime,
         );
         if (success) {
           setInputWord("");
@@ -100,16 +80,34 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     }
   };
 
-  const gameName = gameState?.name || gameState?.game?.name || "Chain Answer Game";
-  const gameStatus = gameState?.gameStatus || gameState?.game?.status || "active";
+  const gameName =
+    (gameState as any)?.name ||
+    (gameState as any)?.session?.name ||
+    (gameState as any)?.game?.name ||
+    "Chain Answer Game";
+  const gameStatus =
+    (gameState as any)?.gameStatus ||
+    (gameState as any)?.status ||
+    (gameState as any)?.game?.status ||
+    "active";
 
-  const currentPlayer = gameState?.players?.[gameState?.currentPlayerIndex || 0] || 
-                        gameState?.players?.[0];
-  const isCurrentPlayerTurn = currentPlayerId === currentPlayer?.id;
+  const currentPlayer =
+    gameState?.players?.[gameState?.currentPlayerIndex || 0] ||
+    gameState?.players?.[0];
+  const normalizedPlayerName = playerName?.trim().toLowerCase();
+  const isCurrentPlayerTurn =
+    String(currentPlayerId) === String(currentPlayer?.id) ||
+    String(currentPlayerId) === String(currentPlayer?.student_id) ||
+    String(currentPlayerId) === String(currentPlayer?.studentId) ||
+    (!!normalizedPlayerName &&
+      currentPlayer?.name?.trim().toLowerCase() === normalizedPlayerName);
   const lastWord =
-    gameState?.chain?.length > 0
-      ? gameState?.chain[gameState?.chain.length - 1]?.word
-      : gameState?.starting_word || "";
+    (gameState as any)?.chain?.length > 0
+      ? (gameState as any)?.chain[(gameState as any)?.chain.length - 1]?.word
+      : (gameState as any)?.starting_word ||
+      (gameState as any)?.session?.startingWord ||
+      (gameState as any)?.game?.starting_word ||
+      "";
 
   return (
     <div className="space-y-6">
@@ -137,7 +135,9 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
               ) : (
                 <>
                   <WifiOff size={16} style={{ color: "var(--color-error)" }} />
-                  <span style={{ color: "var(--color-error)" }}>Offline (Polling)</span>
+                  <span style={{ color: "var(--color-error)" }}>
+                    Offline (Polling)
+                  </span>
                 </>
               )}
             </div>
@@ -179,7 +179,9 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
         >
           Next word must start with:{" "}
           <strong style={{ fontSize: "1.2em" }}>
-            {lastWord ? lastWord.charAt(lastWord.length - 1).toUpperCase() : "?"}
+            {lastWord
+              ? lastWord.charAt(lastWord.length - 1).toUpperCase()
+              : "?"}
           </strong>
         </p>
       </GlassCard>
@@ -194,9 +196,8 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
             Current Player
           </p>
           <p
-            className={`text-xl font-bold ${
-              isCurrentPlayerTurn ? "text-green-500" : "text-gray-500"
-            }`}
+            className={`text-xl font-bold ${isCurrentPlayerTurn ? "text-green-500" : "text-gray-500"
+              }`}
             style={{
               color: isCurrentPlayerTurn
                 ? "var(--color-status-success)"
@@ -210,7 +211,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
 
       {/* Word Input */}
       <AnimatePresence>
-        {isCurrentPlayerTurn && (gameState?.gameStatus === "active" || gameState?.game?.status === "active") && (
+        {isCurrentPlayerTurn && gameStatus === "active" && (
           <motion.form
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -327,7 +328,8 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
               </span>
               <div className="flex gap-4">
                 <span style={{ color: "var(--color-text-secondary)" }}>
-                  Words: {player.wordsValid}/{player.wordsSubmitted}
+                  Words: {player.wordsValid ?? player.words_valid ?? 0}/
+                  {player.wordsSubmitted ?? player.words_submitted ?? 0}
                 </span>
                 <span
                   className="font-bold"

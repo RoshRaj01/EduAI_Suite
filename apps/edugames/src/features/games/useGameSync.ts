@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { gameAPI } from "../../shared/utils/gameAPI";
+import { gameAPI, API_BASE_URL } from "../../shared/utils/gameAPI";
 import type { GameResponse } from "../../shared/utils/gameAPI";
 
 interface GameUpdateMessage {
@@ -27,7 +27,7 @@ export const useGameSync = ({
   pollingInterval = 2000,
 }: UseGameSyncOptions) => {
   const ws = useRef<WebSocket | null>(null);
-  const pollingTimer = useRef<NodeJS.Timeout | null>(null);
+  const pollingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [useWebSocket, setUseWebSocket] = useState(true);
   const [gameState, setGameState] = useState<GameResponse | null>(null);
@@ -35,8 +35,9 @@ export const useGameSync = ({
   // Connect to WebSocket
   const connectWebSocket = useCallback(() => {
     try {
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws/games/chain-answer/${sessionId}?user_type=${userType}`;
+      const backendUrl = new URL(API_BASE_URL);
+      const wsProtocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${wsProtocol}//${backendUrl.host}/ws/games/chain-answer/${sessionId}?user_type=${userType}`;
 
       console.log("Connecting to WebSocket:", wsUrl);
       ws.current = new WebSocket(wsUrl);
@@ -60,29 +61,67 @@ export const useGameSync = ({
 
           // Update game state based on message type
           if (message.type === "initial_state") {
-            setGameState(message.game);
+            const chain = message.chain || [];
+            const players = message.players || [];
+            
+            // Calculate current player index based on last word in chain
+            let currentPlayerIndex = 0;
+            if (chain.length > 0) {
+              const lastWord = chain[chain.length - 1];
+              const lastPlayerIndex = players.findIndex(
+                (p: any) => String(p.student_id) === String(lastWord.submitted_by)
+              );
+              if (lastPlayerIndex !== -1) {
+                currentPlayerIndex = (lastPlayerIndex + 1) % players.length;
+              }
+            }
+
+            setGameState({
+              ...message.game,
+              players: players,
+              words: chain,
+              chain: chain,
+              currentPlayerIndex,
+              timer: 30,
+            });
           } else if (message.type === "word_submitted") {
             // Update game state with new word
-            if (gameState) {
-              setGameState({
-                ...gameState,
-                // Chain will be updated through callback
+            setGameState((prev) => {
+              if (!prev) return null;
+              const newWords = [...(prev.words || []), message.word];
+              
+              // Calculate next player index
+              const lastPlayerIndex = prev.players.findIndex(
+                (p: any) => String(p.client_id || p.student_id) === String(message.word.submitted_by)
+              );
+              const nextPlayerIndex = lastPlayerIndex !== -1 
+                ? (lastPlayerIndex + 1) % prev.players.length 
+                : (prev.currentPlayerIndex || 0);
+
+              const newPlayers = prev.players.map((p: any) => {
+                if (String(p.student_id) === String(message.word.submitted_by)) {
+                  return {
+                    ...p,
+                    ...message.player_stats,
+                  };
+                }
+                return p;
               });
-            }
+              return {
+                ...prev,
+                words: newWords,
+                chain: newWords,
+                players: newPlayers,
+                currentPlayerIndex: nextPlayerIndex,
+                timer: 30, // Reset timer for next player
+              };
+            });
           } else if (message.type === "game_started") {
-            if (gameState) {
-              setGameState({
-                ...gameState,
-                status: "active",
-              });
-            }
+            setGameState((prev) =>
+              prev ? { ...prev, status: "active", timer: 30, currentPlayerIndex: 0 } : null,
+            );
           } else if (message.type === "game_ended") {
-            if (gameState) {
-              setGameState({
-                ...gameState,
-                status: "completed",
-              });
-            }
+            setGameState((prev) => (prev ? { ...prev, status: "completed" } : null));
           }
 
           // Call user callback
@@ -125,10 +164,14 @@ export const useGameSync = ({
   // Fallback polling function
   const startPolling = useCallback(() => {
     if (pollingTimer.current) return;
+    if (gameId <= 0 && !sessionId) return;
 
     const poll = async () => {
       try {
-        const updatedGame = await gameAPI.getGameById(gameId);
+        const updatedGame =
+          gameId > 0
+            ? await gameAPI.getGameById(gameId)
+            : await gameAPI.getGameBySessionId(sessionId);
         setGameState(updatedGame);
 
         // Emit update event
@@ -138,8 +181,12 @@ export const useGameSync = ({
             game: updatedGame,
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Polling error:", error);
+        if (error.message?.includes("Not Found")) {
+          stopPolling();
+          if (onError) onError("Game session not found. Please rejoin.");
+        }
       }
     };
 
@@ -148,7 +195,7 @@ export const useGameSync = ({
 
     // Set up polling interval
     pollingTimer.current = setInterval(poll, pollingInterval);
-  }, [gameId, pollingInterval, onGameUpdate]);
+  }, [gameId, sessionId, pollingInterval, onGameUpdate]);
 
   // Stop polling
   const stopPolling = useCallback(() => {
@@ -215,6 +262,24 @@ export const useGameSync = ({
       });
     }
   }, [useWebSocket, isConnected, sendMessage]);
+
+  // Timer countdown effect
+  useEffect(() => {
+    if (!gameState || gameState.status !== "active" || (gameState.timer || 0) <= 0)
+      return;
+
+    const interval = setInterval(() => {
+      setGameState((prev) => {
+        if (!prev || (prev.timer || 0) <= 0) return prev;
+        return {
+          ...prev,
+          timer: (prev.timer || 0) - 1,
+        };
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState?.status, gameState?.timer]);
 
   // Heartbeat to keep connection alive
   useEffect(() => {

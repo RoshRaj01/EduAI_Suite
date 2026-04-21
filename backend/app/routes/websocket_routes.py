@@ -104,6 +104,7 @@ async def websocket_endpoint(
             {
                 "id": p.id,
                 "name": p.name,
+                "student_id": p.student_id,
                 "score": p.score,
                 "words_submitted": p.words_submitted,
                 "words_valid": p.words_valid,

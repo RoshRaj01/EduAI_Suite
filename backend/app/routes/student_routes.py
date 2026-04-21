@@ -9,6 +9,7 @@ import io
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
+
 def get_db():
     db = SessionLocal()
     try:
@@ -16,16 +17,18 @@ def get_db():
     finally:
         db.close()
 
+
 @router.get("/{course_id}", response_model=list[StudentResponse])
 def get_students(course_id: int, db: Session = Depends(get_db)):
     return db.query(Student).filter(Student.course_id == course_id).all()
+
 
 @router.post("/{course_id}", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 def manual_enroll(course_id: int, student: StudentCreate, db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    
+
     new_student = Student(**student.model_dump(), course_id=course_id)
     course.students = (course.students or 0) + 1
     db.add(new_student)
@@ -33,18 +36,19 @@ def manual_enroll(course_id: int, student: StudentCreate, db: Session = Depends(
     db.refresh(new_student)
     return new_student
 
+
 @router.post("/bulk_upload/{course_id}", status_code=status.HTTP_201_CREATED)
 async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-        
+
     contents = await file.read()
     decoded = contents.decode("utf-8")
     reader = csv.reader(io.StringIO(decoded))
-    
+
     next(reader, None)  # Skip header row
-    
+
     students_to_add = []
     for row in reader:
         # Expected format: registration_number, name, email, class, department
@@ -62,18 +66,20 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session 
                     avg_score=0
                 )
             )
-            
+
     db.bulk_save_objects(students_to_add)
     course.students = (course.students or 0) + len(students_to_add)
     db.commit()
     return {"message": f"Successfully enrolled {len(students_to_add)} students"}
 
+
 @router.post("/enroll/code", status_code=status.HTTP_201_CREATED)
 def enroll_via_code(enrollment_code: str, student: StudentCreate, db: Session = Depends(get_db)):
-    course = db.query(Course).filter(Course.enrollment_code == enrollment_code).first()
+    course = db.query(Course).filter(
+        Course.enrollment_code == enrollment_code).first()
     if not course:
         raise HTTPException(status_code=404, detail="Invalid enrollment code")
-        
+
     new_student = Student(**student.model_dump(), course_id=course.id)
     course.students = (course.students or 0) + 1
     db.add(new_student)
@@ -81,12 +87,28 @@ def enroll_via_code(enrollment_code: str, student: StudentCreate, db: Session = 
     db.refresh(new_student)
     return new_student
 
+
+@router.get("/{course_id}/active", response_model=list[StudentResponse])
+def get_active_students(course_id: int, db: Session = Depends(get_db)):
+    """Get all active students enrolled in a course (for games/activities)"""
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Return students with decent attendance/engagement (active status)
+    students = db.query(Student).filter(
+        Student.course_id == course_id,
+        Student.attendance > 0  # Filter for active students
+    ).all()
+    return students
+
+
 @router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
-        
+
     course = db.query(Course).filter(Course.id == student.course_id).first()
     if course and course.students and course.students > 0:
         course.students -= 1

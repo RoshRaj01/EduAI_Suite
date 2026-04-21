@@ -1,21 +1,34 @@
 import React, { useState } from "react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ChainGameBoard } from "./ChainGameBoard";
-import { useAuthStore } from "../../store/useAuthStore";
-import { useGameSync } from "./useGameSync";
 import { gameAPI } from "../../shared/utils/gameAPI";
+import {
+  createChainAnswerPlayerId,
+  saveChainAnswerPlayerSession,
+} from "./chainAnswerPlayerSession";
 import { motion } from "framer-motion";
 import { Play, Users, Lock, Loader, Copy, CheckCircle } from "lucide-react";
 
-export const ChainAnswerGameJoinPage: React.FC = () => {
-  const { role } = useAuthStore();
-  const [sessionId, setSessionId] = useState("");
+interface ChainAnswerGameJoinPageProps {
+  initialSessionId?: string;
+  onJoined?: (session: {
+    gameId: number;
+    sessionId: string;
+    playerId: string;
+    playerName: string;
+  }) => void;
+}
+
+export const ChainAnswerGameJoinPage: React.FC<
+  ChainAnswerGameJoinPageProps
+> = ({ initialSessionId = "", onJoined }) => {
+  const [sessionId, setSessionId] = useState(initialSessionId);
   const [playerName, setPlayerName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
   const [gameId, setGameId] = useState<number | null>(null);
-  const [playerId] = useState(`player_${Date.now()}`);
+  const [playerId] = useState(() => createChainAnswerPlayerId());
   const [copied, setCopied] = useState(false);
 
   const handleJoinGame = async () => {
@@ -30,7 +43,32 @@ export const ChainAnswerGameJoinPage: React.FC = () => {
     try {
       // Fetch game by session ID
       const game = await gameAPI.getGameBySessionId(sessionId);
+      
+      // Find the player in the registered list by name (case-insensitive)
+      const registeredPlayer = game.players.find(
+        (p: any) => p.name.trim().toLowerCase() === playerName.trim().toLowerCase()
+      );
+
+      if (!registeredPlayer) {
+        setError(`Student "${playerName}" is not registered for this game. Please check with your teacher.`);
+        setIsLoading(false);
+        return;
+      }
+
       setGameId(game.id);
+      
+      // Use the actual student_id from the backend instead of a generated one
+      const effectivePlayerId = registeredPlayer.student_id;
+      
+      saveChainAnswerPlayerSession(game.id, sessionId, playerName, effectivePlayerId);
+      
+      onJoined?.({
+        gameId: game.id,
+        sessionId,
+        playerId: effectivePlayerId,
+        playerName,
+      });
+      
       setJoined(true);
     } catch (err) {
       setError("Game session not found. Please check the session ID.");
@@ -78,6 +116,7 @@ export const ChainAnswerGameJoinPage: React.FC = () => {
             type="text"
             value={sessionId}
             onChange={(e) => setSessionId(e.target.value)}
+            readOnly={Boolean(initialSessionId)}
             className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-gray-900 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             placeholder="e.g., game_a1b2c3d4"
           />
@@ -85,7 +124,9 @@ export const ChainAnswerGameJoinPage: React.FC = () => {
             style={{ color: "var(--color-text-secondary)" }}
             className="text-xs mt-2"
           >
-            Ask your teacher for the session ID
+            {initialSessionId
+              ? "Using the session linked to this game entry."
+              : "Ask your teacher for the session ID"}
           </p>
         </div>
 

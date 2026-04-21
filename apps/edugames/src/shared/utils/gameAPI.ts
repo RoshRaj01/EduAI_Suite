@@ -1,9 +1,8 @@
 // API service for Chain Answer Game backend integration
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export interface GamePlayer {
-  student_id: string;
-  name: string;
+  student_id: number;
 }
 
 export interface ChainAnswerGameConfig {
@@ -12,6 +11,7 @@ export interface ChainAnswerGameConfig {
   category?: string;
   difficulty_level: string;
   language: string;
+  subject?: string;
   starting_word: string;
   time_per_turn: number;
   max_words?: number;
@@ -26,17 +26,71 @@ export interface GameResponse {
   name: string;
   chain_variation: string;
   difficulty_level: string;
+  subject?: string;
+  ollama_suggestions?: string;
   status: string;
   starting_word: string;
   players: any[];
   words: any[];
+  chain?: any[];
+  currentPlayerIndex?: number;
+  timer?: number;
+  errorMessage?: string;
+}
+
+export interface OllamaStatus {
+  ollama_available: boolean;
+  endpoint: string;
+  available_models: string[];
+  default_model: string;
+  message: string;
+}
+
+export interface Student {
+  id: number;
+  name: string;
+  email: string;
+  registration_number: string;
+  student_class: string;
+  department: string;
+  course_id: number;
+  attendance: number;
+  avg_score: number;
 }
 
 class ChainAnswerGameAPI {
   private baseUrl: string;
+  private studentUrl: string;
 
   constructor() {
     this.baseUrl = `${API_BASE_URL}/games`;
+    this.studentUrl = `${API_BASE_URL}/students`;
+  }
+
+  /**
+   * Get active students for a course
+   */
+  async getActiveStudents(courseId: number): Promise<Student[]> {
+    try {
+      const response = await fetch(
+        `${this.studentUrl}/${courseId}/active`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch students: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching active students:", error);
+      throw error;
+    }
   }
 
   /**

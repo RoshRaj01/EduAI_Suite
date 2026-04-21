@@ -2,8 +2,19 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export interface GamePlayer {
-  student_id: string;
+  student_id: number;
+}
+
+export interface Student {
+  id: number;
   name: string;
+  email: string;
+  registration_number: string;
+  student_class: string;
+  department: string;
+  course_id: number;
+  attendance: number;
+  avg_score: number;
 }
 
 export interface ChainAnswerGameConfig {
@@ -34,9 +45,37 @@ export interface GameResponse {
 
 class ChainAnswerGameAPI {
   private baseUrl: string;
+  private studentUrl: string;
 
   constructor() {
     this.baseUrl = `${API_BASE_URL}/games`;
+    this.studentUrl = `${API_BASE_URL}/students`;
+  }
+
+  /**
+   * Get active students for a course
+   */
+  async getActiveStudents(courseId: number): Promise<Student[]> {
+    try {
+      const response = await fetch(
+        `${this.studentUrl}/${courseId}/active`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch students: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching active students:", error);
+      throw error;
+    }
   }
 
   /**

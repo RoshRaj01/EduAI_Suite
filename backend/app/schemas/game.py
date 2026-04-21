@@ -6,8 +6,7 @@ from datetime import datetime
 
 
 class GamePlayerCreate(BaseModel):
-    student_id: str
-    name: str
+    student_id: int  # Now uses actual student ID from database
 
 
 class GamePlayerResponse(BaseModel):
@@ -54,6 +53,7 @@ class ChainAnswerGameCreate(BaseModel):
     category: Optional[str] = None
     difficulty_level: str
     language: str
+    subject: Optional[str] = None
     starting_word: str
     time_per_turn: int = 30
     max_words: Optional[int] = None
@@ -76,9 +76,11 @@ class ChainAnswerGameResponse(BaseModel):
     category: Optional[str]
     difficulty_level: str
     language: str
+    subject: Optional[str]
     status: str
     starting_word: str
     time_per_turn: int
+    ollama_suggestions: Optional[str]
     created_at: datetime
     started_at: Optional[datetime]
     ended_at: Optional[datetime]
@@ -96,6 +98,7 @@ class ChainAnswerGameListResponse(BaseModel):
     session_id: str
     name: str
     difficulty_level: str
+    subject: Optional[str]
     status: str
     created_at: datetime
     players: List[GamePlayerResponse]

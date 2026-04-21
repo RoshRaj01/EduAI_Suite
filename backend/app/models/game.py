@@ -16,11 +16,15 @@ class ChainAnswerGame(Base):
     category = Column(String, nullable=True)
     difficulty_level = Column(String, default="medium")  # easy, medium, hard
     language = Column(String, default="en")
+    # e.g., "Science", "Animals", "History"
+    subject = Column(String, nullable=True)
     # setup, active, completed, paused
     status = Column(String, default="setup")
     starting_word = Column(String, default="Apple")
     time_per_turn = Column(Integer, default=30)  # seconds
     max_words = Column(Integer, nullable=True)
+    # JSON array of suggested words
+    ollama_suggestions = Column(String, nullable=True)
     penalty_on_invalid = Column(Boolean, default=False)
     # skip_turn, lose_points, elimination
     penalty_type = Column(String, nullable=True)

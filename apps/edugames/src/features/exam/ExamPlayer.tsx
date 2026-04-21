@@ -44,7 +44,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   const [results, setResults] = useState<any>(null);
   const [attemptId, setAttemptId] = useState<number | null>(null);
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Helper to shuffle array
   const shuffle = <T,>(array: T[]): T[] => {

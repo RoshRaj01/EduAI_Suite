@@ -1,8 +1,17 @@
 import React, { useState } from "react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion } from "framer-motion";
-import { Play, Plus, Trash2, Users, ArrowLeft, Loader, Copy, Share2, Check } from "lucide-react";
+import {
+  Play,
+  Users,
+  ArrowLeft,
+  Loader,
+  Copy,
+  Share2,
+  Check,
+} from "lucide-react";
 import { gameAPI } from "../../shared/utils/gameAPI";
+import { useActiveStudents } from "./useActiveStudents";
 
 type ChainVariation =
   | "standard"
@@ -10,11 +19,6 @@ type ChainVariation =
   | "compound"
   | "ladder"
   | "geography";
-
-interface PlayerSetup {
-  id: string;
-  name: string;
-}
 
 interface ChainAnswerGameCreationProps {
   onBack: () => void;
@@ -28,39 +32,71 @@ export const ChainAnswerGameCreation: React.FC<
     name: "New Game",
     chainVariation: "standard" as ChainVariation,
     category: "",
+    subject: "",
     difficulty: "medium" as "easy" | "medium" | "hard",
     language: "en",
     startingWord: "Apple",
     timePerTurn: 30,
   });
 
-  const [players, setPlayers] = useState<PlayerSetup[]>([
-    { id: "1", name: "Student 1" },
-    { id: "2", name: "Student 2" },
-  ]);
-
-  const [newPlayerName, setNewPlayerName] = useState("");
+  const [courseId, setCourseId] = useState<number>(1);
+  const { students: availableStudents, isLoading: loadingStudents, error: studentsError } = useActiveStudents(courseId);
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdGame, setCreatedGame] = useState<{ id: number; session_id: string } | null>(null);
+  const [createdGame, setCreatedGame] = useState<{
+    id: number;
+    session_id: string;
+  } | null>(null);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  const [ollamaStatus, setOllamaStatus] = useState<{
+    available: boolean;
+    loading: boolean;
+  }>({
+    available: false,
+    loading: true,
+  });
 
-  const handleAddPlayer = () => {
-    if (newPlayerName.trim()) {
-      setPlayers([
-        ...players,
-        { id: `player_${Date.now()}`, name: newPlayerName },
-      ]);
-      setNewPlayerName("");
-    }
-  };
+  // Check Ollama status on mount
+  React.useEffect(() => {
+    const checkOllamaStatus = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+        const response = await fetch(
+          `${baseUrl}/games/chain-answer/status/ollama`,
+        );
+        if (response.ok) {
+          const status = await response.json();
+          setOllamaStatus({
+            available: status.ollama_available,
+            loading: false,
+          });
+        } else {
+          setOllamaStatus({ available: false, loading: false });
+        }
+      } catch (err) {
+        console.warn("Could not check Ollama status", err);
+        setOllamaStatus({ available: false, loading: false });
+      }
+    };
 
-  const handleRemovePlayer = (id: string) => {
-    setPlayers(players.filter((p) => p.id !== id));
+    checkOllamaStatus();
+  }, []);
+
+  const handleTogglePlayer = (studentId: number) => {
+    setSelectedPlayerIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(studentId)) {
+        newSet.delete(studentId);
+      } else {
+        newSet.add(studentId);
+      }
+      return newSet;
+    });
   };
 
   const handleCreateGame = async () => {
-    if (players.length < 2) {
+    if (selectedPlayerIds.size < 2) {
       setError("At least 2 players required to start a game!");
       return;
     }
@@ -69,31 +105,39 @@ export const ChainAnswerGameCreation: React.FC<
     setError(null);
 
     try {
+      const selectedPlayers = availableStudents.filter((s) =>
+        selectedPlayerIds.has(s.id),
+      );
+
       // Create the game via backend API
       const gameData = {
         name: gameConfig.name,
         chain_variation: gameConfig.chainVariation,
-        category: gameConfig.chainVariation === "category" ? gameConfig.category : undefined,
+        category:
+          gameConfig.chainVariation === "category"
+            ? gameConfig.category
+            : undefined,
         difficulty_level: gameConfig.difficulty,
         language: gameConfig.language,
+        subject: gameConfig.subject || undefined,
         starting_word: gameConfig.startingWord,
         time_per_turn: gameConfig.timePerTurn,
         penalty_on_invalid: false,
-        players: players.map((p) => ({
+        players: selectedPlayers.map((p) => ({
           student_id: p.id,
-          name: p.name,
         })),
       };
 
       const game = await gameAPI.createGame(gameData);
-      
+
       // Start the game automatically
       await gameAPI.startGame(game.id);
 
       // Show success screen
       setCreatedGame({ id: game.id, session_id: game.session_id });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create game";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create game";
       setError(errorMessage);
       console.error("Error creating game:", err);
     } finally {
@@ -122,7 +166,10 @@ export const ChainAnswerGameCreation: React.FC<
   if (createdGame) {
     return (
       <div className="space-y-8">
-        <GlassCard className="p-12 text-center border-2" style={{ borderColor: "var(--color-brand-blue)" }}>
+        <GlassCard
+          className="p-12 text-center border-2"
+          style={{ borderColor: "var(--color-brand-blue)" }}
+        >
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -149,7 +196,10 @@ export const ChainAnswerGameCreation: React.FC<
           </p>
 
           {/* Session ID Display */}
-          <div className="mb-8 p-6 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+          <div
+            className="mb-8 p-6 rounded-lg"
+            style={{ background: "var(--color-bg-tertiary)" }}
+          >
             <p
               style={{ color: "var(--color-text-secondary)" }}
               className="text-sm mb-3 font-semibold"
@@ -175,19 +225,27 @@ export const ChainAnswerGameCreation: React.FC<
                   background: copiedToClipboard
                     ? "#10b981"
                     : "var(--color-bg-secondary)",
-                  color: copiedToClipboard ? "white" : "var(--color-text-primary)",
+                  color: copiedToClipboard
+                    ? "white"
+                    : "var(--color-text-primary)",
                 }}
               >
                 {copiedToClipboard ? <Check size={20} /> : <Copy size={20} />}
               </motion.button>
             </div>
-            <p style={{ color: "var(--color-text-secondary)" }} className="text-xs">
+            <p
+              style={{ color: "var(--color-text-secondary)" }}
+              className="text-xs"
+            >
               Students will enter this code to join the game
             </p>
           </div>
 
           {/* Game Link */}
-          <div className="mb-8 p-6 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+          <div
+            className="mb-8 p-6 rounded-lg"
+            style={{ background: "var(--color-bg-tertiary)" }}
+          >
             <p
               style={{ color: "var(--color-text-secondary)" }}
               className="text-sm mb-3 font-semibold"
@@ -227,7 +285,10 @@ export const ChainAnswerGameCreation: React.FC<
 
           {/* Game Info */}
           <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="p-4 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+            <div
+              className="p-4 rounded-lg"
+              style={{ background: "var(--color-bg-tertiary)" }}
+            >
               <p
                 style={{ color: "var(--color-text-secondary)" }}
                 className="text-xs mb-1"
@@ -241,7 +302,10 @@ export const ChainAnswerGameCreation: React.FC<
                 {gameConfig.chainVariation}
               </p>
             </div>
-            <div className="p-4 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+            <div
+              className="p-4 rounded-lg"
+              style={{ background: "var(--color-bg-tertiary)" }}
+            >
               <p
                 style={{ color: "var(--color-text-secondary)" }}
                 className="text-xs mb-1"
@@ -252,10 +316,13 @@ export const ChainAnswerGameCreation: React.FC<
                 style={{ color: "var(--color-text-primary)" }}
                 className="font-bold"
               >
-                {players.length}
+                {selectedPlayerIds.size}
               </p>
             </div>
-            <div className="p-4 rounded-lg" style={{ background: "var(--color-bg-tertiary)" }}>
+            <div
+              className="p-4 rounded-lg"
+              style={{ background: "var(--color-bg-tertiary)" }}
+            >
               <p
                 style={{ color: "var(--color-text-secondary)" }}
                 className="text-xs mb-1"
@@ -298,7 +365,8 @@ export const ChainAnswerGameCreation: React.FC<
               }}
               className="flex-1 py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-2"
               style={{
-                background: "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                background:
+                  "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
               }}
             >
               <Play size={20} />
@@ -332,6 +400,33 @@ export const ChainAnswerGameCreation: React.FC<
           </p>
         </div>
       </div>
+
+      {/* Ollama Status Indicator */}
+      {!ollamaStatus.loading && (
+        <div
+          className={`px-4 py-3 rounded-lg flex items-center gap-3 ${
+            ollamaStatus.available
+              ? "bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700"
+              : "bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-700"
+          }`}
+        >
+          <div
+            className={`w-3 h-3 rounded-full ${
+              ollamaStatus.available ? "bg-green-500" : "bg-yellow-500"
+            }`}
+          />
+          <p
+            style={{
+              color: ollamaStatus.available ? "#16a34a" : "#ca8a04",
+            }}
+            className="font-semibold text-sm"
+          >
+            {ollamaStatus.available
+              ? "✓ AI Word Generation Available (Ollama Connected)"
+              : "⚠ AI Word Generation Offline (Using fallback dictionary)"}
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Game Configuration */}
@@ -487,6 +582,35 @@ export const ChainAnswerGameCreation: React.FC<
                 />
               </div>
 
+              {/* Subject (for Ollama word generation) */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  Subject (Optional - AI Word Generation)
+                </label>
+                <input
+                  type="text"
+                  value={gameConfig.subject}
+                  onChange={(e) =>
+                    setGameConfig({
+                      ...gameConfig,
+                      subject: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-gray-900 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="e.g., Science, Animals, History, Mathematics"
+                />
+                <p
+                  style={{ color: "var(--color-text-secondary)" }}
+                  className="text-xs mt-2"
+                >
+                  💡 Providing a subject enables AI to generate contextual word
+                  suggestions
+                </p>
+              </div>
+
               {/* Time Per Turn */}
               <div>
                 <label
@@ -515,7 +639,7 @@ export const ChainAnswerGameCreation: React.FC<
 
         {/* Right: Players Management */}
         <div className="space-y-6">
-          {/* Add Players */}
+          {/* Select Players */}
           <GlassCard className="p-6">
             <h2
               className="text-xl font-bold mb-4"
@@ -523,73 +647,102 @@ export const ChainAnswerGameCreation: React.FC<
             >
               <div className="flex items-center gap-2">
                 <Users size={20} />
-                Add Players
+                Select Players
               </div>
             </h2>
 
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={newPlayerName}
-                onChange={(e) => setNewPlayerName(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleAddPlayer()}
-                className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-gray-900 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                placeholder="Student name"
-              />
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleAddPlayer}
-                className="w-full px-4 py-3 rounded-lg text-white font-semibold flex items-center justify-center gap-2 transition-all"
+            {/* Loading State */}
+            {loadingStudents && (
+              <div className="flex items-center justify-center py-8">
+                <Loader
+                  size={24}
+                  className="animate-spin"
+                  style={{ color: "var(--color-brand-blue)" }}
+                />
+              </div>
+            )}
+
+            {/* Error State */}
+            {studentsError && (
+              <div
+                className="p-4 rounded-lg mb-4"
                 style={{
-                  background:
-                    "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                  background: "var(--color-error-light)",
+                  color: "var(--color-error)",
                 }}
               >
-                <Plus size={18} />
-                Add Player
-              </motion.button>
-            </div>
-          </GlassCard>
+                <p className="text-sm font-semibold">
+                  Error loading students
+                </p>
+                <p className="text-xs">{studentsError}</p>
+              </div>
+            )}
 
-          {/* Players List */}
-          <GlassCard className="p-6">
-            <h3
-              className="text-lg font-bold mb-4"
-              style={{ color: "var(--color-text-primary)" }}
-            >
-              Players ({players.length})
-            </h3>
-
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {players.map((player) => (
-                <motion.div
-                  key={player.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="flex items-center justify-between p-3 rounded-lg"
-                  style={{ backgroundColor: "var(--color-bg-secondary)" }}
-                >
-                  <span style={{ color: "var(--color-text-primary)" }}>
-                    {player.name}
-                  </span>
-                  <button
-                    onClick={() => handleRemovePlayer(player.id)}
-                    className="p-1 hover:bg-red-500/20 rounded transition-colors"
+            {/* Student List */}
+            {!loadingStudents && availableStudents.length > 0 && (
+              <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+                {availableStudents.map((student) => (
+                  <motion.div
+                    key={student.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center p-3 rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                    style={{
+                      background: selectedPlayerIds.has(student.id)
+                        ? "var(--color-brand-blue)"
+                        : "var(--color-bg-tertiary)",
+                    }}
+                    onClick={() => handleTogglePlayer(student.id)}
                   >
-                    <Trash2 size={16} style={{ color: "var(--color-error)" }} />
-                  </button>
-                </motion.div>
-              ))}
-            </div>
+                    <input
+                      type="checkbox"
+                      checked={selectedPlayerIds.has(student.id)}
+                      onChange={() => handleTogglePlayer(student.id)}
+                      className="mr-3"
+                    />
+                    <span
+                      style={{
+                        color: selectedPlayerIds.has(student.id)
+                          ? "white"
+                          : "var(--color-text-primary)",
+                      }}
+                      className="font-semibold flex-1"
+                    >
+                      {student.name}
+                    </span>
+                    {selectedPlayerIds.has(student.id) && (
+                      <Check size={16} style={{ color: "white" }} />
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
 
-            {players.length < 2 && (
+            {/* No Students State */}
+            {!loadingStudents &&
+              availableStudents.length === 0 &&
+              !studentsError && (
+                <div
+                  className="p-4 rounded-lg text-center mb-4"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  <p className="text-sm">No active students available</p>
+                </div>
+              )}
+
+            <p
+              style={{ color: "var(--color-text-secondary)" }}
+              className="text-sm"
+            >
+              Selected Players: <strong>{selectedPlayerIds.size}</strong>
+            </p>
+
+            {selectedPlayerIds.size < 2 && (
               <p
-                className="text-sm mt-4"
+                className="text-sm mt-2"
                 style={{ color: "var(--color-text-secondary)" }}
               >
-                ⚠️ Add at least 2 players to start the game
+                ⚠️ Select at least 2 players to start the game
               </p>
             )}
           </GlassCard>
@@ -602,7 +755,10 @@ export const ChainAnswerGameCreation: React.FC<
               exit={{ opacity: 0, y: -10 }}
               className="p-4 bg-red-500/20 border border-red-500 rounded-lg"
             >
-              <p style={{ color: "var(--color-error)" }} className="font-semibold">
+              <p
+                style={{ color: "var(--color-error)" }}
+                className="font-semibold"
+              >
                 ❌ {error}
               </p>
             </motion.div>
@@ -610,18 +766,20 @@ export const ChainAnswerGameCreation: React.FC<
 
           {/* Create Game Button */}
           <motion.button
-            whileHover={players.length >= 2 && !isLoading ? { scale: 1.05 } : {}}
-            whileTap={players.length >= 2 && !isLoading ? { scale: 0.95 } : {}}
+            whileHover={
+              selectedPlayerIds.size >= 2 && !isLoading ? { scale: 1.05 } : {}
+            }
+            whileTap={selectedPlayerIds.size >= 2 && !isLoading ? { scale: 0.95 } : {}}
             onClick={handleCreateGame}
-            disabled={players.length < 2 || isLoading}
+            disabled={selectedPlayerIds.size < 2 || isLoading}
             className="w-full px-6 py-4 rounded-xl text-white font-bold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             style={{
               background:
-                players.length < 2 || isLoading
+                selectedPlayerIds.size < 2 || isLoading
                   ? "#9ca3af"
                   : "linear-gradient(135deg, #10b981, #059669)",
               boxShadow:
-                players.length < 2 || isLoading
+                selectedPlayerIds.size < 2 || isLoading
                   ? "none"
                   : "0 10px 25px rgba(16, 185, 129, 0.3)",
             }}
