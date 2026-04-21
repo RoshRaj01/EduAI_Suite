@@ -24,7 +24,7 @@ def get_db():
 
 @router.get("/", response_model=List[ExamResponse])
 def get_all_exams(db: Session = Depends(get_db)):
-    return db.query(Exam).filter(Exam.status == "published").all()
+    return db.query(Exam).all()
 
 @router.post("/", response_model=ExamResponse)
 def create_exam(exam_data: ExamCreate, db: Session = Depends(get_db)):
@@ -185,3 +185,28 @@ async def extract_exam_questions(file: UploadFile = File(...)):
             })
 
     return questions
+
+@router.post("/extract-answers")
+async def extract_exam_answers(file: UploadFile = File(...)):
+    contents = await file.read()
+    text = ""
+    
+    if file.filename.endswith(".pdf"):
+        reader = PyPDF2.PdfReader(io.BytesIO(contents))
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+    elif file.filename.endswith(".docx"):
+        doc = docx.Document(io.BytesIO(contents))
+        text = "\n".join([para.text for para in doc.paragraphs])
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported format")
+
+    # Basic mapping: looks for "1. A" or "1) C" or "1 - B"
+    # Returns { "1": "A", "2": "C", ... }
+    answers = {}
+    pattern = re.compile(r'(\d+)\s*[\.\-\)]\s*([A-D])', re.IGNORECASE)
+    matches = pattern.findall(text)
+    for q_num, ans in matches:
+        answers[q_num] = ans.upper()
+    
+    return answers

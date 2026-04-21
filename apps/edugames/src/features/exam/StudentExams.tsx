@@ -18,7 +18,7 @@ export const StudentExams: React.FC = () => {
       const response = await fetch("http://localhost:8000/exams/");
       if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
-      setExams(data);
+      setExams(data.filter((e: any) => e.status === "published"));
     } catch (err) {
       console.error("Error fetching exams:", err);
     } finally {

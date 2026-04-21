@@ -35,10 +35,12 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   const [timeLeft, setTimeLeft] = useState(exam.time_limit * 60);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [attemptId, setAttemptId] = useState<number | null>(null);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    startAttempt();
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -54,6 +56,18 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     };
   }, []);
 
+  const startAttempt = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/exams/${exam.id}/start`, {
+        method: "POST"
+      });
+      const data = await response.json();
+      setAttemptId(data.id);
+    } catch (err) {
+      console.error("Failed to start attempt", err);
+    }
+  };
+
   const handleAutoSubmit = () => {
     if (!isSubmitted) {
       submitExam("time_up");
@@ -61,10 +75,8 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   };
 
   const submitExam = async (status: "submitted" | "time_up" = "submitted") => {
-    if (isSubmitted) return;
+    if (isSubmitted || !attemptId) return;
     
-    // In a real app we'd create an attempt first and then submit to it
-    // Here we'll simulate the submission to the mock or specific endpoint
     const submissionData = {
       answers: Object.entries(answers).map(([qId, cId]) => ({
         question_id: parseInt(qId),
@@ -73,17 +85,24 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     };
 
     try {
-      // Mocking the attempt submission for now as we don't have the attempt ID here yet
-      // In real implementation, we'd have passed down an attempt_id
+      const response = await fetch(`http://localhost:8000/exams/attempts/${attemptId}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(submissionData)
+      });
+      const data = await response.json();
+      
       setIsSubmitted(true);
       if (timerRef.current) clearInterval(timerRef.current);
       
-      // Simulate API call and evaluation
-      const score = Math.floor(Math.random() * 100); // Mock score
+      const maxPoints = exam.questions.reduce((acc, q) => acc + (q.points || 1.0), 0);
+      const percentage = (data.score / maxPoints) * 100;
+
       setResults({
-        score,
-        total: exam.questions.length,
-        status
+        score: data.score,
+        maxPoints: maxPoints,
+        percentage: percentage.toFixed(1),
+        status: data.status
       });
     } catch (err) {
       console.error("Submission failed", err);
@@ -116,20 +135,25 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   if (isSubmitted && results) {
     return (
       <div className="fixed inset-0 z-50 bg-slate-50 flex items-center justify-center p-4 animate-fade-in">
-        <GlassCard className="max-w-md w-full text-center p-10 space-y-6">
-          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
+        <GlassCard className="max-w-md w-full text-center p-10 space-y-6 shadow-2xl">
+          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
             <CheckCircle2 size={40} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Exam Submitted!</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Exam Completed!</h2>
             <p className="text-slate-500 mt-2">
-              {results.status === "time_up" ? "Time ran out, but your answers were saved." : "You have successfully completed the exam."}
+              {results.status === "time_up" ? "Time ran out, but your answers were saved." : "Your submission has been evaluated successfully."}
             </p>
           </div>
           
-          <div className="py-6 border-y border-slate-100">
-             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Your Score</p>
-             <p className="text-5xl font-black text-blue-600 mt-2">{results.score}%</p>
+          <div className="py-6 px-4 bg-blue-50/50 rounded-3xl border border-blue-100/50">
+             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Final Results</p>
+             <div className="flex items-end justify-center gap-1">
+                <span className="text-5xl font-black text-blue-600 leading-none">{results.percentage}%</span>
+             </div>
+             <p className="text-sm font-semibold text-blue-400 mt-2">
+               Score: {results.score} / {results.maxPoints}
+             </p>
           </div>
 
           <button onClick={onClose} className="btn btn-primary w-full py-3 flex items-center justify-center gap-2">

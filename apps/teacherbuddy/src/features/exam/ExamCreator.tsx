@@ -32,6 +32,8 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
   const [randomize, setRandomize] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isMappingAnswers, setIsMappingAnswers] = useState(false);
+  const [error, setError] = useState("");
 
   const addQuestion = () => {
     setQuestions([
@@ -41,6 +43,8 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
         question_type: "mcq",
         points: 1,
         choices: [
+          { choice_text: "", is_correct: false },
+          { choice_text: "", is_correct: false },
           { choice_text: "", is_correct: false },
           { choice_text: "", is_correct: false },
         ]
@@ -93,7 +97,14 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
       });
       const data = await response.json();
       if (Array.isArray(data)) {
-        setQuestions([...questions, ...data]);
+        // Ensure all extracted questions have 4 choices if they don't
+        const formatted = data.map(q => ({
+            ...q,
+            choices: q.choices.length < 4 
+              ? [...q.choices, ...Array(4 - q.choices.length).fill(0).map(() => ({ choice_text: "", is_correct: false }))]
+              : q.choices
+        }));
+        setQuestions([...questions, ...formatted]);
       }
     } catch (err) {
       console.error("Extraction failed", err);
@@ -102,7 +113,63 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
     }
   };
 
+  const handleAnswerKeyUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || questions.length === 0) return;
+
+    setIsMappingAnswers(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("http://localhost:8000/exams/extract-answers", {
+        method: "POST",
+        body: formData,
+      });
+      const answerMap = await response.json(); // e.g. { "1": "A", "2": "C" }
+      
+      const updatedQuestions = [...questions];
+      Object.entries(answerMap).forEach(([qNum, ansChar]) => {
+          const qIdx = parseInt(qNum) - 1;
+          const choiceIdx = (ansChar as string).charCodeAt(0) - 65; // A=0, B=1, ...
+          
+          if (updatedQuestions[qIdx] && updatedQuestions[qIdx].choices[choiceIdx]) {
+              updatedQuestions[qIdx].choices.forEach((c, idx) => {
+                  c.is_correct = (idx === choiceIdx);
+              });
+          }
+      });
+      setQuestions(updatedQuestions);
+    } catch (err) {
+        console.error("Mapping failed", err);
+    } finally {
+        setIsMappingAnswers(false);
+    }
+  };
+
   const handleSubmit = () => {
+    setError("");
+    
+    if (!title.trim()) {
+        setError("Exam title is required.");
+        return;
+    }
+    
+    if (questions.length === 0) {
+        setError("Please add at least one question.");
+        return;
+    }
+    
+    // Verification: all questions must have a correct answer selected
+    const unselectedIndices = questions
+      .map((q, i) => q.choices.some(c => c.is_correct) ? -1 : i)
+      .filter(i => i !== -1);
+      
+    if (unselectedIndices.length > 0) {
+        setError(`Please select correct answers for questions: ${unselectedIndices.map(i => i + 1).join(", ")}`);
+        return;
+    }
+
     const examData = {
       title,
       description,
@@ -142,13 +209,14 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
               
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-semibold mb-1 block text-slate-600">Exam Title</label>
+                  <label className="text-xs font-semibold mb-1 block text-slate-600">Exam Title <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className="form-input text-sm" 
+                    className={`form-input text-sm ${!title && error.includes("title") ? "border-red-500" : ""}`} 
                     placeholder="e.g. Mid-Term Assessment"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
+                    required
                   />
                 </div>
                 
@@ -190,17 +258,31 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
               </div>
             </section>
 
-            <section className="p-4 rounded-2xl bg-blue-50 border border-blue-100 space-y-3">
+            <section className="p-4 rounded-2xl bg-blue-50 border border-blue-100 space-y-4">
               <h4 className="text-xs font-bold text-blue-700 flex items-center gap-2">
-                <Upload size={14} /> Quick Import
+                <Upload size={14} /> AI Smart Import
               </h4>
-              <p className="text-[10px] text-blue-600 leading-relaxed">
-                Upload a DOCX or PDF file. Our AI will automatically extract MCQs and correct answers.
+              
+              <div className="space-y-3">
+                <div>
+                    <p className="text-[10px] text-blue-600/70 mb-1.5 font-bold uppercase tracking-tight">Step 1: Upload Questions</p>
+                    <label className="btn btn-primary w-full text-xs py-2 cursor-pointer flex items-center justify-center gap-2 shadow-sm">
+                        <FileText size={12} /> {isExtracting ? "Parsing..." : "Select Question Paper"}
+                        <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleFileUpload} disabled={isExtracting} />
+                    </label>
+                </div>
+
+                <div className={questions.length === 0 ? "opacity-40 pointer-events-none" : ""}>
+                    <p className="text-[10px] text-blue-600/70 mb-1.5 font-bold uppercase tracking-tight">Step 2: Upload Answer Key</p>
+                    <label className="btn border-2 border-blue-200 text-blue-700 bg-white hover:bg-blue-50 w-full text-xs py-2 cursor-pointer flex items-center justify-center gap-2 shadow-sm">
+                        <CheckCircle2 size={12} /> {isMappingAnswers ? "Mapping..." : "Select Answer Key"}
+                        <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleAnswerKeyUpload} disabled={isMappingAnswers || questions.length === 0} />
+                    </label>
+                </div>
+              </div>
+              <p className="text-[9px] text-blue-600/60 leading-tight italic">
+                * Answer key should follow format: 1. A, 2. C...
               </p>
-              <label className="btn btn-primary w-full text-xs py-2 cursor-pointer flex items-center justify-center gap-2">
-                <Upload size={12} /> {isExtracting ? "Extracting..." : "Upload & Parse"}
-                <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleFileUpload} disabled={isExtracting} />
-              </label>
             </section>
           </div>
 
@@ -217,6 +299,13 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
                 <Plus size={14} /> Add Question
               </button>
             </div>
+
+            {error && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-100 flex items-center gap-2 text-red-600 text-xs animate-shake">
+                    <AlertCircle size={14} />
+                    <span>{error}</span>
+                </div>
+            )}
 
             {questions.length === 0 ? (
               <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 bg-slate-50/50">
@@ -261,7 +350,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
                               <input 
                                 type="text"
                                 className={`flex-1 text-xs py-2 px-3 rounded-xl border transition-all ${
-                                  choice.is_correct ? "bg-green-50/50 border-green-200 text-green-700" : "bg-slate-50 border-transparent focus:bg-white focus:border-blue-300"
+                                  choice.is_correct ? "bg-green-50/50 border-green-200 text-green-700 shadow-sm font-semibold" : "bg-slate-50 border-transparent focus:bg-white focus:border-blue-300"
                                 }`}
                                 placeholder={`Option ${String.fromCharCode(65 + ci)}`}
                                 value={choice.choice_text}
@@ -290,10 +379,10 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
           <button onClick={onClose} className="btn btn-outline px-6 py-2">Cancel</button>
           <button 
             onClick={handleSubmit}
-            className="btn btn-primary px-10 py-2 font-bold flex items-center gap-2"
-            disabled={questions.length === 0 || !title}
+            className="btn btn-primary px-10 py-2 font-bold flex items-center gap-2 shadow-lg hover:shadow-xl active:scale-95 transition-all"
+            disabled={questions.length === 0}
           >
-            <Save size={18} /> Save & Publish Exam
+            <CheckCircle2 size={18} /> Save & Publish Exam
           </button>
         </div>
       </div>
