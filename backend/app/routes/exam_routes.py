@@ -22,6 +22,10 @@ def get_db():
     finally:
         db.close()
 
+@router.get("/", response_model=List[ExamResponse])
+def get_all_exams(db: Session = Depends(get_db)):
+    return db.query(Exam).filter(Exam.status == "published").all()
+
 @router.post("/", response_model=ExamResponse)
 def create_exam(exam_data: ExamCreate, db: Session = Depends(get_db)):
     new_exam = Exam(

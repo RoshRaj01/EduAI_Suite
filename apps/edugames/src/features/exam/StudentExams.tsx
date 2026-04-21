@@ -1,17 +1,30 @@
-import React from "react";
-import { Clock, CheckCircle2, PlayCircle, AlertCircle, FileText } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Clock, PlayCircle, AlertCircle, FileText } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ExamPlayer } from "./ExamPlayer";
-import { useState } from "react";
-
-const myExams = [
-  { id: 1, title: "Neural Networks Mid-Term", course: "CSC401", date: "Apr 20, 2026", time: "10:00 AM", duration: 90, status: "upcoming" },
-  { id: 2, title: "Database Systems Quiz 1", course: "CSC220", date: "Apr 14, 2026", time: "9:00 AM", duration: 30, status: "completed", score: "28/30" },
-  { id: 3, title: "Cloud Deployment Lab", course: "CSC501", date: "Apr 16, 2026", time: "2:00 PM", duration: 120, status: "pending_review" },
-];
 
 export const StudentExams: React.FC = () => {
+  const [exams, setExams] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeExam, setActiveExam] = useState<any>(null);
+
+  useEffect(() => {
+    fetchExams();
+  }, []);
+
+  const fetchExams = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("http://localhost:8000/exams/");
+      if (!response.ok) throw new Error("Failed to fetch");
+      const data = await response.json();
+      setExams(data);
+    } catch (err) {
+      console.error("Error fetching exams:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const startExam = async (examId: number) => {
     try {
@@ -20,16 +33,6 @@ export const StudentExams: React.FC = () => {
       setActiveExam(data);
     } catch (err) {
       console.error("Failed to load exam", err);
-      // Fallback for demo
-      setActiveExam({
-        id: examId,
-        title: "Neural Networks Mid-Term",
-        time_limit: 90,
-        questions: [
-            { id: 1, question_text: "What is backpropagation?", choices: [{id: 1, choice_text: "Algorithm"}, {id: 2, choice_text: "Data"}] },
-            { id: 2, question_text: "What is ReLU?", choices: [{id: 3, choice_text: "Activation"}, {id: 4, choice_text: "Optimizer"}] }
-        ]
-      });
     }
   };
 
@@ -38,9 +41,20 @@ export const StudentExams: React.FC = () => {
        <ExamPlayer 
          exam={activeExam} 
          onClose={() => setActiveExam(null)} 
-         onComplete={() => setActiveExam(null)} 
+         onComplete={() => {
+            setActiveExam(null);
+            fetchExams(); // Refresh to show completed status if implemented
+         }} 
        />
      );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   return (
@@ -50,41 +64,59 @@ export const StudentExams: React.FC = () => {
         <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>Take online exams and view your AI-evaluated results.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {myExams.map(exam => (
-          <GlassCard key={exam.id} className="p-0 overflow-hidden flex flex-col justify-between">
-             <div className="p-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                 <div className="flex justify-between items-start mb-2">
-                    <p className="text-xs font-bold uppercase tracking-widest text-blue-500">{exam.course}</p>
-                    {exam.status === 'upcoming' && <span className="badge badge-blue text-[10px]">Upcoming</span>}
-                    {exam.status === 'completed' && <span className="badge badge-green text-[10px]">Evaluated</span>}
-                    {exam.status === 'pending_review' && <span className="badge badge-orange text-[10px]">Awaiting Marks</span>}
-                 </div>
-                 <h2 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{exam.title}</h2>
-             </div>
-             
-             <div className="p-5 flex justify-between items-center bg-black/5">
-                <div className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                   <p><Clock className="inline mr-1" size={14}/> {exam.date} at {exam.time}</p>
-                   <p className="mt-1"><FileText className="inline mr-1" size={14}/> {exam.duration} Minutes</p>
+      {exams.length === 0 ? (
+        <GlassCard className="p-12 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+              <FileText size={32} />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-700">No Exams Available</h3>
+            <p className="text-slate-500 max-w-sm mx-auto">There are currently no published exams for your courses. Check back later!</p>
+          </div>
+        </GlassCard>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {exams.map(exam => {
+            // Basic formatting for UI
+            const createdDate = new Date(exam.created_at).toLocaleDateString('en-US', { 
+                month: 'short', day: 'numeric', year: 'numeric' 
+            });
+            
+            return (
+              <GlassCard key={exam.id} className="p-0 overflow-hidden flex flex-col justify-between hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                <div className="p-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                    <div className="flex justify-between items-start mb-2">
+                        <p className="text-xs font-bold uppercase tracking-widest text-blue-500">
+                            {exam.course?.code || `COURSE-${exam.course_id}`}
+                        </p>
+                        <span className="badge badge-blue text-[10px]">Active</span>
+                    </div>
+                    <h2 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{exam.title}</h2>
+                    {exam.course?.name && (
+                        <p className="text-xs text-slate-500 mt-1">{exam.course.name}</p>
+                    )}
                 </div>
                 
-                <div className="text-right">
-                  {exam.status === 'upcoming' && (
-                    <button 
-                      onClick={() => startExam(exam.id)}
-                      className="btn btn-primary text-xs px-5 shadow-lg"
-                    >
-                      <PlayCircle size={16} className="mr-1"/> Take Exam
-                    </button>
-                  )}
-                  {exam.status === 'completed' && <div><p className="text-xs text-green-600 font-semibold mb-1">Final Score</p><p className="text-2xl font-black text-green-700">{exam.score}</p></div>}
-                  {exam.status === 'pending_review' && <p className="text-xs text-orange-600 font-semibold flex items-center"><AlertCircle size={14} className="mr-1"/> Under AI Review</p>}
+                <div className="p-5 flex justify-between items-center bg-black/[0.02]">
+                    <div className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                      <p><Clock className="inline mr-1" size={14}/> Released: {createdDate}</p>
+                      <p className="mt-1"><FileText className="inline mr-1" size={14}/> {exam.time_limit} Minutes</p>
+                    </div>
+                    
+                    <div className="text-right">
+                      <button 
+                        onClick={() => startExam(exam.id)}
+                        className="btn btn-primary text-xs px-5 shadow-md flex items-center"
+                      >
+                        <PlayCircle size={16} className="mr-1"/> Take Exam
+                      </button>
+                    </div>
                 </div>
-             </div>
-          </GlassCard>
-        ))}
-      </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

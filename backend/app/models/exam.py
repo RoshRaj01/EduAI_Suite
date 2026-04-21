@@ -17,6 +17,7 @@ class Exam(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
+    course = relationship("app.models.course.Course")
     questions = relationship("ExamQuestion", back_populates="exam", cascade="all, delete-orphan")
     attempts = relationship("ExamAttempt", back_populates="exam", cascade="all, delete-orphan")
 

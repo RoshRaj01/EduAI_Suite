@@ -24,6 +24,19 @@ with engine.begin() as connection:
     if "course_plan_path" not in course_columns:
         connection.execute(text("ALTER TABLE courses ADD COLUMN course_plan_path VARCHAR"))
 
+    # Exam tables auto-migrations
+    exam_columns = {column["name"] for column in inspector.get_columns("exams")}
+    if "attempts_allowed" not in exam_columns:
+        connection.execute(text("ALTER TABLE exams ADD COLUMN attempts_allowed INTEGER DEFAULT 1"))
+    if "status" not in exam_columns:
+        connection.execute(text("ALTER TABLE exams ADD COLUMN status VARCHAR DEFAULT 'draft'"))
+
+    question_columns = {column["name"] for column in inspector.get_columns("exam_questions")}
+    if "question_type" not in question_columns:
+        connection.execute(text("ALTER TABLE exam_questions ADD COLUMN question_type VARCHAR DEFAULT 'mcq'"))
+    if "order" not in question_columns:
+        connection.execute(text("ALTER TABLE exam_questions ADD COLUMN \"order\" INTEGER DEFAULT 0"))
+
 app = FastAPI()
 
 app.add_middleware(

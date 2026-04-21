@@ -38,10 +38,18 @@ class ExamCreate(ExamBase):
     course_id: int
     questions: List[ExamQuestionCreate]
 
+class CourseBrief(BaseModel):
+    id: int
+    name: str
+    code: str
+    class Config:
+        from_attributes = True
+
 class ExamResponse(ExamBase):
     id: int
     course_id: int
     created_at: datetime
+    course: Optional[CourseBrief] = None
     questions: List[ExamQuestionResponse]
     class Config:
         from_attributes = True
