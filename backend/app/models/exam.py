@@ -34,6 +34,7 @@ class ExamQuestion(Base):
     # Relationships
     exam = relationship("Exam", back_populates="questions")
     choices = relationship("ExamChoice", back_populates="question", cascade="all, delete-orphan")
+    answers = relationship("ExamAnswer", back_populates="question", cascade="all, delete-orphan")
 
 class ExamChoice(Base):
     __tablename__ = "exam_choices"
@@ -71,3 +72,4 @@ class ExamAnswer(Base):
 
     # Relationships
     attempt = relationship("ExamAttempt", back_populates="answers")
+    question = relationship("ExamQuestion", back_populates="answers")

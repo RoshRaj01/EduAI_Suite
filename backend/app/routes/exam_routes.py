@@ -50,8 +50,7 @@ def create_exam(exam_data: ExamCreate, db: Session = Depends(get_db)):
             order=q_data.order or i
         )
         db.add(new_question)
-        db.commit()
-        db.refresh(new_question)
+        db.flush() # Ensures the question ID is generated for the choices
 
         for choice_data in q_data.choices:
             new_choice = ExamChoice(
@@ -238,10 +237,8 @@ def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_d
     db_exam.status = exam_data.status
     db_exam.course_id = exam_data.course_id
     
-    # For questions/choices, we'll do a simple "delete and recreate" for consistency
-    # unless we want to map IDs, which is more complex.
-    # First, delete existing questions
-    db.query(ExamQuestion).filter(ExamQuestion.exam_id == exam_id).delete()
+    # Clear existing questions (cascade="all, delete-orphan" handles the record deletion)
+    db_exam.questions = []
     db.commit()
 
     # Re-add new ones
@@ -254,8 +251,7 @@ def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_d
             order=q_data.order or i
         )
         db.add(new_question)
-        db.commit()
-        db.refresh(new_question)
+        db.flush()
 
         for choice_data in q_data.choices:
             new_choice = ExamChoice(

@@ -15,15 +15,40 @@ export const AuthPage: React.FC = () => {
   const { setRole } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    
+    if (mode === "forgot") {
+      setTimeout(() => {
+        setLoading(false);
+        setDone(true);
+      }, 1500);
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:8000/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        localStorage.setItem("token", data.access_token);
+        localStorage.setItem("user", JSON.stringify(data));
+        setRole("student");
+        navigate("/");
+      } else {
+        alert(data.detail || "Invalid credentials");
+      }
+    } catch (err) {
+      console.error("Login failed", err);
+      alert("Failed to connect to authentication server.");
+    } finally {
       setLoading(false);
-      if (mode === "forgot") { setDone(true); return; }
-      setRole("student");
-      navigate("/");
-    }, 1800);
+    }
   };
 
   return (

@@ -30,6 +30,7 @@ interface ExamPlayerProps {
 }
 
 export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClose }) => {
+  const [displayQuestions, setDisplayQuestions] = useState<Question[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [timeLeft, setTimeLeft] = useState(exam.time_limit * 60);
@@ -39,8 +40,32 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Helper to shuffle array
+  const shuffle = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
   useEffect(() => {
+    // Randomize questions and choices if needed
+    let processedQuestions = [...exam.questions];
+    if (exam.randomize_questions) {
+      processedQuestions = shuffle(processedQuestions);
+    }
+    
+    // Always randomize choices for better integrity
+    processedQuestions = processedQuestions.map(q => ({
+      ...q,
+      choices: shuffle(q.choices)
+    }));
+
+    setDisplayQuestions(processedQuestions);
     startAttempt();
+
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -58,9 +83,14 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
 
   const startAttempt = async () => {
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(`http://localhost:8000/exams/${exam.id}/start`, {
-        method: "POST"
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
       });
+      if (!response.ok) throw new Error("Failed to start attempt");
       const data = await response.json();
       setAttemptId(data.id);
     } catch (err) {
@@ -77,6 +107,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   const submitExam = async (status: "submitted" | "time_up" = "submitted") => {
     if (isSubmitted || !attemptId) return;
     
+    const token = localStorage.getItem("token");
     const submissionData = {
       answers: Object.entries(answers).map(([qId, cId]) => ({
         question_id: parseInt(qId),
@@ -87,7 +118,10 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     try {
       const response = await fetch(`http://localhost:8000/exams/attempts/${attemptId}/submit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(submissionData)
       });
       const data = await response.json();
@@ -115,7 +149,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  if (!exam || !exam.questions || exam.questions.length === 0) {
+  if (!exam || !displayQuestions || displayQuestions.length === 0) {
     return (
       <div className="fixed inset-0 z-50 bg-white flex items-center justify-center p-6">
         <GlassCard className="max-w-md w-full text-center p-8 space-y-4">
@@ -128,8 +162,8 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     );
   }
 
-  const currentQuestion = exam.questions[currentIdx];
-  const progress = ((currentIdx + 1) / exam.questions.length) * 100;
+  const currentQuestion = displayQuestions[currentIdx];
+  const progress = ((currentIdx + 1) / displayQuestions.length) * 100;
   const timerColor = timeLeft < 300 ? "text-red-500 animate-pulse" : "text-blue-600";
 
   if (isSubmitted && results) {
@@ -187,7 +221,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
           {/* Progress */}
           <div className="space-y-2">
              <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
-                <span>Question {currentIdx + 1} of {exam.questions.length}</span>
+                <span>Question {currentIdx + 1} of {displayQuestions.length}</span>
                 <span>{Math.round(progress)}% Complete</span>
              </div>
              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
@@ -236,7 +270,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
                 <ChevronLeft size={18} /> Previous
              </button>
 
-             {currentIdx === exam.questions.length - 1 ? (
+             {currentIdx === displayQuestions.length - 1 ? (
                <button 
                  onClick={() => submitExam()}
                  className="btn btn-primary px-10 py-2.5 flex items-center gap-2 font-bold shadow-lg"

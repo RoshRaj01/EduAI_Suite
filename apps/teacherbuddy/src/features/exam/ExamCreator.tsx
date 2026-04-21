@@ -20,7 +20,7 @@ interface Question {
 
 interface ExamCreatorProps {
   onClose: () => void;
-  onSave: (examData: any) => void;
+  onSave: (examData: any) => Promise<boolean>;
   initialData?: any;
 }
 
@@ -34,6 +34,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
   const [questions, setQuestions] = useState<Question[]>(initialData?.questions || []);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isMappingAnswers, setIsMappingAnswers] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
   const addQuestion = () => {
@@ -92,8 +93,10 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
     formData.append("file", file);
 
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8000/exams/extract", {
         method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
         body: formData,
       });
       const data = await response.json();
@@ -123,8 +126,10 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
     formData.append("file", file);
 
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8000/exams/extract-answers", {
         method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
         body: formData,
       });
       const answerMap = await response.json(); // e.g. { "1": "A", "2": "C" }
@@ -181,7 +186,15 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
       status: "published",
       questions
     };
-    onSave(examData);
+    
+    setIsSaving(true);
+    onSave(examData).then(success => {
+        if (!success) {
+            setError("Failed to save the exam. Please try again.");
+            setIsSaving(false);
+        }
+        // If success, ExamsPage will close us.
+    });
   };
 
   return (
@@ -382,10 +395,19 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
           <button onClick={onClose} className="btn btn-outline px-6 py-2">Cancel</button>
           <button 
             onClick={handleSubmit}
-            className="btn btn-primary px-10 py-2 font-bold flex items-center gap-2 shadow-lg hover:shadow-xl active:scale-95 transition-all"
-            disabled={questions.length === 0}
+            className={`btn btn-primary px-10 py-2 font-bold flex items-center gap-2 shadow-lg hover:shadow-xl active:scale-95 transition-all ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}
+            disabled={questions.length === 0 || isSaving}
           >
-            <CheckCircle2 size={18} /> Save & Publish Exam
+            {isSaving ? (
+                <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Saving Exam...
+                </>
+            ) : (
+                <>
+                    <CheckCircle2 size={18} /> Save & Publish Exam
+                </>
+            )}
           </button>
         </div>
       </div>

@@ -31,7 +31,10 @@ export const ExamsPage: React.FC = () => {
   const fetchExams = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:8000/exams/");
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:8000/exams/", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
       if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
       setExamsList(data);
@@ -51,26 +54,34 @@ export const ExamsPage: React.FC = () => {
         ? `http://localhost:8000/exams/${editingExam.id}`
         : "http://localhost:8000/exams/";
       
+      const token = localStorage.getItem("token");
       const response = await fetch(url, {
         method: editingExam ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` 
+        },
         body: JSON.stringify(examData),
       });
       if (response.ok) {
         setShowCreator(false);
         setEditingExam(null);
         fetchExams();
+        return true;
       }
     } catch (err) {
       console.error("Save failed", err);
     }
+    return false;
   };
 
   const handleDeleteExam = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this exam? This action cannot be undone.")) return;
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(`http://localhost:8000/exams/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
       });
       if (response.ok) {
         setExamsList(prev => prev.filter(e => e.id !== id));
