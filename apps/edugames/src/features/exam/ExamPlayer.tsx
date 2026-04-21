@@ -8,18 +8,24 @@ import { GlassCard } from "../../shared/components/GlassCard";
 interface Choice {
   id: number;
   choice_text: string;
+  is_correct?: boolean;
 }
 
 interface Question {
   id: number;
   question_text: string;
+  question_type: string;
+  points: number;
+  order: number;
   choices: Choice[];
 }
 
 interface Exam {
   id: number;
   title: string;
+  description?: string;
   time_limit: number;
+  randomize_questions: boolean;
   questions: Question[];
 }
 
@@ -129,7 +135,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
       setIsSubmitted(true);
       if (timerRef.current) clearInterval(timerRef.current);
       
-      const maxPoints = exam.questions.reduce((acc, q) => acc + (q.points || 1.0), 0);
+      const maxPoints = displayQuestions.reduce((acc, q) => acc + (q.points || 1.0), 0);
       const percentage = (data.score / maxPoints) * 100;
 
       setResults({

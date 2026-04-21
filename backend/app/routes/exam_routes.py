@@ -239,7 +239,6 @@ def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_d
     
     # Clear existing questions (cascade="all, delete-orphan" handles the record deletion)
     db_exam.questions = []
-    db.commit()
 
     # Re-add new ones
     for i, q_data in enumerate(exam_data.questions):
@@ -250,7 +249,7 @@ def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_d
             points=q_data.points,
             order=q_data.order or i
         )
-        db.add(new_question)
+        db_exam.questions.append(new_question)
         db.flush()
 
         for choice_data in q_data.choices:

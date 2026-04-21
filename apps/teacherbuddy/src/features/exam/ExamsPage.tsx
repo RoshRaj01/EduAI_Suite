@@ -21,6 +21,7 @@ export const ExamsPage: React.FC = () => {
   const [selectedExam, setSelectedExam] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "take" | "review">("overview");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showCreator, setShowCreator] = useState(false);
   const [editingExam, setEditingExam] = useState<any>(null);
 
@@ -31,18 +32,21 @@ export const ExamsPage: React.FC = () => {
   const fetchExams = async () => {
     try {
       setLoading(true);
+      setError("");
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8000/exams/", {
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { "Authorization": `Bearer ${token}` },
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       });
-      if (!response.ok) throw new Error("Failed to fetch");
+      if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
       const data = await response.json();
       setExamsList(data);
       if (data.length > 0 && !selectedExam) {
         setSelectedExam(data[0]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching exams:", err);
+      setError(err.name === 'TimeoutError' ? "Request timed out. Is the backend running?" : "Failed to load exams. Please refresh.");
     } finally {
       setLoading(false);
     }
@@ -146,7 +150,16 @@ export const ExamsPage: React.FC = () => {
         {/* Exam List */}
         <div className="space-y-3">
           {loading ? (
-            <div className="p-10 text-center text-slate-400">Loading exams...</div>
+            <div className="p-10 text-center text-slate-400">
+               <div className="w-8 h-8 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
+               Loading exams...
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center bg-red-50 rounded-2xl border border-red-100">
+               <AlertCircle size={24} className="text-red-500 mx-auto mb-2" />
+               <p className="text-sm font-semibold text-red-600">{error}</p>
+               <button onClick={fetchExams} className="btn bg-white border-red-200 text-red-600 text-xs mt-3 px-4 py-1.5 hover:bg-red-100">Try Again</button>
+            </div>
           ) : examsList.length === 0 ? (
             <div className="p-10 text-center text-slate-400">No exams found.</div>
           ) : (
