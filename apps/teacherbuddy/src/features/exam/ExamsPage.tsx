@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   ClipboardList, Clock, Users, Plus, CheckCircle2, AlertCircle,
   Play, ChevronRight, BrainCircuit, Eye, Check, X, Timer,
-  FileText, Layers,
+  FileText, Layers, Trash2, Settings,
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ExamCreator } from "./ExamCreator";
@@ -22,6 +22,7 @@ export const ExamsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"overview" | "take" | "review">("overview");
   const [loading, setLoading] = useState(true);
   const [showCreator, setShowCreator] = useState(false);
+  const [editingExam, setEditingExam] = useState<any>(null);
 
   useEffect(() => {
     fetchExams();
@@ -46,18 +47,43 @@ export const ExamsPage: React.FC = () => {
 
   const handleSaveExam = async (examData: any) => {
     try {
-      const response = await fetch("http://localhost:8000/exams/", {
-        method: "POST",
+      const url = editingExam 
+        ? `http://localhost:8000/exams/${editingExam.id}`
+        : "http://localhost:8000/exams/";
+      
+      const response = await fetch(url, {
+        method: editingExam ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(examData),
       });
       if (response.ok) {
         setShowCreator(false);
+        setEditingExam(null);
         fetchExams();
       }
     } catch (err) {
       console.error("Save failed", err);
     }
+  };
+
+  const handleDeleteExam = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this exam? This action cannot be undone.")) return;
+    try {
+      const response = await fetch(`http://localhost:8000/exams/${id}`, {
+        method: "DELETE"
+      });
+      if (response.ok) {
+        setExamsList(prev => prev.filter(e => e.id !== id));
+        if (selectedExam?.id === id) setSelectedExam(null);
+      }
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
+  };
+
+  const openEditCreator = (exam: any) => {
+      setEditingExam(exam);
+      setShowCreator(true);
   };
 
   return (
@@ -71,15 +97,16 @@ export const ExamsPage: React.FC = () => {
             Create, manage, review AI evaluations, track student submissions.
           </p>
         </div>
-        <button onClick={() => setShowCreator(true)} className="btn btn-primary text-sm">
+        <button onClick={() => { setEditingExam(null); setShowCreator(true); }} className="btn btn-primary text-sm">
           <Plus size={15} /> Create Exam
         </button>
       </div>
 
       {showCreator && (
         <ExamCreator 
-          onClose={() => setShowCreator(false)} 
+          onClose={() => { setShowCreator(false); setEditingExam(null); }} 
           onSave={handleSaveExam}
+          initialData={editingExam}
         />
       )}
 
@@ -161,9 +188,27 @@ export const ExamsPage: React.FC = () => {
                     <h2 className="text-lg font-bold">{selectedExam.title}</h2>
                     <p className="text-white/70 text-sm mt-1">Created: {new Date(selectedExam.created_at).toLocaleDateString()}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-black">{selectedExam.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 0}</p>
-                    <p className="text-white/60 text-xs">Total Marks</p>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="text-right">
+                        <p className="text-3xl font-black">{selectedExam.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 0}</p>
+                        <p className="text-white/60 text-xs">Total Marks</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => openEditCreator(selectedExam)}
+                            className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white"
+                            title="Edit Exam"
+                        >
+                            <Settings size={14} />
+                        </button>
+                        <button 
+                            onClick={() => handleDeleteExam(selectedExam.id)}
+                            className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-lg transition-colors text-white"
+                            title="Delete Exam"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-6 mt-4 pt-4 border-t border-white/15 text-xs text-white/75">

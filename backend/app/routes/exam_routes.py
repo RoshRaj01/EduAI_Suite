@@ -210,3 +210,61 @@ async def extract_exam_answers(file: UploadFile = File(...)):
         answers[q_num] = ans.upper()
     
     return answers
+
+@router.delete("/{exam_id}")
+def delete_exam(exam_id: int, db: Session = Depends(get_db)):
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Cascade delete is usually handled by models, but we'll be explicit if needed
+    # ExamAttempt and related answers will be orphaned or deleted based on FK config.
+    db.delete(exam)
+    db.commit()
+    return {"message": "Exam deleted successfully"}
+
+@router.put("/{exam_id}", response_model=ExamResponse)
+def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_db)):
+    db_exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not db_exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    # Update main fields
+    db_exam.title = exam_data.title
+    db_exam.description = exam_data.description
+    db_exam.time_limit = exam_data.time_limit
+    db_exam.attempts_allowed = exam_data.attempts_allowed
+    db_exam.randomize_questions = exam_data.randomize_questions
+    db_exam.status = exam_data.status
+    db_exam.course_id = exam_data.course_id
+    
+    # For questions/choices, we'll do a simple "delete and recreate" for consistency
+    # unless we want to map IDs, which is more complex.
+    # First, delete existing questions
+    db.query(ExamQuestion).filter(ExamQuestion.exam_id == exam_id).delete()
+    db.commit()
+
+    # Re-add new ones
+    for i, q_data in enumerate(exam_data.questions):
+        new_question = ExamQuestion(
+            exam_id=db_exam.id,
+            question_text=q_data.question_text,
+            question_type=q_data.question_type,
+            points=q_data.points,
+            order=q_data.order or i
+        )
+        db.add(new_question)
+        db.commit()
+        db.refresh(new_question)
+
+        for choice_data in q_data.choices:
+            new_choice = ExamChoice(
+                question_id=new_question.id,
+                choice_text=choice_data.choice_text,
+                is_correct=choice_data.is_correct
+            )
+            db.add(new_choice)
+    
+    db.commit()
+    db.refresh(db_exam)
+    return db_exam

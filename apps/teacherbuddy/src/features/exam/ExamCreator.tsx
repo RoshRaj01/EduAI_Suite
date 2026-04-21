@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { 
   X, Plus, Trash2, Upload, FileText, Settings, 
   CheckCircle2, BrainCircuit, ListOrdered, Shuffle,
-  HelpCircle, ChevronDown, ChevronUp, Save
+  HelpCircle, ChevronDown, ChevronUp, Save, AlertCircle
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
@@ -21,16 +21,17 @@ interface Question {
 interface ExamCreatorProps {
   onClose: () => void;
   onSave: (examData: any) => void;
+  initialData?: any;
 }
 
-export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [courseId, setCourseId] = useState(1);
-  const [timeLimit, setTimeLimit] = useState(60);
-  const [attempts, setAttempts] = useState(1);
-  const [randomize, setRandomize] = useState(false);
-  const [questions, setQuestions] = useState<Question[]>([]);
+export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initialData }) => {
+  const [title, setTitle] = useState(initialData?.title || "");
+  const [description, setDescription] = useState(initialData?.description || "");
+  const [courseId, setCourseId] = useState(initialData?.course_id || 1);
+  const [timeLimit, setTimeLimit] = useState(initialData?.time_limit || 60);
+  const [attempts, setAttempts] = useState(initialData?.attempts_allowed || 1);
+  const [randomize, setRandomize] = useState(initialData?.randomize_questions || false);
+  const [questions, setQuestions] = useState<Question[]>(initialData?.questions || []);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isMappingAnswers, setIsMappingAnswers] = useState(false);
   const [error, setError] = useState("");
@@ -190,9 +191,11 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave }) => 
         <div className="p-6 border-b flex items-center justify-between bg-slate-50">
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: "var(--color-brand-blue)" }}>
-              <BrainCircuit size={22} /> Create New Online Exam
+              <BrainCircuit size={22} /> {initialData ? "Edit Online Exam" : "Create New Online Exam"}
             </h2>
-            <p className="text-sm text-slate-500">Configure exam settings and add questions manually or via upload.</p>
+            <p className="text-sm text-slate-500">
+              {initialData ? "Update the exam settings and questions below." : "Configure exam settings and add questions manually or via upload."}
+            </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
             <X size={20} />
