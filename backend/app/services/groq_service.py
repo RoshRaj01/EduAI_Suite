@@ -9,11 +9,17 @@ from groq import Groq
 
 logger = logging.getLogger(__name__)
 
-# Load from environment
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-DEFAULT_MODEL = "mixtral-8x7b-32768"
+# Get from environment at runtime
+# List of models in fallback order (newer models first, older as fallback)
+AVAILABLE_MODELS = [
+    "llama-3.3-70b-versatile",  # Current working model
+    "llama-3.1-70b-versatile",  # Alternative
+    "llama-3.1-8b-instant",     # Faster alternative
+]
 
-logger.info(f"Groq service configured with model: {DEFAULT_MODEL}")
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
+
+logger.info(f"Groq service configured with default model: {DEFAULT_MODEL}")
 
 
 class LocalWordValidator:
@@ -74,12 +80,13 @@ class GroqService:
         logger.info("="*60)
         logger.info(f"Model: {DEFAULT_MODEL}")
 
-        if not GROQ_API_KEY:
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        if not groq_api_key:
             logger.error("❌ GROQ_API_KEY not set in environment")
             cls._available = False
         else:
             try:
-                cls._client = Groq(api_key=GROQ_API_KEY)
+                cls._client = Groq(api_key=groq_api_key)
                 cls._available = cls.is_groq_available()
                 if cls._available:
                     logger.info(f"✅ Groq Connected and Ready")
@@ -128,19 +135,41 @@ These words will be used in a word chain game starting with "{starting_word}".
 For a {chain_variation} chain game.
 Return ONLY the words, one per line, no numbering, no explanations, no extra text."""
 
-            message = GroqService._client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                model=DEFAULT_MODEL,
-                temperature=0.7,
-                max_tokens=200,
-            )
-
-            generated_text = message.choices[0].message.content
+            try:
+                message = GroqService._client.chat.completions.create(
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    model=DEFAULT_MODEL,
+                    temperature=0.7,
+                    max_tokens=200,
+                )
+                generated_text = message.choices[0].message.content
+            except Exception as e:
+                if "decommissioned" in str(e).lower() or "model" in str(e).lower():
+                    logger.warning(f"Model {DEFAULT_MODEL} not available, trying alternative models")
+                    # Try alternative models
+                    for alt_model in AVAILABLE_MODELS[1:]:
+                        try:
+                            message = GroqService._client.chat.completions.create(
+                                messages=[{"role": "user", "content": prompt}],
+                                model=alt_model,
+                                temperature=0.7,
+                                max_tokens=200,
+                            )
+                            generated_text = message.choices[0].message.content
+                            logger.info(f"Successfully used alternative model: {alt_model}")
+                            break
+                        except Exception:
+                            continue
+                    else:
+                        logger.error("All models failed")
+                        return []
+                else:
+                    raise
 
             # Parse words from response
             words = [w.strip().lower()
@@ -190,19 +219,39 @@ Chain so far: {chain_summary}
 
 Answer with ONLY "yes" or "no", followed by a brief reason (max 10 words)."""
 
-            message = GroqService._client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                model=DEFAULT_MODEL,
-                temperature=0.3,
-                max_tokens=50,
-            )
-
-            generated_text = message.choices[0].message.content.lower().strip()
+            try:
+                message = GroqService._client.chat.completions.create(
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    model=DEFAULT_MODEL,
+                    temperature=0.3,
+                    max_tokens=50,
+                )
+                generated_text = message.choices[0].message.content.lower().strip()
+            except Exception as e:
+                if "decommissioned" in str(e).lower() or "model" in str(e).lower():
+                    logger.warning(f"Model {DEFAULT_MODEL} not available, trying alternative")
+                    # Try alternative models
+                    for alt_model in AVAILABLE_MODELS[1:]:
+                        try:
+                            message = GroqService._client.chat.completions.create(
+                                messages=[{"role": "user", "content": prompt}],
+                                model=alt_model,
+                                temperature=0.3,
+                                max_tokens=50,
+                            )
+                            generated_text = message.choices[0].message.content.lower().strip()
+                            break
+                        except Exception:
+                            continue
+                    else:
+                        return False, "Service unavailable"
+                else:
+                    raise
 
             # Parse yes/no answer
             is_valid = generated_text.startswith("yes")
