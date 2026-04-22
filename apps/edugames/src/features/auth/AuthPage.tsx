@@ -37,8 +37,10 @@ export const AuthPage: React.FC = () => {
       const data = await response.json();
       if (response.ok) {
         localStorage.setItem("token", data.access_token);
-        localStorage.setItem("user", JSON.stringify(data));
-        setRole("student");
+        // Decode token to get user details (name, email, etc.)
+        const payload = JSON.parse(atob(data.access_token.split(".")[1]));
+        localStorage.setItem("user", JSON.stringify(payload));
+        setRole(payload.role || "student");
         navigate("/");
       } else {
         alert(data.detail || "Invalid credentials");

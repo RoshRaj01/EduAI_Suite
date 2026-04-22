@@ -16,8 +16,13 @@ import {
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
+const get_user = () => {
+  const storedUser = localStorage.getItem("user");
+  return storedUser ? JSON.parse(storedUser) : null;
+};
+
 const API_URL = "http://localhost:8000";
-const CURRENT_STUDENT = "Aarav S.";
+const CURRENT_STUDENT = get_user()?.name || "Student";
 
 type AppointmentMode = "In-person" | "Online";
 type AppointmentStatus = "pending" | "approved" | "rejected";
@@ -175,7 +180,7 @@ export const AppointmentBookingPage: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           student_name: CURRENT_STUDENT,
-          student_email: "aarav.s@christuniversity.in",
+          student_email: get_user()?.sub || "student@christuniversity.in",
           teacher_name: selectedTeacher.teacher_name,
           meeting_mode: mode,
           time_slot: `${preferredDate} ${preferredTime}`.trim(),

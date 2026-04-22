@@ -17,12 +17,22 @@ export const StudentShell: React.FC = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const { logout, role } = useAuthStore();
   const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    if (!role) navigate("/login");
+    if (!role) {
+      navigate("/login");
+    } else {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) setUser(JSON.parse(storedUser));
+    }
   }, [role, navigate]);
 
   if (!role) return null;
+
+  const initials = user?.name 
+    ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+    : "ST";
 
   return (
     <div className="flex min-h-screen" style={{ background: "var(--color-surface-base)" }}>
@@ -82,10 +92,10 @@ export const StudentShell: React.FC = () => {
                  className="flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full transition-all hover:bg-slate-100 border border-slate-200/80"
                >
                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow bg-emerald-500">
-                     AS
+                     {initials}
                  </div>
                  <div className="hidden md:block text-left">
-                   <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>Aarav S.</p>
+                   <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "Student"}</p>
                    <p className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>Student</p>
                  </div>
                </button>
@@ -93,8 +103,8 @@ export const StudentShell: React.FC = () => {
                {profileOpen && (
                  <div className="glass-card absolute right-0 top-12 w-52 z-50 overflow-hidden animate-fade-in py-1">
                    <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                     <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Aarav S.</p>
-                     <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>aarav.s@christuniversity.in</p>
+                     <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "Student"}</p>
+                     <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{user?.sub || "student@christuniversity.in"}</p>
                      <span className="badge mt-2" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>Student</span>
                    </div>
                    {["View Profile", "Settings"].map(item => (
