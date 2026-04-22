@@ -10,6 +10,7 @@ import { loadChainAnswerPlayerSession } from "./chainAnswerPlayerSession";
 import type { ChainVariation } from "./types";
 import { motion } from "framer-motion";
 import { Play, Users, Lock, Loader, Check } from "lucide-react";
+import { gameAPI } from "../../shared/utils/gameAPI";
 
 export const ChainAnswerGamePage: React.FC = () => {
   try {
@@ -96,10 +97,10 @@ export const ChainAnswerGamePage: React.FC = () => {
     const activeSessionId = urlSessionId || joinedSessionId;
     const hasStudentIdentity = Boolean(
       activeSessionId &&
-        joinedSessionId === activeSessionId &&
-        joinedGameId !== null &&
-        joinedPlayerId &&
-        joinedPlayerName,
+      joinedSessionId === activeSessionId &&
+      joinedGameId !== null &&
+      joinedPlayerId &&
+      joinedPlayerName,
     );
 
     const handleStudentJoined = (session: {

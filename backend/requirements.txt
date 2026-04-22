@@ -10,3 +10,4 @@ python-docx
 python-dotenv
 email-validator
 httpx
+groq

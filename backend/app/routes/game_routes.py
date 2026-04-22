@@ -11,7 +11,7 @@ from app.schemas.game import (
     GameWordCreate,
     GameWordResponse,
 )
-from app.services.ollama_service import OllamaService, OLLAMA_BASE_URL, DEFAULT_MODEL
+from app.services.groq_service import GroqService
 from datetime import datetime
 import uuid
 import json
@@ -39,10 +39,10 @@ def create_chain_answer_game(
     # Generate unique session ID
     session_id = f"game_{uuid.uuid4().hex[:8]}"
 
-    # Generate word suggestions from Ollama if subject is provided
-    ollama_suggestions = None
+    # Generate word suggestions from Groq if subject is provided
+    groq_suggestions = None
     if game_data.subject:
-        suggestions = OllamaService.generate_word_suggestions(
+        suggestions = GroqService.generate_word_suggestions(
             subject=game_data.subject,
             difficulty=game_data.difficulty_level,
             count=5,
@@ -50,7 +50,7 @@ def create_chain_answer_game(
             starting_word=game_data.starting_word
         )
         if suggestions:
-            ollama_suggestions = json.dumps(suggestions)
+            groq_suggestions = json.dumps(suggestions)
 
     # Create the game
     new_game = ChainAnswerGame(
@@ -66,7 +66,7 @@ def create_chain_answer_game(
         max_words=game_data.max_words,
         penalty_on_invalid=game_data.penalty_on_invalid,
         penalty_type=game_data.penalty_type,
-        ollama_suggestions=ollama_suggestions,
+        ollama_suggestions=groq_suggestions,
         status="setup"
     )
 
@@ -78,13 +78,13 @@ def create_chain_answer_game(
         student = db.query(Student).filter(
             Student.id == player_data.student_id
         ).first()
-        
+
         if not student:
             raise HTTPException(
                 status_code=404,
                 detail=f"Student with ID {player_data.student_id} not found"
             )
-        
+
         new_player = ChainAnswerGamePlayer(
             game_id=new_game.id,
             student_id=str(student.id),
@@ -353,54 +353,28 @@ def resume_chain_answer_game(
     return game
 
 
-# Ollama status check
-@router.get("/chain-answer/status/ollama")
-def get_ollama_status():
-    """Check Ollama service availability"""
-    is_available = OllamaService.is_ollama_available()
-    models = OllamaService.get_available_models() if is_available else []
+# Groq status check
+@router.get("/chain-answer/status/groq")
+def get_groq_status():
+    """Check Groq service availability"""
+    is_available = GroqService.is_groq_available()
 
     return {
-        "ollama_available": is_available,
-        "endpoint": OLLAMA_BASE_URL,
-        "available_models": models,
-        "default_model": DEFAULT_MODEL,
-        "message": "Ollama service is running" if is_available else "Ollama service is not available"
+        "groq_available": is_available,
+        "service": "Groq Cloud API",
+        "message": "Groq service is running" if is_available else "Groq service is not available"
     }
 
 
-# Ollama debug endpoint - test connectivity
-@router.get("/chain-answer/debug/ollama")
-def debug_ollama():
-    """Debug Ollama connectivity - detailed diagnostics"""
-    import httpx
+# Groq debug endpoint - test connectivity
+@router.get("/chain-answer/debug/groq")
+def debug_groq():
+    """Debug Groq connectivity - detailed diagnostics"""
 
     debug_info = {
-        "endpoint": OLLAMA_BASE_URL,
-        "endpoints_to_try": [
-            "http://localhost:11434",
-            "http://127.0.0.1:11434",
-            "http://host.docker.internal:11434",  # For Docker on Windows
-        ],
-        "tests": {}
+        "service": "Groq Cloud API",
+        "available": GroqService.is_groq_available(),
+        "model": "mixtral-8x7b-32768"
     }
-
-    for endpoint in debug_info["endpoints_to_try"]:
-        try:
-            response = httpx.get(f"{endpoint}/api/tags", timeout=10.0)
-            debug_info["tests"][endpoint] = {
-                "reachable": True,
-                "status_code": response.status_code,
-                "models": response.json().get("models", []) if response.status_code == 200 else []
-            }
-        except Exception as e:
-            debug_info["tests"][endpoint] = {
-                "reachable": False,
-                "error": str(e)
-            }
-
-    # Primary endpoint test
-    debug_info["primary_endpoint_available"] = OllamaService.is_ollama_available()
-    debug_info["available_models"] = OllamaService.get_available_models()
 
     return debug_info

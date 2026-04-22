@@ -35,7 +35,8 @@ export const useGameSync = ({
   // Connect to WebSocket
   const connectWebSocket = useCallback(() => {
     try {
-      const backendUrl = new URL(API_BASE_URL);
+      const cleanUrl = API_BASE_URL.trim();
+      const backendUrl = new URL(cleanUrl);
       const wsProtocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${wsProtocol}//${backendUrl.host}/ws/games/chain-answer/${sessionId}?user_type=${userType}`;
 
@@ -63,13 +64,14 @@ export const useGameSync = ({
           if (message.type === "initial_state") {
             const chain = message.chain || [];
             const players = message.players || [];
-            
+
             // Calculate current player index based on last word in chain
             let currentPlayerIndex = 0;
             if (chain.length > 0) {
               const lastWord = chain[chain.length - 1];
               const lastPlayerIndex = players.findIndex(
-                (p: any) => String(p.student_id) === String(lastWord.submitted_by)
+                (p: any) =>
+                  String(p.student_id) === String(lastWord.submitted_by),
               );
               if (lastPlayerIndex !== -1) {
                 currentPlayerIndex = (lastPlayerIndex + 1) % players.length;
@@ -89,17 +91,22 @@ export const useGameSync = ({
             setGameState((prev) => {
               if (!prev) return null;
               const newWords = [...(prev.words || []), message.word];
-              
+
               // Calculate next player index
               const lastPlayerIndex = prev.players.findIndex(
-                (p: any) => String(p.client_id || p.student_id) === String(message.word.submitted_by)
+                (p: any) =>
+                  String(p.client_id || p.student_id) ===
+                  String(message.word.submitted_by),
               );
-              const nextPlayerIndex = lastPlayerIndex !== -1 
-                ? (lastPlayerIndex + 1) % prev.players.length 
-                : (prev.currentPlayerIndex || 0);
+              const nextPlayerIndex =
+                lastPlayerIndex !== -1
+                  ? (lastPlayerIndex + 1) % prev.players.length
+                  : prev.currentPlayerIndex || 0;
 
               const newPlayers = prev.players.map((p: any) => {
-                if (String(p.student_id) === String(message.word.submitted_by)) {
+                if (
+                  String(p.student_id) === String(message.word.submitted_by)
+                ) {
                   return {
                     ...p,
                     ...message.player_stats,
@@ -118,10 +125,19 @@ export const useGameSync = ({
             });
           } else if (message.type === "game_started") {
             setGameState((prev) =>
-              prev ? { ...prev, status: "active", timer: 30, currentPlayerIndex: 0 } : null,
+              prev
+                ? {
+                    ...prev,
+                    status: "active",
+                    timer: 30,
+                    currentPlayerIndex: 0,
+                  }
+                : null,
             );
           } else if (message.type === "game_ended") {
-            setGameState((prev) => (prev ? { ...prev, status: "completed" } : null));
+            setGameState((prev) =>
+              prev ? { ...prev, status: "completed" } : null,
+            );
           }
 
           // Call user callback
@@ -152,7 +168,7 @@ export const useGameSync = ({
         onError("Failed to establish WebSocket connection");
       }
     }
-  }, [sessionId, userType, playerId, gameState, onGameUpdate, onError]);
+  }, [sessionId, userType, playerId, onGameUpdate, onError]);
 
   // Send message via WebSocket
   const sendMessage = useCallback((message: GameUpdateMessage) => {
@@ -265,7 +281,11 @@ export const useGameSync = ({
 
   // Timer countdown effect
   useEffect(() => {
-    if (!gameState || gameState.status !== "active" || (gameState.timer || 0) <= 0)
+    if (
+      !gameState ||
+      gameState.status !== "active" ||
+      (gameState.timer || 0) <= 0
+    )
       return;
 
     const interval = setInterval(() => {

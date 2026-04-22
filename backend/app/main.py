@@ -1,3 +1,4 @@
+from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.models.user import User
@@ -76,11 +77,10 @@ app.add_middleware(
 
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-# Initialize Ollama service on startup
-from app.services.ollama_service import OllamaService
-OllamaService.initialize()
+# Initialize Groq service on startup
+from app.services.groq_service import GroqService
+GroqService.initialize()
 
-from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes
 
 app.include_router(auth_routes.router)
 app.include_router(course_routes.router)

@@ -28,7 +28,7 @@ export const ChainAnswerGameJoinPage: React.FC<
   const [error, setError] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
   const [gameId, setGameId] = useState<number | null>(null);
-  const [playerId] = useState(() => createChainAnswerPlayerId());
+  const [playerId, setPlayerId] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
   const handleJoinGame = async () => {
@@ -43,32 +43,41 @@ export const ChainAnswerGameJoinPage: React.FC<
     try {
       // Fetch game by session ID
       const game = await gameAPI.getGameBySessionId(sessionId);
-      
+
       // Find the player in the registered list by name (case-insensitive)
       const registeredPlayer = game.players.find(
-        (p: any) => p.name.trim().toLowerCase() === playerName.trim().toLowerCase()
+        (p: any) =>
+          p.name.trim().toLowerCase() === playerName.trim().toLowerCase(),
       );
 
       if (!registeredPlayer) {
-        setError(`Student "${playerName}" is not registered for this game. Please check with your teacher.`);
+        setError(
+          `Student "${playerName}" is not registered for this game. Please check with your teacher.`,
+        );
         setIsLoading(false);
         return;
       }
 
       setGameId(game.id);
-      
+
       // Use the actual student_id from the backend instead of a generated one
       const effectivePlayerId = registeredPlayer.student_id;
-      
-      saveChainAnswerPlayerSession(game.id, sessionId, playerName, effectivePlayerId);
-      
+
+      setPlayerId(effectivePlayerId);
+      saveChainAnswerPlayerSession(
+        game.id,
+        sessionId,
+        playerName,
+        effectivePlayerId,
+      );
+
       onJoined?.({
         gameId: game.id,
         sessionId,
         playerId: effectivePlayerId,
         playerName,
       });
-      
+
       setJoined(true);
     } catch (err) {
       setError("Game session not found. Please check the session ID.");
