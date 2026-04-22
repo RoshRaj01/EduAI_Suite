@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from app.services.groq_service import GroqService
 from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes
 from fastapi import FastAPI
@@ -9,6 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 import os
+
+# Load environment variables FIRST
+load_dotenv()
 
 Base.metadata.create_all(bind=engine)
 
