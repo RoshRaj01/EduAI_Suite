@@ -4,6 +4,7 @@ import {
   AlertTriangle, ArrowRight, Home
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
+import { AnswerSheet } from "./AnswerSheet";
 
 interface Choice {
   id: number;
@@ -45,6 +46,9 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showReview, setShowReview] = useState(false);
+  const [fullSubmissionDetail, setFullSubmissionDetail] = useState<any>(null);
+  const [isLoadingReview, setIsLoadingReview] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -176,6 +180,26 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     }
   };
 
+  const fetchFullReview = async () => {
+    if (!attemptId) return;
+    try {
+      setIsLoadingReview(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:8000/exams/attempts/${attemptId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setFullSubmissionDetail(data);
+        setShowReview(true);
+      }
+    } catch (err) {
+      console.error("Failed to fetch full review", err);
+    } finally {
+      setIsLoadingReview(false);
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -223,9 +247,18 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
              </p>
           </div>
 
-          <button onClick={onClose} className="btn btn-primary w-full py-3 flex items-center justify-center gap-2">
-            <Home size={18} /> Back to Dashboard
-          </button>
+          <div className="flex gap-3">
+             <button onClick={fetchFullReview} disabled={isLoadingReview} className="btn bg-white border-blue-200 text-blue-600 flex-1 py-3 font-bold hover:bg-blue-50">
+                {isLoadingReview ? "Loading..." : "Review Answers"}
+             </button>
+             <button onClick={onClose} className="btn btn-primary flex-1 py-3 flex items-center justify-center gap-2">
+               <Home size={18} /> Exit
+             </button>
+          </div>
+
+          {showReview && fullSubmissionDetail && (
+             <AnswerSheet attempt={fullSubmissionDetail} onClose={() => setShowReview(false)} />
+          )}
         </GlassCard>
       </div>
     );

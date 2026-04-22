@@ -60,6 +60,7 @@ class ExamAttempt(Base):
 
     # Relationships
     exam = relationship("Exam", back_populates="attempts")
+    student = relationship("app.models.user.User")
     answers = relationship("ExamAnswer", back_populates="attempt", cascade="all, delete-orphan")
 
 class ExamAnswer(Base):

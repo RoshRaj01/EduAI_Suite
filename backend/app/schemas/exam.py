@@ -68,9 +68,28 @@ class ExamAttemptResponse(BaseModel):
     id: int
     exam_id: int
     student_id: int
+    student_name: Optional[str] = None
+    student_email: Optional[str] = None
     score: Optional[float] = None
     status: str
     start_time: datetime
     end_time: Optional[datetime] = None
     class Config:
         from_attributes = True
+
+class ExamReviewResponse(BaseModel):
+    exam_id: int
+    title: str
+    attempts: List[ExamAttemptResponse]
+
+class ExamAnswerResponse(BaseModel):
+    id: int
+    question_id: int
+    selected_choice_id: Optional[int] = None
+    question: ExamQuestionResponse
+    class Config:
+        from_attributes = True
+
+class ExamAttemptDetailResponse(ExamAttemptResponse):
+    exam: ExamResponse
+    answers: List[ExamAnswerResponse]

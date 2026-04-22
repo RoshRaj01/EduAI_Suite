@@ -2,10 +2,11 @@ import React, { useState, useEffect } from "react";
 import {
   ClipboardList, Clock, Users, Plus, CheckCircle2, AlertCircle,
   Play, ChevronRight, BrainCircuit, Eye, Check, X, Timer,
-  FileText, Layers, Trash2, Settings,
+  FileText, Layers, Trash2, Settings, RefreshCw
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ExamCreator } from "./ExamCreator";
+import { AnswerSheet } from "./AnswerSheet";
 
 type ExamView = "list" | "take" | "review";
 
@@ -24,10 +25,31 @@ export const ExamsPage: React.FC = () => {
   const [error, setError] = useState("");
   const [showCreator, setShowCreator] = useState(false);
   const [editingExam, setEditingExam] = useState<any>(null);
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [loadingAttempts, setLoadingAttempts] = useState(false);
+  const [selectedAttempt, setSelectedAttempt] = useState<any>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [stats, setStats] = useState<any>({ total_exams: 0, submissions_today: 0, avg_completion: "0%", pending_ai_review: 0 });
 
   useEffect(() => {
     fetchExams();
+    fetchStats();
   }, []);
+
+  const fetchStats = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:8000/exams/stats", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error("Error fetching stats:", err);
+    }
+  };
 
   const fetchExams = async () => {
     try {
@@ -101,6 +123,46 @@ export const ExamsPage: React.FC = () => {
       setShowCreator(true);
   };
 
+  const fetchAttempts = async (examId: number) => {
+    try {
+      setLoadingAttempts(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:8000/exams/${examId}/attempts`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Failed to fetch attempts");
+      const data = await response.json();
+      setAttempts(data);
+    } catch (err) {
+      console.error("Error fetching attempts:", err);
+    } finally {
+      setLoadingAttempts(false);
+    }
+  };
+
+  const fetchAttemptDetail = async (attemptId: number) => {
+    try {
+      setLoadingDetail(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:8000/exams/attempts/${attemptId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Failed to fetch attempt details");
+      const data = await response.json();
+      setSelectedAttempt(data);
+    } catch (err) {
+      console.error("Error fetching attempt details:", err);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedExam && activeTab === "review") {
+      fetchAttempts(selectedExam.id);
+    }
+  }, [selectedExam, activeTab]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -128,10 +190,10 @@ export const ExamsPage: React.FC = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Exams",      value: String(examsList.length),  icon: ClipboardList, color: "#264796" },
-          { label: "Pending AI Review",value: "0", icon: BrainCircuit,  color: "#d97706" },
-          { label: "Submissions Today",value: "0", icon: CheckCircle2,  color: "#16a34a" },
-          { label: "Avg Completion",   value: "0%",icon: Users,         color: "#7c3aed" },
+          { label: "Total Exams",      value: String(stats.total_exams),  icon: ClipboardList, color: "#264796" },
+          { label: "Pending AI Review",value: String(stats.pending_ai_review), icon: BrainCircuit,  color: "#d97706" },
+          { label: "Submissions Today",value: String(stats.submissions_today), icon: CheckCircle2,  color: "#16a34a" },
+          { label: "Avg Completion",   value: stats.avg_completion, icon: Users,         color: "#7c3aed" },
         ].map(s => (
           <GlassCard key={s.label} padding="sm" className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -196,111 +258,176 @@ export const ExamsPage: React.FC = () => {
         {/* Exam Detail */}
         <div className="xl:col-span-2">
           {selectedExam ? (
-            <GlassCard padding="none">
-              {/* Hero */}
-              <div className="gradient-blue rounded-t-2xl p-5 text-white">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="badge text-[9px] px-2" style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
-                        MCQ
-                      </span>
-                      <span className="badge text-[9px] px-2" style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
-                        Course {selectedExam.course_id}
-                      </span>
+            <>
+              <GlassCard padding="none">
+                {/* Hero */}
+                <div className="gradient-blue rounded-t-2xl p-5 text-white">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="badge text-[9px] px-2" style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
+                          MCQ
+                        </span>
+                        <span className="badge text-[9px] px-2" style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>
+                          Course {selectedExam.course_id}
+                        </span>
+                      </div>
+                      <h2 className="text-lg font-bold">{selectedExam.title}</h2>
+                      <p className="text-white/70 text-sm mt-1">Created: {new Date(selectedExam.created_at).toLocaleDateString()}</p>
                     </div>
-                    <h2 className="text-lg font-bold">{selectedExam.title}</h2>
-                    <p className="text-white/70 text-sm mt-1">Created: {new Date(selectedExam.created_at).toLocaleDateString()}</p>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="text-right">
+                          <p className="text-3xl font-black">{selectedExam.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 0}</p>
+                          <p className="text-white/60 text-xs">Total Marks</p>
+                      </div>
+                      <div className="flex gap-2">
+                          <button 
+                              onClick={() => openEditCreator(selectedExam)}
+                              className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white"
+                              title="Edit Exam"
+                          >
+                              <Settings size={14} />
+                          </button>
+                          <button 
+                              onClick={() => handleDeleteExam(selectedExam.id)}
+                              className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-lg transition-colors text-white"
+                              title="Delete Exam"
+                          >
+                              <Trash2 size={14} />
+                          </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="text-right">
-                        <p className="text-3xl font-black">{selectedExam.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 0}</p>
-                        <p className="text-white/60 text-xs">Total Marks</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={() => openEditCreator(selectedExam)}
-                            className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white"
-                            title="Edit Exam"
-                        >
-                            <Settings size={14} />
-                        </button>
-                        <button 
-                            onClick={() => handleDeleteExam(selectedExam.id)}
-                            className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-lg transition-colors text-white"
-                            title="Delete Exam"
-                        >
-                            <Trash2 size={14} />
-                        </button>
-                    </div>
+                  <div className="flex gap-6 mt-4 pt-4 border-t border-white/15 text-xs text-white/75">
+                    <span className="flex items-center gap-1.5"><Timer size={12} /> {selectedExam.time_limit} minutes</span>
+                    <span className="flex items-center gap-1.5"><ClipboardList size={12} /> {selectedExam.questions?.length || 0} questions</span>
                   </div>
                 </div>
-                <div className="flex gap-6 mt-4 pt-4 border-t border-white/15 text-xs text-white/75">
-                  <span className="flex items-center gap-1.5"><Timer size={12} /> {selectedExam.time_limit} minutes</span>
-                  <span className="flex items-center gap-1.5"><ClipboardList size={12} /> {selectedExam.questions?.length || 0} questions</span>
+
+                {/* Tabs */}
+                <div className="flex border-b" style={{ borderColor: "rgba(38,71,150,0.1)" }}>
+                  {(["overview", "take", "review"] as const).map(tab => (
+                    <button key={tab} onClick={() => setActiveTab(tab)}
+                      className={`px-5 py-3.5 text-sm font-semibold capitalize transition-colors flex items-center gap-1.5 ${
+                        activeTab === tab ? "border-b-2 border-[#264796] text-[#264796]" : "text-slate-400 hover:text-slate-600"
+                      }`}>
+                      {tab === "take" && <Play size={13} />}
+                      {tab === "review" && <Eye size={13} />}
+                      {tab}
+                    </button>
+                  ))}
                 </div>
-              </div>
 
-              {/* Tabs */}
-              <div className="flex border-b" style={{ borderColor: "rgba(38,71,150,0.1)" }}>
-                {(["overview", "take", "review"] as const).map(tab => (
-                  <button key={tab} onClick={() => setActiveTab(tab)}
-                    className={`px-5 py-3.5 text-sm font-semibold capitalize transition-colors flex items-center gap-1.5 ${
-                      activeTab === tab ? "border-b-2 border-[#264796] text-[#264796]" : "text-slate-400 hover:text-slate-600"
-                    }`}>
-                    {tab === "take" && <Play size={13} />}
-                    {tab === "review" && <Eye size={13} />}
-                    {tab}
-                  </button>
-                ))}
-              </div>
+                <div className="p-5">
+                  {/* Overview */}
+                  {activeTab === "overview" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { label: "Questions", value: `${selectedExam.questions?.length || 0}` },
+                          { label: "Status",  value: `${selectedExam.status}` },
+                          { label: "Time Limit", value: `${selectedExam.time_limit}m` },
+                          { label: "Randomized", value: selectedExam.randomize_questions ? "Yes" : "No" },
+                        ].map(item => (
+                          <div key={item.label} className="p-3 rounded-xl text-center"
+                            style={{ background: "rgba(38,71,150,0.05)", border: "1px solid rgba(38,71,150,0.1)" }}>
+                            <p className="text-xl font-bold" style={{ color: "var(--color-brand-blue)" }}>{item.value}</p>
+                            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>{item.label}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-3">
+                        <button className="btn btn-primary flex-1 text-sm">
+                          <Eye size={14} /> Preview Exam
+                        </button>
+                        <button className="btn btn-outline text-sm flex-1">
+                          <FileText size={14} /> Export Stats
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-              <div className="p-5">
-                {/* Overview */}
-                {activeTab === "overview" && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { label: "Questions", value: `${selectedExam.questions?.length || 0}` },
-                        { label: "Status",  value: `${selectedExam.status}` },
-                        { label: "Time Limit", value: `${selectedExam.time_limit}m` },
-                        { label: "Randomized", value: selectedExam.randomize_questions ? "Yes" : "No" },
-                      ].map(item => (
-                        <div key={item.label} className="p-3 rounded-xl text-center"
-                          style={{ background: "rgba(38,71,150,0.05)", border: "1px solid rgba(38,71,150,0.1)" }}>
-                          <p className="text-xl font-bold" style={{ color: "var(--color-brand-blue)" }}>{item.value}</p>
-                          <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>{item.label}</p>
+                  {/* Take Exam (Student View) */}
+                  {activeTab === "take" && (
+                    <div className="space-y-5">
+                      <div className="p-10 text-center text-slate-400">
+                          Take exam preview not yet implemented for teacher view.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Review Submissions */}
+                  {activeTab === "review" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between mb-4">
+                         <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                           <Users size={16} className="text-blue-600" />
+                           Student Submissions ({attempts.length})
+                         </h3>
+                         <button onClick={() => fetchAttempts(selectedExam.id)} className="text-blue-600 text-xs hover:underline flex items-center gap-1">
+                           <RefreshCw size={12} /> Refresh
+                         </button>
+                      </div>
+
+                      {loadingAttempts ? (
+                        <div className="py-10 text-center text-slate-400">
+                          <div className="w-6 h-6 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto mb-2"></div>
+                          Loading submissions...
                         </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-3">
-                      <button className="btn btn-primary flex-1 text-sm">
-                        <Eye size={14} /> Preview Exam
-                      </button>
-                      <button className="btn btn-outline text-sm flex-1">
-                        <FileText size={14} /> Export Stats
-                      </button>
-                    </div>
-                  </div>
-                )}
+                      ) : attempts.length === 0 ? (
+                        <div className="py-10 text-center text-slate-400 rounded-2xl border-2 border-dashed border-slate-100 italic text-sm">
+                          No submissions found for this exam yet.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {attempts.map(attempt => (
+                            <div key={attempt.id} className="p-4 rounded-2xl border transition-all hover:shadow-sm flex items-center justify-between gap-4"
+                               style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)" }}>
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
+                                  {attempt.student_name?.charAt(0) || "S"}
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-sm" style={{ color: "var(--color-text-primary)" }}>{attempt.student_name}</p>
+                                  <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{attempt.student_email}</p>
+                                </div>
+                              </div>
 
-                {/* Take Exam (Student View) */}
-                {activeTab === "take" && (
-                  <div className="space-y-5">
-                    <div className="p-10 text-center text-slate-400">
-                        Take exam preview not yet implemented for teacher view.
+                              <div className="flex items-center gap-6">
+                                <div className="text-center">
+                                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-0.5" style={{ fontSize: '9px' }}>Finished</p>
+                                  <p className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+                                    {attempt.end_time ? new Date(attempt.end_time).toLocaleDateString() : "-"}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-0.5" style={{ fontSize: '9px' }}>Score</p>
+                                  <div className="flex items-center gap-1.5">
+                                     <span className="text-lg font-black text-blue-600">{attempt.score || 0}</span>
+                                     <span className="text-[10px] font-bold text-slate-400">pts</span>
+                                  </div>
+                                </div>
+                                <button 
+                                  onClick={() => fetchAttemptDetail(attempt.id)}
+                                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors"
+                                >
+                                  {loadingDetail && selectedAttempt?.id === attempt.id ? "..." : "View Sheet"}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
-
-                {/* AI Review */}
-                {activeTab === "review" && (
-                  <div className="p-10 text-center text-slate-400">
-                    AI Review submissions will appear here after students complete the exam.
-                  </div>
-                )}
-              </div>
-            </GlassCard>
+                  )}
+                </div>
+              </GlassCard>
+              
+              {/* Answer Sheet Viewer Modal */}
+              {selectedAttempt && (
+                 <AnswerSheet attempt={selectedAttempt} onClose={() => setSelectedAttempt(null)} />
+              )}
+            </>
           ) : (
             <div className="h-full flex items-center justify-center p-12 text-slate-400">
               Select an exam from the list to view details.

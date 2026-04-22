@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.database import SessionLocal
 from app.models.exam import Exam, ExamQuestion, ExamChoice, ExamAttempt, ExamAnswer
-from app.schemas.exam import ExamCreate, ExamResponse, ExamAttemptCreate, ExamAttemptResponse, ExamAttemptSubmit
+from app.schemas.exam import ExamCreate, ExamResponse, ExamAttemptCreate, ExamAttemptResponse, ExamAttemptSubmit, ExamAttemptDetailResponse, ExamReviewResponse
 from app.utils.auth import get_current_user
 from app.models.user import User
 import PyPDF2
@@ -21,6 +21,28 @@ def get_db():
         yield db
     finally:
         db.close()
+
+@router.get("/stats")
+def get_exam_stats(db: Session = Depends(get_db)):
+    total_exams = db.query(Exam).count()
+    
+    # Submissions today
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    submissions_today = db.query(ExamAttempt).filter(
+        ExamAttempt.status == "submitted",
+        ExamAttempt.end_time >= today
+    ).count()
+    
+    # Simple average completion (this is a heuristic)
+    total_attempts = db.query(ExamAttempt).filter(ExamAttempt.status == "submitted").count()
+    avg_completion = f"{min(100, (total_attempts / (total_exams * 10 or 1)) * 100):.1f}%" if total_exams > 0 else "0%"
+    
+    return {
+        "total_exams": total_exams,
+        "submissions_today": submissions_today,
+        "avg_completion": avg_completion,
+        "pending_ai_review": 0 # Placeholder for now
+    }
 
 @router.get("/", response_model=List[ExamResponse])
 def get_all_exams(db: Session = Depends(get_db)):
@@ -275,3 +297,39 @@ def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_d
     db.commit()
     db.refresh(db_exam)
     return db_exam
+
+@router.get("/{exam_id}/attempts", response_model=List[ExamAttemptResponse])
+def get_exam_attempts(exam_id: int, db: Session = Depends(get_db)):
+    attempts = db.query(ExamAttempt).filter(ExamAttempt.exam_id == exam_id).all()
+    
+    # Manually populate student info for the response
+    res = []
+    for a in attempts:
+        res.append({
+            "id": a.id,
+            "exam_id": a.exam_id,
+            "student_id": a.student_id,
+            "student_name": a.student.name if a.student else "Unknown",
+            "student_email": a.student.email if a.student else "Unknown",
+            "score": a.score,
+            "status": a.status,
+            "start_time": a.start_time,
+            "end_time": a.end_time
+        })
+    return res
+
+@router.get("/attempts/{attempt_id}", response_model=ExamAttemptDetailResponse)
+def get_attempt_details(attempt_id: int, db: Session = Depends(get_db)):
+    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == attempt_id).first()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+    
+    # We need to manually match the student info like in the list view if needed, 
+    # but ExamAttemptDetailResponse inherits from ExamAttemptResponse which has these fields.
+    # sqlalchemy objects can handle nested relationships if they are defined.
+    
+    # Ensuring student info is in the top level if needed by the schema
+    attempt.student_name = attempt.student.name if attempt.student else "Unknown"
+    attempt.student_email = attempt.student.email if attempt.student else "Unknown"
+    
+    return attempt
