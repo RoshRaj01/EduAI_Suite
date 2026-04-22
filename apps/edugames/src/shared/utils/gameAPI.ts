@@ -1,5 +1,6 @@
 // API service for Chain Answer Game backend integration
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export interface GamePlayer {
   student_id: number;
@@ -28,6 +29,7 @@ export interface GameResponse {
   difficulty_level: string;
   subject?: string;
   ollama_suggestions?: string;
+  groq_suggestions?: string;
   status: string;
   starting_word: string;
   players: any[];
@@ -43,6 +45,12 @@ export interface OllamaStatus {
   endpoint: string;
   available_models: string[];
   default_model: string;
+  message: string;
+}
+
+export interface GroqStatus {
+  groq_available: boolean;
+  service: string;
   message: string;
 }
 
@@ -72,15 +80,12 @@ class ChainAnswerGameAPI {
    */
   async getActiveStudents(courseId: number): Promise<Student[]> {
     try {
-      const response = await fetch(
-        `${this.studentUrl}/${courseId}/active`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
+      const response = await fetch(`${this.studentUrl}/${courseId}/active`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch students: ${response.statusText}`);

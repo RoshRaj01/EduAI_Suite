@@ -40,8 +40,14 @@ export const ChainAnswerGameCreation: React.FC<
   });
 
   const [courseId, setCourseId] = useState<number>(1);
-  const { students: availableStudents, isLoading: loadingStudents, error: studentsError } = useActiveStudents(courseId);
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
+  const {
+    students: availableStudents,
+    isLoading: loadingStudents,
+    error: studentsError,
+  } = useActiveStudents(courseId);
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(
+    new Set(),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdGame, setCreatedGame] = useState<{
@@ -49,7 +55,7 @@ export const ChainAnswerGameCreation: React.FC<
     session_id: string;
   } | null>(null);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
-  const [ollamaStatus, setOllamaStatus] = useState<{
+  const [groqStatus, setGroqStatus] = useState<{
     available: boolean;
     loading: boolean;
   }>({
@@ -57,30 +63,30 @@ export const ChainAnswerGameCreation: React.FC<
     loading: true,
   });
 
-  // Check Ollama status on mount
+  // Check Groq status on mount
   React.useEffect(() => {
-    const checkOllamaStatus = async () => {
+    const checkGroqStatus = async () => {
       try {
         const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
         const response = await fetch(
-          `${baseUrl}/games/chain-answer/status/ollama`,
+          `${baseUrl}/games/chain-answer/status/groq`,
         );
         if (response.ok) {
           const status = await response.json();
-          setOllamaStatus({
-            available: status.ollama_available,
+          setGroqStatus({
+            available: status.groq_available,
             loading: false,
           });
         } else {
-          setOllamaStatus({ available: false, loading: false });
+          setGroqStatus({ available: false, loading: false });
         }
       } catch (err) {
-        console.warn("Could not check Ollama status", err);
-        setOllamaStatus({ available: false, loading: false });
+        console.warn("Could not check Groq status", err);
+        setGroqStatus({ available: false, loading: false });
       }
     };
 
-    checkOllamaStatus();
+    checkGroqStatus();
   }, []);
 
   const handleTogglePlayer = (studentId: number) => {
@@ -401,28 +407,28 @@ export const ChainAnswerGameCreation: React.FC<
         </div>
       </div>
 
-      {/* Ollama Status Indicator */}
-      {!ollamaStatus.loading && (
+      {/* Groq Status Indicator */}
+      {!groqStatus.loading && (
         <div
           className={`px-4 py-3 rounded-lg flex items-center gap-3 ${
-            ollamaStatus.available
+            groqStatus.available
               ? "bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700"
               : "bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-700"
           }`}
         >
           <div
             className={`w-3 h-3 rounded-full ${
-              ollamaStatus.available ? "bg-green-500" : "bg-yellow-500"
+              groqStatus.available ? "bg-green-500" : "bg-yellow-500"
             }`}
           />
           <p
             style={{
-              color: ollamaStatus.available ? "#16a34a" : "#ca8a04",
+              color: groqStatus.available ? "#16a34a" : "#ca8a04",
             }}
             className="font-semibold text-sm"
           >
-            {ollamaStatus.available
-              ? "✓ AI Word Generation Available (Ollama Connected)"
+            {groqStatus.available
+              ? "✓ AI Word Generation Available (Groq Connected)"
               : "⚠ AI Word Generation Offline (Using fallback dictionary)"}
           </p>
         </div>
@@ -671,9 +677,7 @@ export const ChainAnswerGameCreation: React.FC<
                   color: "var(--color-error)",
                 }}
               >
-                <p className="text-sm font-semibold">
-                  Error loading students
-                </p>
+                <p className="text-sm font-semibold">Error loading students</p>
                 <p className="text-xs">{studentsError}</p>
               </div>
             )}
@@ -769,7 +773,9 @@ export const ChainAnswerGameCreation: React.FC<
             whileHover={
               selectedPlayerIds.size >= 2 && !isLoading ? { scale: 1.05 } : {}
             }
-            whileTap={selectedPlayerIds.size >= 2 && !isLoading ? { scale: 0.95 } : {}}
+            whileTap={
+              selectedPlayerIds.size >= 2 && !isLoading ? { scale: 0.95 } : {}
+            }
             onClick={handleCreateGame}
             disabled={selectedPlayerIds.size < 2 || isLoading}
             className="w-full px-6 py-4 rounded-xl text-white font-bold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
