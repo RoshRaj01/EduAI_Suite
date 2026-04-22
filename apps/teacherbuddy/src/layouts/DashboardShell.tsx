@@ -294,7 +294,7 @@ export const DashboardShell: React.FC = () => {
         className={`fixed top-[64px] bottom-0 left-0 z-40 w-[260px] overflow-y-auto transition-transform duration-300 transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         style={{
-          background: "var(--color-surface-base)",
+          background: "var(--color-surface-sidebar)",
           borderRight: "1px solid var(--color-border)",
         }}
       >
