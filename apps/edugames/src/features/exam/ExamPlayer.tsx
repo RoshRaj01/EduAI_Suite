@@ -43,6 +43,8 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [results, setResults] = useState<any>(null);
   const [attemptId, setAttemptId] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -89,6 +91,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
 
   const startAttempt = async () => {
     try {
+      setError(null);
       const token = localStorage.getItem("token");
       const response = await fetch(`http://localhost:8000/exams/${exam.id}/start`, {
         method: "POST",
@@ -96,11 +99,15 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
           "Authorization": `Bearer ${token}`
         }
       });
-      if (!response.ok) throw new Error("Failed to start attempt");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to start attempt");
+      }
       const data = await response.json();
       setAttemptId(data.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to start attempt", err);
+      setError(err.message || "Connection error. Please check if the server is running.");
     }
   };
 
@@ -111,8 +118,19 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   };
 
   const submitExam = async (status: "submitted" | "time_up" = "submitted") => {
-    if (isSubmitted || !attemptId) return;
+    if (isSubmitted || !attemptId || isSubmitting) return;
+
+    if (status === "submitted") {
+      const unansweredCount = displayQuestions.length - Object.keys(answers).length;
+      if (unansweredCount > 0) {
+        if (!confirm(`You have ${unansweredCount} unanswered questions. Are you sure you want to finish?`)) {
+          return;
+        }
+      }
+    }
     
+    setIsSubmitting(true);
+    setError(null);
     const token = localStorage.getItem("token");
     const submissionData = {
       answers: Object.entries(answers).map(([qId, cId]) => ({
@@ -130,6 +148,12 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
         },
         body: JSON.stringify(submissionData)
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Submission failed");
+      }
+      
       const data = await response.json();
       
       setIsSubmitted(true);
@@ -144,8 +168,11 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
         percentage: percentage.toFixed(1),
         status: data.status
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Submission failed", err);
+      setError(err.message || "Failed to submit exam. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -206,6 +233,21 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
 
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
+      {/* Error Overlay */}
+      {error && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[60] w-full max-w-md px-4">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl shadow-lg flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={20} className="shrink-0" />
+              <p className="text-sm font-medium">{error}</p>
+            </div>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
+              <ChevronRight size={20} className="rotate-45" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Bar */}
       <div className="h-16 border-b px-6 flex items-center justify-between bg-white sticky top-0 z-10">
         <div className="flex items-center gap-4">
@@ -276,13 +318,19 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
                 <ChevronLeft size={18} /> Previous
              </button>
 
-             {currentIdx === displayQuestions.length - 1 ? (
-               <button 
-                 onClick={() => submitExam()}
-                 className="btn btn-primary px-10 py-2.5 flex items-center gap-2 font-bold shadow-lg"
-               >
-                  <CheckCircle2 size={18} /> Finish Exam
-               </button>
+              {currentIdx === displayQuestions.length - 1 ? (
+                <button 
+                  onClick={() => submitExam()}
+                  disabled={isSubmitting || !attemptId}
+                  className="btn btn-primary px-10 py-2.5 flex items-center gap-2 font-bold shadow-lg disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : (
+                    <CheckCircle2 size={18} />
+                  )}
+                  {isSubmitting ? "Submitting..." : "Finish Exam"}
+                </button>
              ) : (
                <button 
                  onClick={() => setCurrentIdx(currentIdx + 1)}

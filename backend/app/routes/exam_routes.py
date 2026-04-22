@@ -81,14 +81,25 @@ def start_exam_attempt(exam_id: int, db: Session = Depends(get_db), current_user
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Check attempts
-    prev_attempts = db.query(ExamAttempt).filter(
+    # Check for existing in-progress attempt to allow resuming
+    existing_attempt = db.query(ExamAttempt).filter(
+        ExamAttempt.exam_id == exam_id,
+        ExamAttempt.student_id == current_user.id,
+        ExamAttempt.status == "in_progress"
+    ).first()
+    
+    if existing_attempt:
+        return existing_attempt
+    
+    # Check completed attempts
+    completed_attempts = db.query(ExamAttempt).filter(
         ExamAttempt.exam_id == exam_id, 
-        ExamAttempt.student_id == current_user.id
+        ExamAttempt.student_id == current_user.id,
+        ExamAttempt.status != "in_progress"
     ).count()
     
-    if prev_attempts >= exam.attempts_allowed:
-        raise HTTPException(status_code= status.HTTP_403_FORBIDDEN, detail="Maximum attempts reached")
+    if completed_attempts >= exam.attempts_allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Maximum attempts reached")
 
     new_attempt = ExamAttempt(
         exam_id=exam_id,
@@ -125,7 +136,8 @@ def submit_exam_attempt(attempt_id: int, submission: ExamAttemptSubmit, db: Sess
             choice = db.query(ExamChoice).filter(ExamChoice.id == ans.selected_choice_id).first()
             if choice and choice.is_correct:
                 question = db.query(ExamQuestion).filter(ExamQuestion.id == ans.question_id).first()
-                total_score += question.points
+                if question:
+                    total_score += (question.points or 0.0)
 
     attempt.score = total_score
     attempt.status = "submitted"
