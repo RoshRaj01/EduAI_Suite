@@ -133,6 +133,14 @@ export const ChainAnswerGamePage: React.FC = () => {
             setJoinedPlayerName(null);
             localStorage.removeItem("chain_answer_player_session");
           }}
+          onGameEnded={() => {
+            // Game ended by teacher, reset student state
+            setJoinedSessionId(null);
+            setJoinedGameId(null);
+            setJoinedPlayerId(null);
+            setJoinedPlayerName(null);
+            localStorage.removeItem("chain_answer_player_session");
+          }}
         />
       );
     }

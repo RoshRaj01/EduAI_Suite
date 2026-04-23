@@ -16,6 +16,7 @@ interface ChainGameBoardProps {
   playerName?: string;
   userType?: "teacher" | "student";
   onError?: (error: string) => void;
+  onGameEnded?: () => void;
 }
 
 export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
@@ -28,9 +29,11 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
   playerName,
   userType = "teacher",
   onError,
+  onGameEnded,
 }) => {
   const [inputWord, setInputWord] = useState("");
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [lastPlayerId, setLastPlayerId] = useState<string | null>(null);
   // Use WebSocket sync if sessionId is provided
   const {
     isConnected,
@@ -80,6 +83,47 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     }
   };
 
+  // Handle timer expiry - auto-skip to next player
+  useEffect(() => {
+    if (!gameState || gameState.status !== "active") return;
+    if ((gameState.timer || 0) > 0) return;
+
+    const currentPlayer =
+      gameState?.players?.[gameState?.currentPlayerIndex || 0];
+    const currentPlayerIdStr = String(
+      currentPlayer?.id || currentPlayer?.student_id,
+    );
+
+    // Only trigger skip once per player
+    if (currentPlayerIdStr === lastPlayerId) return;
+    setLastPlayerId(currentPlayerIdStr);
+
+    const skipTimer = setTimeout(() => {
+      if (actions?.skipTurn && currentPlayer) {
+        actions.skipTurn(currentPlayer.id || currentPlayer.student_id);
+      }
+      setInputWord("");
+      setStartTime(Date.now());
+    }, 500); // Small delay to avoid race conditions
+
+    return () => clearTimeout(skipTimer);
+  }, [
+    gameState?.timer,
+    gameState?.status,
+    gameState?.currentPlayerIndex,
+    gameState?.players,
+    actions,
+    lastPlayerId,
+  ]);
+
+  // Handle game ended state
+  useEffect(() => {
+    const status = (gameState as any)?.status;
+    if ((status === "completed" || status === "ended") && onGameEnded) {
+      onGameEnded();
+    }
+  }, [(gameState as any)?.status, onGameEnded]);
+
   const gameName =
     (gameState as any)?.name ||
     (gameState as any)?.session?.name ||
@@ -105,9 +149,9 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     (gameState as any)?.chain?.length > 0
       ? (gameState as any)?.chain[(gameState as any)?.chain.length - 1]?.word
       : (gameState as any)?.starting_word ||
-      (gameState as any)?.session?.startingWord ||
-      (gameState as any)?.game?.starting_word ||
-      "";
+        (gameState as any)?.session?.startingWord ||
+        (gameState as any)?.game?.starting_word ||
+        "";
 
   return (
     <div className="space-y-6">
@@ -196,8 +240,9 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
             Current Player
           </p>
           <p
-            className={`text-xl font-bold ${isCurrentPlayerTurn ? "text-green-500" : "text-gray-500"
-              }`}
+            className={`text-xl font-bold ${
+              isCurrentPlayerTurn ? "text-green-500" : "text-gray-500"
+            }`}
             style={{
               color: isCurrentPlayerTurn
                 ? "var(--color-status-success)"
@@ -279,7 +324,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
         <div className="flex flex-wrap gap-2">
           {(gameState?.chain || []).map((word, index) => (
             <motion.div
-              key={word.id}
+              key={word.id ? `word-${word.id}` : `word-${index}`}
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               className="px-3 py-2 rounded-full text-sm font-semibold"
@@ -311,7 +356,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
         <div className="space-y-2">
           {(gameState?.players || []).map((player, index) => (
             <div
-              key={player.id}
+              key={player.id ? `player-${player.id}` : `player-${index}`}
               className="flex justify-between items-center p-3 rounded-lg"
               style={{
                 background:
