@@ -96,7 +96,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     # Sort months correctly
     month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     trend_df = df.groupby('month')['score'].mean().reindex(month_order).dropna().reset_index()
-    trend = trend_df.to_dict(orient='records')
+    trend = trend_df.replace([np.inf, -np.inf], 0).fillna(0).to_dict(orient='records')
     
     # Risk Students list
     risk_list = []
@@ -106,7 +106,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
                 "id": f"ST-{hash(sname) % 10000}",
                 "name": sname,
                 "attendance": 85, # Placeholder
-                "avgScore": float(savg),
+                "avgScore": float(savg) if not np.isnan(savg) else 0,
                 "assignments": 90, # Placeholder
                 "risk": int(100 - savg), 
                 "level": "high" if savg < 40 else "moderate"
@@ -153,12 +153,18 @@ async def upload_analytics_data(
     # Identify numeric columns for imputation
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     
+    # Replace Infinity with NaN so they can be filled
+    df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan)
+
     if impute_method == "zero":
         df[numeric_cols] = df[numeric_cols].fillna(0)
     elif impute_method == "mean":
-        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean().fillna(0))
     elif impute_method == "blank":
         pass
+
+    # Final sweep to ensure JSON compatibility for numeric data
+    df[numeric_cols] = df[numeric_cols].fillna(0)
 
     # Basic Analysis
     score_col = None
@@ -177,8 +183,10 @@ async def upload_analytics_data(
         bins = [0, 60, 70, 80, 90, 101]
         labels = ['Below 60%', 'B+ (60-69%)', 'A (70-79%)', 'A+ (80-89%)', 'O (90-100%)']
         df['grade_group'] = pd.cut(df[score_col], bins=bins, labels=labels, right=False)
+        # Convert to string to avoid Categorical fillna error and ensure JSON compatibility
+        df['grade_group'] = df['grade_group'].astype(str)
         distribution = df['grade_group'].value_counts().to_dict()
-        dist_list = [{"grade": k, "pct": int((v / len(df)) * 100)} for k, v in distribution.items()]
+        dist_list = [{"grade": k, "pct": int((v / len(df)) * 100)} for k, v in distribution.items() if k != 'nan']
         
         # Risk identification
         risk_students = []
@@ -200,10 +208,10 @@ async def upload_analytics_data(
     return {
         "summary": {
             "rows": len(df),
-            "columns": list(df.columns),
+            "columns": [str(c) for c in df.columns],
             "avg_score": f"{avg_score:.1f}%" if score_col else "N/A"
         },
         "distribution": dist_list,
         "risk_students": risk_students,
-        "raw_data": df.to_dict(orient='records')[:50] 
+        "raw_data": df.replace([np.inf, -np.inf], 0).fillna(0).to_dict(orient='records')[:50] 
     }

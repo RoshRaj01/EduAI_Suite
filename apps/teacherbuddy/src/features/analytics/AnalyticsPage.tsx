@@ -11,7 +11,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "http://localhost:8000";
 
 /* ─── Types ──────────────────────────────────────────── */
 interface Course {
@@ -129,12 +129,17 @@ export const AnalyticsPage: React.FC = () => {
         method: "POST",
         body: formData,
       });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.detail || "Upload failed");
+      }
       const data = await res.json();
       setUploadedData(data);
       setDataSource("upload");
       setActiveTab("overview");
     } catch (err) {
       console.error("Upload failed:", err);
+      alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
@@ -148,16 +153,16 @@ export const AnalyticsPage: React.FC = () => {
 
     const stats = dataSource === "platform" 
       ? [
-          { label: "Class Average", value: analytics?.overview.avg_score || "0%", color: "#264796" },
-          { label: "Total Students", value: analytics?.overview.total_students || 0, color: "#16a34a" },
-          { label: "At-Risk Students", value: analytics?.overview.at_risk_count || 0, color: "#dc2626" },
-          { label: "Attendance", value: analytics?.overview.attendance_rate || "0%", color: "#d0ae61" },
+          { label: "Class Average", value: analytics?.overview?.avg_score || "0%", color: "#264796" },
+          { label: "Total Students", value: analytics?.overview?.total_students || 0, color: "#16a34a" },
+          { label: "At-Risk Students", value: analytics?.overview?.at_risk_count || 0, color: "#dc2626" },
+          { label: "Attendance", value: analytics?.overview?.attendance_rate || "0%", color: "#d0ae61" },
         ]
       : [
-          { label: "File Average", value: uploadedData?.summary.avg_score || "0%", color: "#264796" },
-          { label: "Total Rows", value: uploadedData?.summary.rows || 0, color: "#16a34a" },
-          { label: "At-Risk", value: uploadedData?.risk_students.length || 0, color: "#dc2626" },
-          { label: "Columns", value: uploadedData?.summary.columns.length || 0, color: "#d0ae61" },
+          { label: "File Average", value: uploadedData?.summary?.avg_score || "0%", color: "#264796" },
+          { label: "Total Rows", value: uploadedData?.summary?.rows || 0, color: "#16a34a" },
+          { label: "At-Risk", value: uploadedData?.risk_students?.length || 0, color: "#dc2626" },
+          { label: "Columns", value: uploadedData?.summary?.columns?.length || 0, color: "#d0ae61" },
         ];
 
     return (
@@ -447,15 +452,15 @@ export const AnalyticsPage: React.FC = () => {
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-100">
-                        {(dataSource === "platform" ? ['Student', 'Score', 'Exam', 'Date'] : uploadedData?.summary.columns)?.map(col => (
+                        {(dataSource === "platform" ? ['Student', 'Score', 'Exam', 'Date'] : (uploadedData?.summary?.columns || []))?.map(col => (
                           <th key={col} className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider">{col}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {(dataSource === "platform" ? [] : uploadedData?.raw_data)?.map((row, idx) => (
+                      {(dataSource === "platform" ? [] : (uploadedData?.raw_data || []))?.map((row: any, idx: number) => (
                         <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                          {uploadedData?.summary.columns.map(col => (
+                          {uploadedData?.summary?.columns?.map((col: string) => (
                             <td key={col} className="px-4 py-3 text-slate-600 font-medium">{String(row[col])}</td>
                           ))}
                         </tr>
