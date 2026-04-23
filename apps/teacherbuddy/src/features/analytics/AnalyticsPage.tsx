@@ -1,60 +1,50 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   BarChart3, TrendingUp, AlertTriangle, Users, Download,
   ChevronDown, Filter, RefreshCw, Activity, ArrowUp, ArrowDown,
-  BrainCircuit, Eye, Info,
+  BrainCircuit, Eye, Info, Upload, FileSpreadsheet, Check, X,
+  PieChart as PieChartIcon, LayoutDashboard, Database
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
+} from 'recharts';
 
-/* ─── Mock Data ──────────────────────────────────────── */
-const classrooms = ["CSC401 — Neural Networks", "CSC312 — DSA", "CSC501 — Cloud DevOps", "CSC220 — DBMS"];
+const API_BASE = "http://localhost:8000/api";
 
-const performanceTrend = [
-  { month: "Nov", avg: 62 }, { month: "Dec", avg: 58 }, { month: "Jan", avg: 65 },
-  { month: "Feb", avg: 70 }, { month: "Mar", avg: 74 }, { month: "Apr", avg: 78 },
-];
+/* ─── Types ──────────────────────────────────────────── */
+interface Course {
+  id: number;
+  name: string;
+  code: string;
+}
 
-const riskStudents = [
-  { id: "S4121", name: "Arjun Mehta",    attendance: 42, avgScore: 48, assignments: 60, risk: 82, level: "high"     },
-  { id: "S4122", name: "Priya Sharma",   attendance: 55, avgScore: 52, assignments: 70, risk: 74, level: "high"     },
-  { id: "S4109", name: "Rohan Verma",    attendance: 68, avgScore: 61, assignments: 55, risk: 58, level: "moderate" },
-  { id: "S4135", name: "Sneha Patil",    attendance: 71, avgScore: 65, assignments: 75, risk: 51, level: "moderate" },
-  { id: "S4140", name: "Kiran Nair",     attendance: 80, avgScore: 72, assignments: 85, risk: 28, level: "low"      },
-  { id: "S4147", name: "Anjali Singh",   attendance: 95, avgScore: 88, assignments: 100,risk: 8,  level: "low"      },
-];
+interface AnalyticsData {
+  overview: {
+    avg_score: string;
+    total_students: number;
+    at_risk_count: number;
+    attendance_rate: string;
+  };
+  risk_students: any[];
+  performance_trend: any[];
+  subject_breakdown: any[];
+}
 
-const subjectBreakdown = [
-  { subject: "Neural Networks", avg: 71, highest: 95, lowest: 38, submitted: 42 },
-  { subject: "DSA",             avg: 76, highest: 98, lowest: 42, submitted: 38 },
-  { subject: "Cloud DevOps",    avg: 68, highest: 91, lowest: 31, submitted: 30 },
-  { subject: "DBMS",            avg: 82, highest: 100,lowest: 55, submitted: 50 },
-];
+interface UploadedData {
+  summary: {
+    rows: number;
+    columns: string[];
+    avg_score: string;
+  };
+  distribution: { grade: string; pct: number }[];
+  risk_students: any[];
+  raw_data: any[];
+}
 
-/* ─── Mini Bar Chart ─────────────────────────────────── */
-const MiniBar: React.FC<{ data: { month: string; avg: number }[] }> = ({ data }) => {
-  const max = Math.max(...data.map(d => d.avg));
-  return (
-    <div className="flex items-end gap-2 h-28 pt-2">
-      {data.map((d, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-1">
-          <div
-            className="w-full rounded-t-md transition-all duration-700"
-            style={{
-              height: `${(d.avg / max) * 100}%`,
-              background: i === data.length - 1
-                ? "linear-gradient(180deg,#264796,#3460c4)"
-                : "rgba(38,71,150,0.2)",
-            }}
-            title={`${d.avg}%`}
-          />
-          <span className="text-[10px] font-medium" style={{ color: "var(--color-text-muted)" }}>{d.month}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
+/* ─── Components ─────────────────────────────────────── */
 
-/* ─── Risk Heatmap Cell ──────────────────────────────── */
 const RiskCell: React.FC<{ value: number; label: string }> = ({ value, label }) => {
   const color = value >= 75 ? "#dc2626" : value >= 50 ? "#d97706" : "#16a34a";
   const bg    = value >= 75 ? "rgba(220,38,38,0.09)" : value >= 50 ? "rgba(217,119,6,0.09)" : "rgba(22,163,74,0.09)";
@@ -73,290 +63,414 @@ const RiskCell: React.FC<{ value: number; label: string }> = ({ value, label }) 
 };
 
 export const AnalyticsPage: React.FC = () => {
-  const [selectedClass, setSelectedClass] = useState(classrooms[0]);
-  const [activeTab, setActiveTab] = useState<"overview" | "risk" | "subjects">("overview");
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [dataSource, setDataSource] = useState<"platform" | "upload">("platform");
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [uploadedData, setUploadedData] = useState<UploadedData | null>(null);
+  
+  const [activeTab, setActiveTab] = useState<"overview" | "risk" | "subjects" | "raw">("overview");
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imputeMethod, setImputeMethod] = useState("zero");
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleGenerate = () => {
-    setGenerating(true);
-    setTimeout(() => { setGenerating(false); setGenerated(true); }, 2200);
+  // Fetch courses on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/courses/`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch courses");
+        return res.json();
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          setCourses(data);
+          if (data.length > 0) setSelectedCourseId(data[0].id);
+        } else {
+          setCourses([]);
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching courses:", err);
+        setCourses([]);
+      });
+  }, []);
+
+  // Fetch analytics when course changes
+  useEffect(() => {
+    if (selectedCourseId && dataSource === "platform") {
+      setLoading(true);
+      fetch(`${API_BASE}/analytics/course/${selectedCourseId}`)
+        .then(res => res.json())
+        .then(data => {
+          setAnalytics(data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error("Error fetching analytics:", err);
+          setLoading(false);
+        });
+    }
+  }, [selectedCourseId, dataSource]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("impute_method", imputeMethod);
+
+    try {
+      const res = await fetch(`${API_BASE}/analytics/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      setUploadedData(data);
+      setDataSource("upload");
+      setActiveTab("overview");
+    } catch (err) {
+      console.error("Upload failed:", err);
+    } finally {
+      setUploading(false);
+    }
   };
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
-            Analytics & Risk Intelligence
-          </h1>
-          <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
-            AI-powered student performance insights and early-warning risk detection.
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <div className="relative">
-            <select
-              className="form-input text-sm pr-8 appearance-none cursor-pointer bg-white"
-              value={selectedClass}
-              onChange={e => setSelectedClass(e.target.value)}
-            >
-              {classrooms.map(c => <option key={c}>{c}</option>)}
-            </select>
-            <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
-          </div>
-          <button className="btn btn-outline text-sm gap-1.5">
-            <Filter size={13} /> Filter
-          </button>
-          <button className="btn btn-primary text-sm gap-1.5" onClick={handleGenerate} disabled={generating}>
-            {generating
-              ? <><RefreshCw size={13} className="animate-spin" /> Generating…</>
-              : <><Download size={13} /> Export Report</>
-            }
-          </button>
-        </div>
-      </div>
+  const COLORS = ['#264796', '#3460c4', '#d0ae61', '#d97706', '#dc2626'];
 
-      {generated && (
-        <div className="p-3 rounded-xl flex items-center gap-2 animate-fade-in"
-          style={{ background: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.2)" }}>
-          <Activity size={14} className="text-green-600" />
-          <p className="text-sm text-green-700 font-semibold">Report generated! Download started for <strong>{selectedClass}</strong>.</p>
-        </div>
-      )}
+  const renderOverview = () => {
+    const data = dataSource === "platform" ? analytics : uploadedData;
+    if (!data) return <div className="text-center py-20 opacity-50">No data available</div>;
 
-      {/* Top KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Class Average",     value: "74%",  delta: "+4%", up: true,  color: "#264796" },
-          { label: "Attendance Rate",   value: "81%",  delta: "+2%", up: true,  color: "#16a34a" },
-          { label: "At-Risk Students",  value: "4",    delta: "+1",  up: false, color: "#dc2626" },
-          { label: "AI Confidence Avg", value: "82%",  delta: "+6%", up: true,  color: "#d0ae61" },
-        ].map(kpi => (
-          <GlassCard key={kpi.label} padding="sm">
-            <div className="flex items-center justify-between mb-2">
+    const stats = dataSource === "platform" 
+      ? [
+          { label: "Class Average", value: analytics?.overview.avg_score || "0%", color: "#264796" },
+          { label: "Total Students", value: analytics?.overview.total_students || 0, color: "#16a34a" },
+          { label: "At-Risk Students", value: analytics?.overview.at_risk_count || 0, color: "#dc2626" },
+          { label: "Attendance", value: analytics?.overview.attendance_rate || "0%", color: "#d0ae61" },
+        ]
+      : [
+          { label: "File Average", value: uploadedData?.summary.avg_score || "0%", color: "#264796" },
+          { label: "Total Rows", value: uploadedData?.summary.rows || 0, color: "#16a34a" },
+          { label: "At-Risk", value: uploadedData?.risk_students.length || 0, color: "#dc2626" },
+          { label: "Columns", value: uploadedData?.summary.columns.length || 0, color: "#d0ae61" },
+        ];
+
+    return (
+      <div className="space-y-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map(kpi => (
+            <GlassCard key={kpi.label} padding="sm">
               <p className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>{kpi.label}</p>
-              <span className={`badge text-[9px] px-1.5 py-0.5 flex items-center gap-0.5 ${kpi.up ? "badge-green" : "badge-red"}`}>
-                {kpi.up ? <ArrowUp size={8} /> : <ArrowDown size={8} />}
-                {kpi.delta}
-              </span>
-            </div>
-            <p className="text-2xl font-black" style={{ color: kpi.color, fontFamily: "var(--font-display)" }}>{kpi.value}</p>
-          </GlassCard>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <GlassCard padding="none">
-        <div className="flex border-b" style={{ borderColor: "rgba(38,71,150,0.1)" }}>
-          {(["overview", "risk", "subjects"] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`px-5 py-3.5 text-sm font-semibold capitalize transition-colors ${
-                activeTab === tab ? "border-b-2 border-[#264796] text-[#264796]" : "text-slate-400 hover:text-slate-600"
-              }`}>
-              {tab === "risk" ? "Risk Heatmap" : tab === "subjects" ? "Subject Breakdown" : "Overview"}
-            </button>
+              <p className="text-2xl font-black mt-1" style={{ color: kpi.color, fontFamily: "var(--font-display)" }}>{kpi.value}</p>
+            </GlassCard>
           ))}
         </div>
 
-        <div className="p-5">
-          {/* ── Overview Tab ── */}
-          {activeTab === "overview" && (
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Trend Chart */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="font-semibold text-sm" style={{ color: "var(--color-text-primary)" }}>Score Trend (6 Months)</p>
-                    <span className="badge badge-blue text-[10px]">+14% improvement</span>
-                  </div>
-                  <MiniBar data={performanceTrend} />
-                </div>
-
-                {/* Distribution Donut (CSS-only approximation) */}
-                <div>
-                  <p className="font-semibold text-sm mb-3" style={{ color: "var(--color-text-primary)" }}>Grade Distribution</p>
-                  <div className="space-y-2.5">
-                    {[
-                      { grade: "O (90–100%)", pct: 12, color: "#264796" },
-                      { grade: "A+ (80–89%)", pct: 28, color: "#3460c4" },
-                      { grade: "A (70–79%)",  pct: 31, color: "#d0ae61" },
-                      { grade: "B+ (60–69%)", pct: 18, color: "#d97706" },
-                      { grade: "Below 60%",   pct: 11, color: "#dc2626" },
-                    ].map(g => (
-                      <div key={g.grade} className="flex items-center gap-3">
-                        <span className="text-xs w-28 shrink-0" style={{ color: "var(--color-text-secondary)" }}>{g.grade}</span>
-                        <div className="flex-1 h-5 rounded-full overflow-hidden" style={{ background: "rgba(38,71,150,0.07)" }}>
-                          <div
-                            className="h-full rounded-full transition-all duration-700 flex items-center justify-end pr-2"
-                            style={{ width: `${g.pct}%`, background: g.color }}
-                          >
-                            <span className="text-[9px] text-white font-bold">{g.pct}%</span>
-                          </div>
-                        </div>
-                      </div>
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Main Chart */}
+          <GlassCard padding="md" className="h-[350px]">
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+              <TrendingUp size={16} /> {dataSource === "platform" ? "Performance Trend" : "Grade Distribution"}
+            </h3>
+            <ResponsiveContainer width="100%" height="90%">
+              {dataSource === "platform" ? (
+                <AreaChart data={analytics?.performance_trend}>
+                  <defs>
+                    <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#264796" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#264796" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  />
+                  <Area type="monotone" dataKey="score" stroke="#264796" fillOpacity={1} fill="url(#colorAvg)" strokeWidth={3} />
+                </AreaChart>
+              ) : (
+                <BarChart data={uploadedData?.distribution}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                  <XAxis dataKey="grade" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                  <Tooltip />
+                  <Bar dataKey="pct" fill="#3460c4" radius={[4, 4, 0, 0]} barSize={40}>
+                    {uploadedData?.distribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
+                  </Bar>
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </GlassCard>
+
+          {/* Secondary Stats */}
+          <GlassCard padding="md" className="h-[350px]">
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+              <PieChartIcon size={16} /> Subject/Category Breakdown
+            </h3>
+            <ResponsiveContainer width="100%" height="90%">
+              <PieChart>
+                <Pie
+                  data={dataSource === "platform" ? analytics?.subject_breakdown : uploadedData?.distribution}
+                  cx="50%" cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey={dataSource === "platform" ? "avg" : "pct"}
+                  nameKey={dataSource === "platform" ? "subject" : "grade"}
+                >
+                  {(dataSource === "platform" ? analytics?.subject_breakdown : uploadedData?.distribution)?.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </GlassCard>
+        </div>
+      </div>
+    );
+  };
+
+  const renderRiskTable = () => {
+    const students = dataSource === "platform" ? analytics?.risk_students : uploadedData?.risk_students;
+    if (!students || students.length === 0) return <div className="text-center py-20 opacity-50">No at-risk students identified</div>;
+
+    return (
+      <div className="space-y-3">
+        {students.map((s: any) => (
+          <div key={s.id} className="animate-fade-in-up">
+            <div
+              className="flex items-center gap-3 p-4 rounded-xl cursor-pointer hover:shadow-md transition-all bg-white/60 border border-slate-100 hover:border-blue-200"
+              onClick={() => setExpandedStudent(expandedStudent === s.id ? null : s.id)}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                s.level === "high" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
+              }`}>
+                {s.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-800">{s.name}</p>
+                <p className="text-[11px] text-slate-500">{s.id}</p>
+              </div>
+              <div className="flex gap-4">
+                 <RiskCell value={100 - (s.attendance || 80)} label="Absent" />
+                 <RiskCell value={100 - s.avgScore} label="Marks" />
+              </div>
+              <div className="w-16 text-center">
+                <p className={`text-lg font-black ${s.level === "high" ? "text-red-600" : "text-orange-600"}`}>{s.risk}</p>
+                <span className={`text-[9px] font-bold uppercase ${s.level === "high" ? "text-red-500" : "text-orange-500"}`}>{s.level}</span>
+              </div>
+              <ChevronDown size={16} className={`text-slate-400 transition-transform ${expandedStudent === s.id ? "rotate-180" : ""}`} />
+            </div>
+            {expandedStudent === s.id && (
+              <div className="mx-4 p-4 rounded-b-xl border-x border-b border-slate-100 bg-slate-50/50 animate-slide-down space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
+                    <p className="text-xs text-slate-500 mb-1">Avg Score</p>
+                    <p className="text-lg font-bold text-slate-800">{s.avgScore.toFixed(1)}%</p>
+                  </div>
+                  <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
+                    <p className="text-xs text-slate-500 mb-1">Attendance</p>
+                    <p className="text-lg font-bold text-slate-800">{s.attendance || 85}%</p>
+                  </div>
+                  <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
+                    <p className="text-xs text-slate-500 mb-1">Risk Factor</p>
+                    <p className={`text-lg font-bold ${s.level === 'high' ? 'text-red-600' : 'text-orange-600'}`}>{s.risk}</p>
                   </div>
                 </div>
-              </div>
-
-              {/* Engagement Metrics */}
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "Assignments Submitted", value: "87%", color: "#264796" },
-                  { label: "Quiz Participation",    value: "92%", color: "#16a34a" },
-                  { label: "Resource Downloads",    value: "634", color: "#d0ae61" },
-                ].map(m => (
-                  <div key={m.label} className="p-4 rounded-xl text-center"
-                    style={{ background: "rgba(38,71,150,0.04)", border: "1px solid rgba(38,71,150,0.1)" }}>
-                    <p className="text-2xl font-black mb-1" style={{ color: m.color, fontFamily: "var(--font-display)" }}>{m.value}</p>
-                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{m.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── Risk Heatmap Tab ── */}
-          {activeTab === "risk" && (
-            <div className="space-y-5">
-              <div className="flex items-center gap-2 p-3 rounded-xl text-sm"
-                style={{ background: "rgba(38,71,150,0.05)", border: "1px solid rgba(38,71,150,0.12)" }}>
-                <Info size={14} style={{ color: "var(--color-brand-blue)", flexShrink: 0 }} />
-                <p style={{ color: "var(--color-text-secondary)" }}>
-                  Risk scores are computed daily at 02:00 AM using AI-weighted factors: attendance, marks, and assignment completion.
-                </p>
-              </div>
-
-              {/* Legend */}
-              <div className="flex items-center gap-4 text-xs">
-                {[{ l: "Low (0–49)", c: "#16a34a", bg: "rgba(22,163,74,0.1)" },
-                  { l: "Moderate (50–74)", c: "#d97706", bg: "rgba(217,119,6,0.1)" },
-                  { l: "High (75–100)", c: "#dc2626", bg: "rgba(220,38,38,0.1)" }].map(x => (
-                  <span key={x.l} className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full" style={{ background: x.c }} />
-                    <span style={{ color: "var(--color-text-secondary)" }}>{x.l}</span>
-                  </span>
-                ))}
-              </div>
-
-              {/* Student Risk Rows */}
-              <div className="space-y-2">
-                {riskStudents.map(s => (
-                  <div key={s.id}>
-                    <div
-                      className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:shadow-sm transition-all"
-                      style={{ border: "1px solid rgba(38,71,150,0.1)", background: "rgba(255,255,255,0.6)" }}
-                      onClick={() => setExpandedStudent(expandedStudent === s.id ? null : s.id)}
-                    >
-                      {/* Avatar */}
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-                        s.level === "high" ? "bg-red-100 text-red-700" :
-                        s.level === "moderate" ? "bg-orange-100 text-orange-700" :
-                        "bg-green-100 text-green-700"
-                      }`}>
-                        {s.name.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{s.name}</p>
-                        <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{s.id}</p>
-                      </div>
-                      {/* Heatmap Cells */}
-                      <div className="flex gap-2">
-                        <RiskCell value={100 - s.attendance} label="Absent" />
-                        <RiskCell value={100 - s.avgScore}   label="Marks"  />
-                        <RiskCell value={100 - s.assignments} label="Assign" />
-                      </div>
-                      {/* Overall Risk */}
-                      <div className="text-center w-16 shrink-0">
-                        <p className={`text-lg font-black ${
-                          s.level === "high" ? "text-red-600" : s.level === "moderate" ? "text-orange-600" : "text-green-600"
-                        }`} style={{ fontFamily: "var(--font-display)" }}>
-                          {s.risk}
-                        </p>
-                        <span className={`badge text-[9px] px-1.5 ${
-                          s.level === "high" ? "badge-red" : s.level === "moderate" ? "badge-orange" : "badge-green"
-                        }`}>
-                          {s.level}
-                        </span>
-                      </div>
-                      <Eye size={15} className="text-slate-300 shrink-0" />
-                    </div>
-
-                    {/* Drill-down */}
-                    {expandedStudent === s.id && (
-                      <div className="ml-12 p-4 rounded-xl mt-1 animate-fade-in space-y-3"
-                        style={{ background: "rgba(38,71,150,0.04)", border: "1px solid rgba(38,71,150,0.1)" }}>
-                        <div className="grid grid-cols-3 gap-3 text-center">
-                          {[
-                            { l: "Attendance", v: `${s.attendance}%`, ok: s.attendance >= 75 },
-                            { l: "Avg Score",  v: `${s.avgScore}%`,   ok: s.avgScore >= 50  },
-                            { l: "Assignments",v: `${s.assignments}%`, ok: s.assignments >= 70},
-                          ].map(item => (
-                            <div key={item.l} className="p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.7)" }}>
-                              <p className="text-lg font-bold" style={{ color: item.ok ? "#16a34a" : "#dc2626", fontFamily: "var(--font-display)" }}>{item.v}</p>
-                              <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{item.l}</p>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex gap-2">
-                          <button className="btn btn-primary text-xs flex-1">Contact Student</button>
-                          <button className="btn btn-outline text-xs flex-1">Schedule Meeting</button>
-                          <button className="btn btn-ghost text-xs flex-1">View Full Profile</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <button className="btn btn-gold w-full text-sm py-3 font-bold" onClick={handleGenerate} disabled={generating}>
-                <BrainCircuit size={15} />
-                {generating ? "Running AI Analysis…" : "Run Global AI Risk Analysis"}
-              </button>
-            </div>
-          )}
-
-          {/* ── Subject Breakdown Tab ── */}
-          {activeTab === "subjects" && (
-            <div className="space-y-4">
-              {subjectBreakdown.map(sub => (
-                <div key={sub.subject} className="p-4 rounded-xl"
-                  style={{ border: "1px solid rgba(38,71,150,0.1)", background: "rgba(255,255,255,0.6)" }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="font-semibold text-sm" style={{ color: "var(--color-text-primary)" }}>{sub.subject}</p>
-                    <span className="badge badge-blue text-xs">Avg: {sub.avg}%</span>
-                  </div>
-                  <div className="relative h-6 rounded-full overflow-hidden mb-2"
-                    style={{ background: "rgba(38,71,150,0.08)" }}>
-                    {/* Range bar */}
-                    <div
-                      className="absolute top-0 h-full rounded-full"
-                      style={{
-                        left: `${sub.lowest}%`,
-                        width: `${sub.highest - sub.lowest}%`,
-                        background: "linear-gradient(90deg,rgba(220,38,38,0.3),rgba(38,71,150,0.5),rgba(22,163,74,0.3))",
-                      }}
-                    />
-                    {/* Avg marker */}
-                    <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-[#264796]"
-                      style={{ left: `${sub.avg}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-[11px]" style={{ color: "var(--color-text-muted)" }}>
-                    <span>Lowest: <strong style={{ color: "#dc2626" }}>{sub.lowest}%</strong></span>
-                    <span>Students: <strong>{sub.submitted}</strong></span>
-                    <span>Highest: <strong style={{ color: "#16a34a" }}>{sub.highest}%</strong></span>
-                  </div>
+                <div className="flex gap-2">
+                  <button className="btn btn-primary text-xs flex-1 py-2">Create Intervention Plan</button>
+                  <button className="btn btn-outline text-xs flex-1 py-2">Notify Parents</button>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto px-2">
+      {/* Top Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-blue-900 to-blue-600 bg-clip-text text-transparent" style={{ fontFamily: "var(--font-display)" }}>
+            Risk Intelligence Dashboard
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">Real-time performance monitoring and predictive risk analytics.</p>
+        </div>
+
+        <div className="flex items-center gap-3 bg-white p-1 rounded-2xl border border-slate-100 shadow-sm self-start">
+          <button 
+            onClick={() => setDataSource("platform")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+              dataSource === "platform" ? "bg-blue-900 text-white shadow-lg shadow-blue-900/20" : "text-slate-400 hover:bg-slate-50"
+            }`}
+          >
+            <Database size={16} /> Platform Data
+          </button>
+          <button 
+            onClick={() => {
+              if (!uploadedData) fileInputRef.current?.click();
+              else setDataSource("upload");
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+              dataSource === "upload" ? "bg-gold-500 text-white shadow-lg shadow-gold-500/20" : "text-slate-400 hover:bg-slate-50"
+            }`}
+          >
+            <Upload size={16} /> External Data
+          </button>
+        </div>
+      </div>
+
+      {/* Control Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 py-2 border-y border-slate-100">
+        <div className="flex items-center gap-3">
+          {dataSource === "platform" ? (
+            <>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Selected Course:</span>
+              <div className="relative">
+                <select 
+                  className="bg-transparent border-none font-bold text-blue-900 text-sm focus:ring-0 cursor-pointer pr-8"
+                  value={selectedCourseId || ""}
+                  onChange={e => setSelectedCourseId(Number(e.target.value))}
+                >
+                  {Array.isArray(courses) && courses.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 text-blue-900 pointer-events-none" />
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active File:</span>
+              <span className="text-sm font-bold text-gold-600 flex items-center gap-1">
+                <FileSpreadsheet size={14} /> analysis_export_v1.xlsx
+              </span>
+              <button onClick={() => fileInputRef.current?.click()} className="text-[10px] text-blue-500 font-bold hover:underline ml-2">Change File</button>
+            </>
           )}
         </div>
-      </GlassCard>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 mr-4">
+            <span className="text-[10px] font-bold text-slate-400">IMPUTE:</span>
+            <select 
+              className="text-[10px] font-bold bg-slate-100 rounded-lg border-none py-1 px-2 focus:ring-0"
+              value={imputeMethod}
+              onChange={e => setImputeMethod(e.target.value)}
+            >
+              <option value="zero">Fill Zeros</option>
+              <option value="mean">Average Impute</option>
+              <option value="blank">Keep Blank</option>
+            </select>
+          </div>
+          <button className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors">
+            <RefreshCw size={18} className={loading || uploading ? "animate-spin" : ""} />
+          </button>
+          <button className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors">
+            <Download size={14} /> Export Report
+          </button>
+        </div>
+      </div>
+
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileUpload} 
+        className="hidden" 
+        accept=".csv,.xlsx,.xls"
+      />
+
+      {/* Tabs Navigation */}
+      <div className="flex gap-1 bg-slate-100/50 p-1 rounded-2xl w-fit">
+        {(["overview", "risk", "subjects", "raw"] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold capitalize transition-all ${
+              activeTab === tab ? "bg-white text-blue-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            {tab === "risk" ? "Risk Heatmap" : tab === "subjects" ? "Detailed Insights" : tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="min-h-[500px]">
+        {loading || uploading ? (
+          <div className="flex flex-col items-center justify-center py-40 gap-4">
+            <div className="w-12 h-12 border-4 border-blue-900/10 border-t-blue-900 rounded-full animate-spin" />
+            <p className="text-sm font-bold text-slate-500">{uploading ? "Analyzing document patterns..." : "Crunching platform data..."}</p>
+          </div>
+        ) : (
+          <>
+            {activeTab === "overview" && renderOverview()}
+            {activeTab === "risk" && renderRiskTable()}
+            {activeTab === "subjects" && (
+              <GlassCard className="p-6">
+                <h3 className="text-lg font-bold mb-6">Subject Performance Distribution</h3>
+                <div className="space-y-8">
+                  {(dataSource === "platform" ? analytics?.subject_breakdown : uploadedData?.distribution)?.map((item: any, idx: number) => (
+                    <div key={idx} className="space-y-2">
+                      <div className="flex justify-between items-end">
+                        <span className="text-sm font-bold text-slate-700">{item.subject || item.grade}</span>
+                        <span className="text-sm font-black text-blue-900">{item.avg || item.pct}%</span>
+                      </div>
+                      <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full transition-all duration-1000 ease-out rounded-full"
+                          style={{ 
+                            width: `${item.avg || item.pct}%`, 
+                            background: `linear-gradient(90deg, ${COLORS[idx % COLORS.length]}, ${COLORS[idx % COLORS.length]}dd)`
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            )}
+            {activeTab === "raw" && (
+              <GlassCard className="overflow-hidden border border-slate-100 shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        {(dataSource === "platform" ? ['Student', 'Score', 'Exam', 'Date'] : uploadedData?.summary.columns)?.map(col => (
+                          <th key={col} className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider">{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {(dataSource === "platform" ? [] : uploadedData?.raw_data)?.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                          {uploadedData?.summary.columns.map(col => (
+                            <td key={col} className="px-4 py-3 text-slate-600 font-medium">{String(row[col])}</td>
+                          ))}
+                        </tr>
+                      ))}
+                      {dataSource === "platform" && (
+                        <tr><td colSpan={4} className="py-20 text-center opacity-40">Raw database records view coming soon</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </GlassCard>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 };

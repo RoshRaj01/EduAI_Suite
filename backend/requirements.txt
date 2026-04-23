@@ -12,3 +12,5 @@ email-validator
 httpx
 groq
 dotenv
+pandas
+openpyxl
