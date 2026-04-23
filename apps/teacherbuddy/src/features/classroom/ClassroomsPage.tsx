@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle, Edit2, AlertTriangle, Download, User } from "lucide-react";
+import { Users, Clock, PlusCircle, FilePlus, UserPlus, Megaphone, Trash2, X, Paperclip, AlertCircle, Edit2, AlertTriangle, Download, User, Activity, TrendingUp, BarChart3, Gamepad2, FileCheck, ClipboardList, ChevronRight, Eye, Award, Target, BookOpen, Zap, AlertOctagon, CheckCircle2, XCircle, Timer, Sparkles, ShieldAlert } from "lucide-react";
 
 const API_URL = "http://localhost:8000";
 
@@ -21,7 +21,18 @@ export const ClassroomsPage: React.FC = () => {
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"home" | "assignments" | "students">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "assignments" | "students" | "engagement">("home");
+
+  // Engagement State
+  const [engagementData, setEngagementData] = useState<any>(null);
+  const [engagementLoading, setEngagementLoading] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [studentProfileData, setStudentProfileData] = useState<any>(null);
+  const [showStudentProfile, setShowStudentProfile] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileTab, setProfileTab] = useState<"overview" | "assignments" | "exams" | "games" | "timeline">("overview");
+  const [engagementSortKey, setEngagementSortKey] = useState<string>("engagement_score");
+  const [engagementSortDir, setEngagementSortDir] = useState<"asc" | "desc">("desc");
 
   // Modals
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -104,6 +115,88 @@ export const ClassroomsPage: React.FC = () => {
     }
   }, []);
   useEffect(() => { if (selectedId) fetchCourseData(); }, [selectedId]);
+
+  // Engagement data fetching
+  const fetchEngagement = async () => {
+    if (!selectedId) return;
+    setEngagementLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/engagement/${selectedId}/summary`);
+      const data = await res.json();
+      setEngagementData(data);
+    } catch {
+      setErrorMsg("Failed to load engagement data.");
+    } finally {
+      setEngagementLoading(false);
+    }
+  };
+
+  const fetchStudentProfile = async (studentId: number) => {
+    setProfileLoading(true);
+    setProfileTab("overview");
+    try {
+      const res = await fetch(`${API_URL}/engagement/student/${studentId}`);
+      const data = await res.json();
+      setStudentProfileData(data);
+    } catch {
+      setErrorMsg("Failed to load student profile.");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const openStudentProfile = (student: any) => {
+    setSelectedStudent(student);
+    setShowStudentProfile(true);
+    // Engagement-tab rows use student_id; students-tab rows use id
+    fetchStudentProfile(student.student_id ?? student.id);
+  };
+
+  useEffect(() => {
+    if (activeTab === "engagement" && selectedId) {
+      fetchEngagement();
+    }
+  }, [activeTab, selectedId]);
+
+  // Engagement helpers
+  const getEngagementColor = (level: string) => {
+    switch (level) {
+      case "excellent": return { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" };
+      case "good": return { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" };
+      case "needs_attention": return { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-500" };
+      case "at_risk": return { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", dot: "bg-red-500" };
+      default: return { bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-200", dot: "bg-slate-400" };
+    }
+  };
+
+  const getEngagementLabel = (level: string) => {
+    switch (level) {
+      case "excellent": return "Excellent";
+      case "good": return "Good";
+      case "needs_attention": return "Needs Attention";
+      case "at_risk": return "At Risk";
+      default: return "Unknown";
+    }
+  };
+
+  const sortedEngagementStudents = engagementData?.students
+    ? [...engagementData.students].sort((a: any, b: any) => {
+        let aVal = a[engagementSortKey] ?? 0;
+        let bVal = b[engagementSortKey] ?? 0;
+        if (engagementSortKey === "assignments.completion_rate") { aVal = a.assignments?.completion_rate ?? 0; bVal = b.assignments?.completion_rate ?? 0; }
+        if (engagementSortKey === "games.sessions_played") { aVal = a.games?.sessions_played ?? 0; bVal = b.games?.sessions_played ?? 0; }
+        return engagementSortDir === "desc" ? bVal - aVal : aVal - bVal;
+      })
+    : [];
+
+  const toggleSort = (key: string) => {
+    if (engagementSortKey === key) {
+      setEngagementSortDir(d => d === "desc" ? "asc" : "desc");
+    } else {
+      setEngagementSortKey(key);
+      setEngagementSortDir("desc");
+    }
+  };
 
   const handleApiCall = async (action: () => Promise<Response>, onSuccess: () => void) => {
     try {
@@ -430,7 +523,7 @@ export const ClassroomsPage: React.FC = () => {
               </div>
 
               <div className="flex justify-center gap-10 border-b border-slate-200 pb-0 mt-6 px-4">
-                {["home", "assignments", "students"].map((tab) => (
+                {["home", "assignments", "students", "engagement"].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab as any)}
@@ -551,22 +644,183 @@ export const ClassroomsPage: React.FC = () => {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {students.map((s: any) => (
-                          <div key={s.id} className="p-4 bg-white rounded-xl border border-slate-200 flex items-center justify-between group shadow-sm hover:shadow-md hover:border-brand-blue/30 transition-all">
+                          <div key={s.id} onClick={() => openStudentProfile(s)} className="p-4 bg-white rounded-xl border border-slate-200 flex items-center justify-between group shadow-sm hover:shadow-lg hover:border-brand-blue/40 transition-all cursor-pointer hover:scale-[1.01]">
                             <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-extrabold text-lg shadow-md"
-                                style={{ background: "var(--color-brand-blue)" }}>{s.name.charAt(0)}</div>
+                              <div className="relative">
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-extrabold text-lg shadow-md"
+                                  style={{ background: "var(--color-brand-blue)" }}>{s.name.charAt(0)}</div>
+                                <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${s.attendance > 60 ? 'bg-emerald-500' : s.attendance > 30 ? 'bg-amber-500' : 'bg-red-500'}`} title={`Attendance: ${s.attendance}%`} />
+                              </div>
                               <div>
-                                <p className="font-bold text-slate-900 ">{s.name}</p>
+                                <p className="font-bold text-slate-900">{s.name}</p>
                                 <p className="text-xs font-bold text-slate-500 mt-1">{s.registration_number} • {s.department}</p>
-                                <p className="text-[10px] font-bold text-brand-blue ">{s.email}</p>
+                                <p className="text-[10px] font-bold text-brand-blue">{s.email}</p>
                               </div>
                             </div>
-                            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteStudent(s.id); }} className="relative z-10 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-100 p-2 rounded-lg transition-all cursor-pointer">
-                              <Trash2 size={18} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openStudentProfile(s); }} className="text-brand-blue hover:bg-blue-50 p-2 rounded-lg transition-all cursor-pointer" title="View Profile">
+                                <Eye size={18} />
+                              </button>
+                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteStudent(s.id); }} className="relative z-10 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-100 p-2 rounded-lg transition-all cursor-pointer">
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "engagement" && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {engagementLoading ? (
+                      <div className="flex flex-col items-center justify-center py-20">
+                        <div className="w-10 h-10 border-4 border-brand-blue border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p className="text-sm font-bold text-slate-500">Analyzing student engagement...</p>
+                      </div>
+                    ) : !engagementData || engagementData.total_students === 0 ? (
+                      <div className="text-center py-16 rounded-2xl bg-white/60 border border-slate-200">
+                        <Activity size={48} className="mx-auto mb-4 text-slate-300" />
+                        <p className="text-slate-500 font-medium">No engagement data available. Enroll students and create assignments to begin tracking.</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Engagement Overview Cards */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="p-2.5 bg-blue-50 rounded-xl"><TrendingUp size={20} className="text-brand-blue" /></div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Avg Engagement</p>
+                            </div>
+                            <p className="text-3xl font-extrabold text-slate-900">{engagementData.class_avg_engagement}%</p>
+                          </div>
+                          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="p-2.5 bg-emerald-50 rounded-xl"><CheckCircle2 size={20} className="text-emerald-600" /></div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Avg Attendance</p>
+                            </div>
+                            <p className="text-3xl font-extrabold text-slate-900">{engagementData.class_avg_attendance}%</p>
+                          </div>
+                          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="p-2.5 bg-purple-50 rounded-xl"><FileCheck size={20} className="text-purple-600" /></div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Assignment Rate</p>
+                            </div>
+                            <p className="text-3xl font-extrabold text-slate-900">{engagementData.class_avg_assignment_completion}%</p>
+                          </div>
+                          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="p-2.5 bg-red-50 rounded-xl"><AlertOctagon size={20} className="text-red-500" /></div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">At Risk</p>
+                            </div>
+                            <p className="text-3xl font-extrabold text-red-600">{engagementData.at_risk_count}</p>
+                            {engagementData.needs_attention_count > 0 && <p className="text-xs font-bold text-amber-600 mt-1">+{engagementData.needs_attention_count} need attention</p>}
+                          </div>
+                        </div>
+
+                        {/* Student Engagement Table */}
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-blue-50 rounded-lg"><BarChart3 size={20} className="text-brand-blue" /></div>
+                              <h3 className="font-extrabold text-lg text-slate-900">Student Engagement Rankings</h3>
+                            </div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{engagementData.total_students} Students</p>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-slate-100 bg-slate-50/50">
+                                  <th className="text-left px-5 py-3 font-bold text-[10px] uppercase tracking-widest text-slate-500">#</th>
+                                  <th className="text-left px-5 py-3 font-bold text-[10px] uppercase tracking-widest text-slate-500">Student</th>
+                                  <th className="text-center px-3 py-3 font-bold text-[10px] uppercase tracking-widest text-slate-500 cursor-pointer hover:text-brand-blue select-none" onClick={() => toggleSort("engagement_score")}>Score {engagementSortKey === "engagement_score" ? (engagementSortDir === "desc" ? "↓" : "↑") : ""}</th>
+                                  <th className="text-center px-3 py-3 font-bold text-[10px] uppercase tracking-widest text-slate-500 cursor-pointer hover:text-brand-blue select-none" onClick={() => toggleSort("attendance")}>Attend. {engagementSortKey === "attendance" ? (engagementSortDir === "desc" ? "↓" : "↑") : ""}</th>
+                                  <th className="text-center px-3 py-3 font-bold text-[10px] uppercase tracking-widest text-slate-500 cursor-pointer hover:text-brand-blue select-none" onClick={() => toggleSort("assignments.completion_rate")}>Assign. {engagementSortKey === "assignments.completion_rate" ? (engagementSortDir === "desc" ? "↓" : "↑") : ""}</th>
+                                  <th className="text-center px-3 py-3 font-bold text-[10px] uppercase tracking-widest text-slate-500 cursor-pointer hover:text-brand-blue select-none" onClick={() => toggleSort("games.sessions_played")}>Games {engagementSortKey === "games.sessions_played" ? (engagementSortDir === "desc" ? "↓" : "↑") : ""}</th>
+                                  <th className="text-center px-3 py-3 font-bold text-[10px] uppercase tracking-widest text-slate-500">Status</th>
+                                  <th className="text-center px-3 py-3 font-bold text-[10px] uppercase tracking-widest text-slate-500"></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sortedEngagementStudents.map((s: any, idx: number) => {
+                                  const colors = getEngagementColor(s.engagement_level);
+                                  return (
+                                    <tr key={s.student_id} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors cursor-pointer" onClick={() => openStudentProfile(s)}>
+                                      <td className="px-5 py-3.5 font-extrabold text-slate-400">{idx + 1}</td>
+                                      <td className="px-5 py-3.5">
+                                        <div className="flex items-center gap-3">
+                                          <div className="relative">
+                                            <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ background: "var(--color-brand-blue)" }}>{s.name.charAt(0)}</div>
+                                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${colors.dot}`} />
+                                          </div>
+                                          <div>
+                                            <p className="font-bold text-slate-900 text-sm">{s.name}</p>
+                                            <p className="text-[10px] text-slate-500 font-semibold">{s.registration_number}</p>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="text-center px-3 py-3.5">
+                                        <span className="text-base font-extrabold text-slate-900">{s.engagement_score}</span>
+                                      </td>
+                                      <td className="text-center px-3 py-3.5 font-bold text-slate-700">{s.attendance}%</td>
+                                      <td className="text-center px-3 py-3.5 font-bold text-slate-700">{s.assignments.completion_rate}%</td>
+                                      <td className="text-center px-3 py-3.5 font-bold text-slate-700">{s.games.sessions_played}</td>
+                                      <td className="text-center px-3 py-3.5">
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${colors.bg} ${colors.text} ${colors.border} border`}>{getEngagementLabel(s.engagement_level)}</span>
+                                      </td>
+                                      <td className="text-center px-3 py-3.5">
+                                        <button className="text-brand-blue hover:bg-blue-50 p-1.5 rounded-lg transition-all" title="View Profile"><ChevronRight size={16} /></button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* At-Risk Alerts */}
+                        {(engagementData.at_risk_count > 0 || engagementData.needs_attention_count > 0) && (
+                          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="p-5 border-b border-slate-200 flex items-center gap-3">
+                              <div className="p-2 bg-red-50 rounded-lg"><ShieldAlert size={20} className="text-red-500" /></div>
+                              <div>
+                                <h3 className="font-extrabold text-lg text-slate-900">Students Needing Attention</h3>
+                                <p className="text-xs text-slate-500 font-semibold">{engagementData.at_risk_count + engagementData.needs_attention_count} student(s) flagged</p>
+                              </div>
+                            </div>
+                            <div className="divide-y divide-slate-100">
+                              {sortedEngagementStudents
+                                .filter((s: any) => s.engagement_level === "at_risk" || s.engagement_level === "needs_attention")
+                                .map((s: any) => {
+                                  const colors = getEngagementColor(s.engagement_level);
+                                  return (
+                                    <div key={s.student_id} className="p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors cursor-pointer" onClick={() => openStudentProfile(s)}>
+                                      <div className="flex items-center gap-3">
+                                        <div className="relative">
+                                          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ background: s.engagement_level === 'at_risk' ? '#ef4444' : '#f59e0b' }}>{s.name.charAt(0)}</div>
+                                        </div>
+                                        <div>
+                                          <p className="font-bold text-slate-900 text-sm">{s.name}</p>
+                                          <div className="flex items-center gap-3 mt-0.5">
+                                            <span className="text-[10px] font-bold text-slate-400">Attend: {s.attendance}%</span>
+                                            <span className="text-[10px] font-bold text-slate-400">Assign: {s.assignments?.completion_rate ?? 0}%</span>
+                                            <span className="text-[10px] font-bold text-slate-400">Score: {s.engagement_score}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${colors.bg} ${colors.text} ${colors.border} border`}>{getEngagementLabel(s.engagement_level)}</span>
+                                        <ChevronRight size={16} className="text-slate-400" />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -789,6 +1043,230 @@ export const ClassroomsPage: React.FC = () => {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Student Profile Card Modal ── */}
+      {showStudentProfile && (
+        <div className="fixed inset-0 z-[60] flex justify-end bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setShowStudentProfile(false)}>
+          <div className="bg-white w-full max-w-2xl h-full overflow-y-auto shadow-[0_0_80px_rgba(0,0,0,0.2)] animate-in slide-in-from-right duration-300" onClick={e => e.stopPropagation()}>
+            
+            {profileLoading ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                <div className="w-12 h-12 border-4 border-brand-blue border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-sm font-bold text-slate-500">Loading student profile...</p>
+              </div>
+            ) : !studentProfileData ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                <p className="text-slate-500 font-medium">No data available.</p>
+              </div>
+            ) : (
+              <>
+                {/* Profile Header */}
+                <div className="relative overflow-hidden">
+                  <div className="p-8 pb-6" style={{ background: "linear-gradient(135deg, #264796, #1a202c)" }}>
+                    <button onClick={() => setShowStudentProfile(false)} className="absolute top-4 right-4 text-white/60 hover:text-white bg-white/10 p-2 rounded-full transition-colors">
+                      <X size={20} />
+                    </button>
+                    <div className="flex items-center gap-5">
+                      <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-2xl" style={{ background: "linear-gradient(135deg, #3460c4, #d0ae61)" }}>
+                        {(studentProfileData.name ?? '?').charAt(0)}
+                      </div>
+                      <div className="text-white">
+                        <h2 className="text-2xl font-black tracking-tight">{studentProfileData.name}</h2>
+                        <p className="text-white/60 text-sm font-semibold mt-1">{studentProfileData.registration_number} • {studentProfileData.department}</p>
+                        <p className="text-white/40 text-xs font-bold mt-1">{studentProfileData.email}</p>
+                      </div>
+                    </div>
+
+                    {/* Engagement Score Ring */}
+                    <div className="mt-5 flex items-center gap-6">
+                      <div className="relative w-16 h-16">
+                        <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                          <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
+                          <circle cx="32" cy="32" r="28" fill="none" stroke={studentProfileData.engagement_level === 'excellent' ? '#10b981' : studentProfileData.engagement_level === 'good' ? '#3b82f6' : studentProfileData.engagement_level === 'needs_attention' ? '#f59e0b' : '#ef4444'} strokeWidth="5" strokeDasharray={`${(studentProfileData.engagement_score / 100) * 175.9} 175.9`} strokeLinecap="round" />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-white font-black text-lg">{studentProfileData.engagement_score}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Engagement Score</p>
+                        {(() => { const c = getEngagementColor(studentProfileData.engagement_level); return (
+                          <span className={`inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${c.bg} ${c.text} border ${c.border}`}>{getEngagementLabel(studentProfileData.engagement_level)}</span>
+                        ); })()}
+                      </div>
+                      <div className="ml-auto flex gap-4">
+                        <div className="text-center"><p className="text-2xl font-black text-white">{studentProfileData.attendance}%</p><p className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Attendance</p></div>
+                        <div className="text-center"><p className="text-2xl font-black text-white">{studentProfileData.assignments.completion_rate}%</p><p className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Assign.</p></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-[60px] pointer-events-none"></div>
+                </div>
+
+                {/* Profile Tabs */}
+                <div className="flex border-b border-slate-200 px-6">
+                  {(["overview", "assignments", "exams", "games", "timeline"] as const).map(tab => (
+                    <button key={tab} onClick={() => setProfileTab(tab)} className={`py-3 px-4 text-xs font-bold uppercase tracking-wider transition-all relative ${profileTab === tab ? "text-brand-blue" : "text-slate-400 hover:text-slate-600"}`}>
+                      {tab}
+                      {profileTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-blue rounded-t-full" />}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {/* Overview Tab */}
+                  {profileTab === "overview" && (
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                          <div className="flex items-center gap-2 mb-2"><BookOpen size={16} className="text-brand-blue" /><p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Assignments</p></div>
+                          <p className="text-2xl font-extrabold text-slate-900">{studentProfileData.assignments.submitted}/{studentProfileData.assignments.total}</p>
+                          <p className="text-xs text-slate-500 font-semibold mt-1">Avg Grade: {studentProfileData.assignments.avg_grade !== null ? `${studentProfileData.assignments.avg_grade}` : "N/A"}</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                          <div className="flex items-center gap-2 mb-2"><ClipboardList size={16} className="text-purple-600" /><p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Exams</p></div>
+                          <p className="text-2xl font-extrabold text-slate-900">{studentProfileData.exams.total_attempts}</p>
+                          <p className="text-xs text-slate-500 font-semibold mt-1">Avg Score: {studentProfileData.exams.avg_score !== null ? `${studentProfileData.exams.avg_score}` : "N/A"}</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                          <div className="flex items-center gap-2 mb-2"><Gamepad2 size={16} className="text-amber-600" /><p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Games</p></div>
+                          <p className="text-2xl font-extrabold text-slate-900">{studentProfileData.games.sessions_played}</p>
+                          <p className="text-xs text-slate-500 font-semibold mt-1">Score: {studentProfileData.games.total_score} pts</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                          <div className="flex items-center gap-2 mb-2"><Target size={16} className="text-emerald-600" /><p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Words Valid</p></div>
+                          <p className="text-2xl font-extrabold text-slate-900">{studentProfileData.games.total_words_valid}/{studentProfileData.games.total_words_submitted}</p>
+                          <p className="text-xs text-slate-500 font-semibold mt-1">Accuracy: {studentProfileData.games.total_words_submitted > 0 ? `${((studentProfileData.games.total_words_valid / studentProfileData.games.total_words_submitted) * 100).toFixed(0)}%` : "N/A"}</p>
+                        </div>
+                      </div>
+
+                      {/* AI Insight Card */}
+                      {studentProfileData.ai_summary && (
+                        <div className="p-5 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-purple-50 shadow-sm">
+                          <div className="flex items-center gap-2.5 mb-3">
+                            <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-md shadow-indigo-300/40">
+                              <Sparkles size={14} className="text-white" />
+                            </div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">AI Engagement Insight</p>
+                          </div>
+                          <p className="text-sm text-slate-700 leading-relaxed font-medium">{studentProfileData.ai_summary}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Assignments Tab */}
+                  {profileTab === "assignments" && (
+                    <div className="space-y-3 animate-in fade-in duration-300">
+                      {studentProfileData.assignments.details.length === 0 ? (
+                        <div className="text-center py-12 text-slate-400"><BookOpen size={32} className="mx-auto mb-3" /><p className="font-medium">No assignments in this course.</p></div>
+                      ) : (
+                        studentProfileData.assignments.details.map((a: any, i: number) => (
+                          <div key={i} className={`p-4 rounded-xl border flex items-center justify-between ${a.status === "submitted" ? "bg-white border-slate-200" : "bg-red-50/50 border-red-200"}`}>
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className={`p-2 rounded-lg ${a.status === "submitted" ? "bg-emerald-50 text-emerald-600" : "bg-red-100 text-red-500"}`}>
+                                {a.status === "submitted" ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold text-slate-900 text-sm truncate">{a.assignment_title}</p>
+                                <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Due: {a.due_date?.replace("T", " at ") || "N/A"}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-3">
+                              {a.status === "submitted" ? (
+                                <>
+                                  <p className="font-extrabold text-brand-blue text-sm">{a.grade !== null ? `${a.grade}/${a.max_points}` : "Pending"}</p>
+                                  <p className="text-[10px] text-slate-400 font-semibold">{a.submitted_at || ""}</p>
+                                </>
+                              ) : (
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">Missing</span>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Exams Tab */}
+                  {profileTab === "exams" && (
+                    <div className="space-y-3 animate-in fade-in duration-300">
+                      {studentProfileData.exams.details.length === 0 ? (
+                        <div className="text-center py-12 text-slate-400"><ClipboardList size={32} className="mx-auto mb-3" /><p className="font-medium">No exam attempts recorded.</p></div>
+                      ) : (
+                        studentProfileData.exams.details.map((e: any, i: number) => (
+                          <div key={i} className="p-4 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-purple-50 text-purple-600"><ClipboardList size={18} /></div>
+                              <div>
+                                <p className="font-bold text-slate-900 text-sm">{e.exam_title}</p>
+                                <p className="text-[10px] text-slate-500 font-semibold mt-0.5">{e.start_time ? new Date(e.start_time).toLocaleDateString() : "N/A"}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-extrabold text-purple-700 text-sm">{e.score !== null ? e.score : "N/A"}</p>
+                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${e.status === "submitted" ? "bg-green-50 text-green-600 border border-green-200" : "bg-amber-50 text-amber-600 border border-amber-200"}`}>{e.status}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Games Tab */}
+                  {profileTab === "games" && (
+                    <div className="space-y-3 animate-in fade-in duration-300">
+                      {studentProfileData.games.details.length === 0 ? (
+                        <div className="text-center py-12 text-slate-400"><Gamepad2 size={32} className="mx-auto mb-3" /><p className="font-medium">No game sessions recorded.</p></div>
+                      ) : (
+                        studentProfileData.games.details.map((g: any, i: number) => (
+                          <div key={i} className="p-4 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-amber-50 text-amber-600"><Gamepad2 size={18} /></div>
+                              <div>
+                                <p className="font-bold text-slate-900 text-sm">{g.game_name}</p>
+                                <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Words: {g.words_valid}/{g.words_submitted} valid</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-extrabold text-amber-700 text-sm">{g.score} pts</p>
+                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${g.game_status === "completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : g.game_status === "active" ? "bg-blue-50 text-blue-600 border border-blue-200" : "bg-slate-50 text-slate-500 border border-slate-200"}`}>{g.game_status}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Timeline Tab */}
+                  {profileTab === "timeline" && (
+                    <div className="space-y-1 animate-in fade-in duration-300">
+                      {studentProfileData.timeline.length === 0 ? (
+                        <div className="text-center py-12 text-slate-400"><Activity size={32} className="mx-auto mb-3" /><p className="font-medium">No activity recorded yet.</p></div>
+                      ) : (
+                        <div className="relative pl-6 border-l-2 border-slate-200 space-y-4">
+                          {studentProfileData.timeline.map((t: any, i: number) => (
+                            <div key={i} className="relative">
+                              <div className={`absolute -left-[25px] w-4 h-4 rounded-full border-2 border-white ${t.type === "assignment_submission" ? "bg-emerald-500" : t.type === "exam_attempt" ? "bg-purple-500" : "bg-amber-500"}`} />
+                              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 ml-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="font-bold text-slate-900 text-sm">{t.title}</p>
+                                  <p className="text-[10px] text-slate-400 font-bold">{t.timestamp || ""}</p>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">{t.detail}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

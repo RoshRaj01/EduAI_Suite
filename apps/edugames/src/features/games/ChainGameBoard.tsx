@@ -93,9 +93,21 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     }
   };
 
+  const gameName =
+    (gameState as any)?.name ||
+    (gameState as any)?.session?.name ||
+    (gameState as any)?.game?.name ||
+    "Chain Answer Game";
+
+  const gameStatus =
+    (gameState as any)?.gameStatus ||
+    (gameState as any)?.status ||
+    (gameState as any)?.game?.status ||
+    "active";
+
   // Handle timer expiry - auto-skip to next player
   useEffect(() => {
-    if (!gameState || gameState.status !== "active") return;
+    if (!gameState || gameStatus !== "active") return;
     if ((gameState.timer || 0) > 0) return;
 
     const currentPlayer =
@@ -119,7 +131,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     return () => clearTimeout(skipTimer);
   }, [
     gameState?.timer,
-    gameState?.status,
+    gameStatus,
     gameState?.currentPlayerIndex,
     gameState?.players,
     actions,
@@ -128,22 +140,10 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
 
   // Handle game ended state
   useEffect(() => {
-    const status = (gameState as any)?.status;
-    if ((status === "completed" || status === "ended") && onGameEnded) {
+    if ((gameStatus === "completed" || gameStatus === "ended") && onGameEnded) {
       onGameEnded();
     }
-  }, [(gameState as any)?.status, onGameEnded]);
-
-  const gameName =
-    (gameState as any)?.name ||
-    (gameState as any)?.session?.name ||
-    (gameState as any)?.game?.name ||
-    "Chain Answer Game";
-  const gameStatus =
-    (gameState as any)?.gameStatus ||
-    (gameState as any)?.status ||
-    (gameState as any)?.game?.status ||
-    "active";
+  }, [gameStatus, onGameEnded]);
 
   const currentPlayer =
     gameState?.players?.[gameState?.currentPlayerIndex || 0] ||

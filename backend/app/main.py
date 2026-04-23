@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from app.services.groq_service import GroqService
-from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes
+from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.models.user import User
@@ -97,6 +97,7 @@ app.include_router(appointment_routes.router)
 app.include_router(exam_routes.router)
 app.include_router(game_routes.router)
 app.include_router(lesson_routes.router)
+app.include_router(engagement_routes.router)
 app.include_router(websocket_routes.ws_router)
 
 
