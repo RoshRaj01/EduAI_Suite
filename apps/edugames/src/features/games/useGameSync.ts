@@ -35,10 +35,21 @@ export const useGameSync = ({
   // Connect to WebSocket
   const connectWebSocket = useCallback(() => {
     try {
+      if (!sessionId) {
+        console.error("Session ID is required for WebSocket connection");
+        setUseWebSocket(false);
+        if (onError) {
+          onError("Session ID is missing");
+        }
+        return;
+      }
+
       const cleanUrl = API_BASE_URL.trim();
       const backendUrl = new URL(cleanUrl);
       const wsProtocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${wsProtocol}//${backendUrl.host}/ws/games/chain-answer/${sessionId}?user_type=${userType}`;
+      // Properly construct the WebSocket URL with query parameters
+      const encodedSessionId = encodeURIComponent(sessionId);
+      const wsUrl = `${wsProtocol}//${backendUrl.host}/ws/games/chain-answer/${encodedSessionId}?user_type=${userType}`;
 
       console.log("Connecting to WebSocket:", wsUrl);
       ws.current = new WebSocket(wsUrl);
@@ -65,9 +76,9 @@ export const useGameSync = ({
             const chain = message.chain || [];
             const players = message.players || [];
 
-            // Calculate current player index based on last word in chain
-            let currentPlayerIndex = 0;
-            if (chain.length > 0) {
+            // Use currentPlayerIndex from backend if available, otherwise calculate it
+            let currentPlayerIndex = message.currentPlayerIndex || 0;
+            if (!message.currentPlayerIndex && chain.length > 0) {
               const lastWord = chain[chain.length - 1];
               const lastPlayerIndex = players.findIndex(
                 (p: any) =>
@@ -152,6 +163,7 @@ export const useGameSync = ({
       ws.current.onerror = (error) => {
         console.error("WebSocket error:", error);
         setUseWebSocket(false);
+        setIsConnected(false);
         if (onError) {
           onError("WebSocket connection failed. Falling back to polling.");
         }
@@ -160,6 +172,8 @@ export const useGameSync = ({
       ws.current.onclose = () => {
         console.log("WebSocket disconnected");
         setIsConnected(false);
+        // Don't automatically set useWebSocket to false on close
+        // The reconnection logic in useEffect will handle fallback
       };
     } catch (error) {
       console.error("Failed to connect WebSocket:", error);
@@ -223,26 +237,45 @@ export const useGameSync = ({
 
   // Initialize connection
   useEffect(() => {
+    // Only connect if we have required parameters
+    if (!sessionId) {
+      console.warn(
+        "useGameSync: sessionId is missing, skipping WebSocket connection",
+      );
+      return;
+    }
+
     // Try WebSocket first
     connectWebSocket();
 
-    // Fallback to polling if WebSocket fails
+    // Fallback to polling if WebSocket fails to connect
     const fallbackTimer = setTimeout(() => {
-      if (!useWebSocket) {
-        console.log("Falling back to polling");
+      if (!isConnected && useWebSocket) {
+        console.log("WebSocket connection timeout, falling back to polling");
+        setUseWebSocket(false);
         startPolling();
       }
-    }, 3000);
+    }, 5000); // Increased timeout to allow more time for connection
 
     return () => {
       clearTimeout(fallbackTimer);
       stopPolling();
 
-      if (ws.current) {
+      // Only close if the connection is already OPEN
+      // Avoid closing during CONNECTING state to prevent "WebSocket is closed before connection is established" error
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
         ws.current.close();
       }
+      ws.current = null;
     };
-  }, [connectWebSocket, useWebSocket, startPolling, stopPolling]);
+  }, [
+    connectWebSocket,
+    isConnected,
+    useWebSocket,
+    startPolling,
+    stopPolling,
+    sessionId,
+  ]);
 
   // Submit word
   const submitWord = useCallback(

@@ -100,6 +100,7 @@ async def websocket_endpoint(
             for w in game.words
         ]
 
+        # Get players in join order to ensure correct turn sequence
         players = [
             {
                 "id": p.id,
@@ -110,8 +111,17 @@ async def websocket_endpoint(
                 "words_valid": p.words_valid,
                 "status": p.status
             }
-            for p in game.players
+            for p in sorted(game.players, key=lambda x: x.join_order or 0)
         ]
+
+        # Calculate current player index based on number of words in chain
+        # The turn order cycles through players based on word count
+        if players:
+            # Skip the starting word (position 0 is system)
+            valid_words_count = len([w for w in chain if w.get("position", 0) > 0])
+            current_player_index = valid_words_count % len(players)
+        else:
+            current_player_index = 0
 
         await websocket.send_json({
             "type": "initial_state",
@@ -128,6 +138,7 @@ async def websocket_endpoint(
             },
             "players": players,
             "chain": chain,
+            "currentPlayerIndex": current_player_index,
             "user_type": user_type
         })
 
