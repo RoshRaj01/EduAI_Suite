@@ -51,11 +51,9 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     
     for s in submissions:
         if s.grade is not None:
-            # Try to parse submitted_at string
             try:
                 # Format is "02:45 PM, Apr 23"
                 date_val = datetime.strptime(s.submitted_at, "%I:%M %p, %b %d")
-                # Add current year if missing
                 date_val = date_val.replace(year=datetime.now().year)
             except:
                 date_val = datetime.now()
@@ -75,7 +73,10 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
                 "avg_score": "0%",
                 "total_students": 0,
                 "at_risk_count": 0,
-                "attendance_rate": "0%"
+                "attendance_rate": "0%",
+                "pass_rate": "0%",
+                "high_score": "0%",
+                "low_score": "0%"
             },
             "risk_students": [],
             "performance_trend": [],
@@ -85,15 +86,15 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     df = pd.DataFrame(all_data)
     avg_score = df["score"].mean()
     total_students = df["student_name"].nunique()
+    pass_rate = (df["score"] >= 50).mean() * 100
     
-    # Simple risk logic: average score across all items < 50
+    # Simple risk logic
     student_avgs = df.groupby('student_name')['score'].mean()
     at_risk_count = int((student_avgs < 50).sum())
     
-    # Performance trend (grouped by month)
+    # Performance trend
     df['date'] = pd.to_datetime(df['date'])
     df['month'] = df['date'].dt.strftime('%b')
-    # Sort months correctly
     month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     trend_df = df.groupby('month')['score'].mean().reindex(month_order).dropna().reset_index()
     trend = trend_df.replace([np.inf, -np.inf], 0).fillna(0).to_dict(orient='records')
@@ -101,18 +102,17 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     # Risk Students list
     risk_list = []
     for sname, savg in student_avgs.items():
-        if savg < 70: # Threshold for showing in risk list
+        if savg < 70:
             risk_list.append({
                 "id": f"ST-{hash(sname) % 10000}",
                 "name": sname,
-                "attendance": 85, # Placeholder
+                "attendance": 85,
                 "avgScore": float(savg) if not np.isnan(savg) else 0,
-                "assignments": 90, # Placeholder
+                "assignments": 90,
                 "risk": int(100 - savg), 
                 "level": "high" if savg < 40 else "moderate"
             })
 
-    # Subject/Exam breakdown
     subject_stats = []
     for e in exams:
         exam_scores = df[(df['type'] == 'exam') & (df['item_id'] == e.id)]['score']
@@ -127,7 +127,10 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
             "avg_score": f"{avg_score:.1f}%",
             "total_students": total_students,
             "at_risk_count": at_risk_count,
-            "attendance_rate": "85%" # Placeholder
+            "attendance_rate": "85%",
+            "pass_rate": f"{pass_rate:.0f}%",
+            "high_score": f"{df['score'].max():.1f}%",
+            "low_score": f"{df['score'].min():.1f}%"
         },
         "risk_students": risk_list,
         "performance_trend": trend,
@@ -137,7 +140,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
 @router.post("/upload")
 async def upload_analytics_data(
     file: UploadFile = File(...),
-    impute_method: str = Form("zero") # zero, mean, blank
+    impute_method: str = Form("auto") # auto, zero, mean, blank
 ):
     contents = await file.read()
     if file.filename.endswith('.csv'):
@@ -148,42 +151,54 @@ async def upload_analytics_data(
         raise HTTPException(status_code=400, detail="Invalid file type")
 
     # Clean column names
+    original_cols = list(df.columns)
     df.columns = [c.strip().lower().replace(' ', '_') for c in df.columns]
     
-    # Identify numeric columns for imputation
+    # Identify numeric columns
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     
-    # Replace Infinity with NaN so they can be filled
-    df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan)
-
-    if impute_method == "zero":
-        df[numeric_cols] = df[numeric_cols].fillna(0)
+    # Avoid columns that look like IDs
+    id_keywords = ['id', 'reg', 'number', 'roll', 'serial', 'sn', 'index']
+    valid_numeric_cols = [c for c in numeric_cols if not any(k in c for k in id_keywords)]
+    
+    # --- Smart Imputation ---
+    if impute_method == "auto" or impute_method == "zero":
+        for col in valid_numeric_cols:
+            if 'total' in col:
+                # Try to find component columns (score, exam, quiz, assignment, mid, final)
+                components = [c for c in valid_numeric_cols if any(k in c for k in ['score', 'exam', 'quiz', 'assign', 'mid', 'final', 'test']) and c != col]
+                if components:
+                    # Fill missing totals by summing components
+                    df[col] = df[col].fillna(df[components].sum(axis=1))
+                else:
+                    df[col] = df[col].fillna(0)
+            else:
+                # Component or exam columns should be zero if missing
+                df[col] = df[col].fillna(0)
     elif impute_method == "mean":
-        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean().fillna(0))
-    elif impute_method == "blank":
-        pass
+        df[valid_numeric_cols] = df[valid_numeric_cols].fillna(df[valid_numeric_cols].mean().fillna(0))
+    
+    # Final sweep for JSON compatibility
+    df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    # Final sweep to ensure JSON compatibility for numeric data
-    df[numeric_cols] = df[numeric_cols].fillna(0)
-
-    # Basic Analysis
+    # Score Column Identification (Prioritize keywords, avoid IDs)
     score_col = None
-    for col in ['score', 'marks', 'total', 'grade', 'percentage']:
+    for col in ['total', 'score', 'marks', 'percentage', 'grade', 'final_score']:
         if col in df.columns:
             score_col = col
             break
     
-    if not score_col and not numeric_cols.empty:
-        score_col = numeric_cols[0]
+    if not score_col and valid_numeric_cols:
+        score_col = valid_numeric_cols[0]
     
     if score_col:
         avg_score = float(df[score_col].mean())
+        pass_rate = (df[score_col] >= 50).mean() * 100 # Assuming 100 base
         
         # Grade Distribution
         bins = [0, 60, 70, 80, 90, 101]
         labels = ['Below 60%', 'B+ (60-69%)', 'A (70-79%)', 'A+ (80-89%)', 'O (90-100%)']
         df['grade_group'] = pd.cut(df[score_col], bins=bins, labels=labels, right=False)
-        # Convert to string to avoid Categorical fillna error and ensure JSON compatibility
         df['grade_group'] = df['grade_group'].astype(str)
         distribution = df['grade_group'].value_counts().to_dict()
         dist_list = [{"grade": k, "pct": int((v / len(df)) * 100)} for k, v in distribution.items() if k != 'nan']
@@ -202,16 +217,21 @@ async def upload_analytics_data(
             })
     else:
         avg_score = 0
+        pass_rate = 0
         dist_list = []
         risk_students = []
 
+    # Map back original names for raw data if needed, but keeping slugs is often cleaner for JSON
     return {
         "summary": {
             "rows": len(df),
-            "columns": [str(c) for c in df.columns],
-            "avg_score": f"{avg_score:.1f}%" if score_col else "N/A"
+            "columns": list(df.columns),
+            "avg_score": f"{avg_score:.1f}%" if score_col else "N/A",
+            "pass_rate": f"{pass_rate:.0f}%",
+            "high_score": f"{df[score_col].max():.1f}%" if score_col else "0%",
+            "low_score": f"{df[score_col].min():.1f}%" if score_col else "0%"
         },
         "distribution": dist_list,
         "risk_students": risk_students,
-        "raw_data": df.replace([np.inf, -np.inf], 0).fillna(0).to_dict(orient='records')[:50] 
+        "raw_data": df.to_dict(orient='records')[:100] 
     }

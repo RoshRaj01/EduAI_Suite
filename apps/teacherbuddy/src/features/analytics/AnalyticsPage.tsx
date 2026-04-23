@@ -37,6 +37,9 @@ interface UploadedData {
     rows: number;
     columns: string[];
     avg_score: string;
+    pass_rate?: string;
+    high_score?: string;
+    low_score?: string;
   };
   distribution: { grade: string; pct: number }[];
   risk_students: any[];
@@ -73,7 +76,7 @@ export const AnalyticsPage: React.FC = () => {
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [imputeMethod, setImputeMethod] = useState("zero");
+  const [imputeMethod, setImputeMethod] = useState("auto");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -153,26 +156,33 @@ export const AnalyticsPage: React.FC = () => {
 
     const stats = dataSource === "platform" 
       ? [
-          { label: "Class Average", value: analytics?.overview?.avg_score || "0%", color: "#264796" },
-          { label: "Total Students", value: analytics?.overview?.total_students || 0, color: "#16a34a" },
-          { label: "At-Risk Students", value: analytics?.overview?.at_risk_count || 0, color: "#dc2626" },
-          { label: "Attendance", value: analytics?.overview?.attendance_rate || "0%", color: "#d0ae61" },
+          { label: "Class Average", value: analytics?.overview?.avg_score || "0%", color: "#264796", icon: <TrendingUp size={16}/> },
+          { label: "Total Students", value: analytics?.overview?.total_students || 0, color: "#16a34a", icon: <Users size={16}/> },
+          { label: "At-Risk Count", value: analytics?.overview?.at_risk_count || 0, color: "#dc2626", icon: <AlertTriangle size={16}/> },
+          { label: "Pass Rate", value: (analytics?.overview as any)?.pass_rate || "N/A", color: "#1d4ed8", icon: <CheckCircle2 size={16}/> },
+          { label: "High Score", value: (analytics?.overview as any)?.high_score || "N/A", color: "#d97706", icon: <Award size={16}/> },
+          { label: "Low Score", value: (analytics?.overview as any)?.low_score || "N/A", color: "#9333ea", icon: <Target size={16}/> },
         ]
       : [
-          { label: "File Average", value: uploadedData?.summary?.avg_score || "0%", color: "#264796" },
-          { label: "Total Rows", value: uploadedData?.summary?.rows || 0, color: "#16a34a" },
-          { label: "At-Risk", value: uploadedData?.risk_students?.length || 0, color: "#dc2626" },
-          { label: "Columns", value: uploadedData?.summary?.columns?.length || 0, color: "#d0ae61" },
+          { label: "File Average", value: uploadedData?.summary?.avg_score || "0%", color: "#264796", icon: <TrendingUp size={16}/> },
+          { label: "Total Rows", value: uploadedData?.summary?.rows || 0, color: "#16a34a", icon: <Users size={16}/> },
+          { label: "At-Risk", value: uploadedData?.risk_students?.length || 0, color: "#dc2626", icon: <AlertTriangle size={16}/> },
+          { label: "Pass Rate", value: uploadedData?.summary?.pass_rate || "N/A", color: "#1d4ed8", icon: <CheckCircle2 size={16}/> },
+          { label: "High Score", value: uploadedData?.summary?.high_score || "N/A", color: "#d97706", icon: <Award size={16}/> },
+          { label: "Low Score", value: uploadedData?.summary?.low_score || "N/A", color: "#9333ea", icon: <Target size={16}/> },
         ];
 
     return (
       <div className="space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map(kpi => (
-            <GlassCard key={kpi.label} padding="sm">
-              <p className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>{kpi.label}</p>
-              <p className="text-2xl font-black mt-1" style={{ color: kpi.color, fontFamily: "var(--font-display)" }}>{kpi.value}</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {stats.map((kpi, i) => (
+            <GlassCard key={i} padding="sm" className="flex flex-col items-center text-center group hover:scale-[1.02] transition-all cursor-default bg-white/40">
+              <div className="flex items-center gap-1.5 mb-1.5 opacity-60">
+                <span style={{ color: kpi.color }}>{kpi.icon}</span>
+                <p className="text-[9px] font-bold uppercase tracking-wider">{kpi.label}</p>
+              </div>
+              <p className="text-xl font-black" style={{ color: kpi.color, fontFamily: "var(--font-display)" }}>{kpi.value}</p>
             </GlassCard>
           ))}
         </div>
@@ -374,6 +384,7 @@ export const AnalyticsPage: React.FC = () => {
               value={imputeMethod}
               onChange={e => setImputeMethod(e.target.value)}
             >
+              <option value="auto">✨ Smart Impute</option>
               <option value="zero">Fill Zeros</option>
               <option value="mean">Average Impute</option>
               <option value="blank">Keep Blank</option>
