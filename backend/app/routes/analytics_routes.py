@@ -194,7 +194,7 @@ async def upload_analytics_data(
         # Grading System Integration
         # Details of Grade - 80-Above (O) 70-79.99 (A+) 60-69.99 (A) 55-59.99 (B+) 50-54.99 (B) 45-49.99 (C) 40-44.99 (P) <40 (F)
         bins = [0, 40, 45, 50, 55, 60, 70, 80, 101]
-        labels = ['F (Fail)', 'P (Pass)', 'C (Fair)', 'B (Satisfactory)', 'B+ (Good)', 'A (Very Good)', 'A+ (Excellent)', 'O (Outstanding)']
+        labels = ['F (Less than 40)', 'P (40-44.99)', 'C (45-49.99)', 'B (50-54.99)', 'B+ (55-59.99)', 'A (60-69.99)', 'A+ (70-79.99)', 'O (80-Above)']
         df['grade_group'] = pd.cut(normalized_series, bins=bins, labels=labels, right=False)
         df['grade_group'] = df['grade_group'].astype(str)
         distribution = df['grade_group'].value_counts().to_dict()

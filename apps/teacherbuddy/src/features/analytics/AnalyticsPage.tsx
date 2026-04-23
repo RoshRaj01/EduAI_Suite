@@ -173,8 +173,8 @@ export const AnalyticsPage: React.FC = () => {
           { label: "Total Students", value: uploadedData?.summary?.rows || 0, color: "#16a34a", icon: <Users size={16}/> },
           { label: "At-Risk", value: uploadedData?.risk_students?.length || 0, color: "#dc2626", icon: <AlertTriangle size={16}/> },
           { label: "Pass Rate", value: uploadedData?.summary?.pass_rate || "N/A", color: "#1d4ed8", icon: <CheckCircle2 size={16}/> },
-          { label: "Analyzed Column", value: uploadedData?.summary?.score_column || "N/A", color: "#d97706", icon: <Database size={16}/> },
-          { label: "Grading Scale", value: `Out of ${uploadedData?.summary?.scale || 100}`, color: "#9333ea", icon: <Target size={16}/> },
+          { label: "High Score", value: uploadedData?.summary?.high_score || "N/A", color: "#d97706", icon: <Award size={16}/> },
+          { label: "Low Score", value: uploadedData?.summary?.low_score || "N/A", color: "#9333ea", icon: <Target size={16}/> },
         ];
 
     return (
@@ -219,15 +219,15 @@ export const AnalyticsPage: React.FC = () => {
                 <BarChart data={uploadedData?.distribution}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
                   <XAxis dataKey="grade" axisLine={false} tickLine={false} tick={{fontSize: 9}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} label={{ value: 'Students', angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} label={{ value: 'Count', angle: -90, position: 'insideLeft', fontSize: 10 }} />
                   <Tooltip 
                     formatter={(value: any, name: any, props: any) => [
-                      `${props.payload.count} Students (${value}%)`, 
-                      "% of Class"
+                      `${value} Students (${props.payload.pct}%)`, 
+                      "Total"
                     ]}
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                   />
-                  <Bar dataKey="pct" name="% of Class" fill="#3460c4" radius={[4, 4, 0, 0]} barSize={40}>
+                  <Bar dataKey="count" name="Students" fill="#3460c4" radius={[4, 4, 0, 0]} barSize={40}>
                     {uploadedData?.distribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -379,10 +379,15 @@ export const AnalyticsPage: React.FC = () => {
           ) : (
             <>
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active File:</span>
-              <span className="text-sm font-bold text-gold-600 flex items-center gap-1">
-                <FileSpreadsheet size={14} /> {fileName || "analysis_export_v1.xlsx"}
-              </span>
-              <button onClick={() => fileInputRef.current?.click()} className="text-[10px] text-blue-500 font-bold hover:underline ml-2">Change File</button>
+              <div className="flex flex-col gap-0.5 ml-1">
+                <span className="text-sm font-bold text-gold-600 flex items-center gap-1">
+                  <FileSpreadsheet size={14} /> {fileName || "analysis_export_v1.xlsx"}
+                </span>
+                <span className="text-[9px] text-slate-400 font-medium">
+                  Source: <span className="text-blue-600 font-bold">{uploadedData?.summary?.score_column}</span> • Scale: <span className="text-blue-600 font-bold">Out of {uploadedData?.summary?.scale}</span>
+                </span>
+              </div>
+              <button onClick={() => fileInputRef.current?.click()} className="text-[10px] text-blue-500 font-bold hover:underline ml-4">Change File</button>
             </>
           )}
         </div>
