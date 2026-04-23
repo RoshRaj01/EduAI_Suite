@@ -10,6 +10,7 @@ import {
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChainAnswerGameCreation } from "./ChainAnswerGameCreation";
+import { GameMonitoringPage } from "./GameMonitoringPage";
 
 const gameCategories = [
   {
@@ -74,6 +75,10 @@ const gameCategories = [
 export const GamesPage: React.FC = () => {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [showCreation, setShowCreation] = useState(false);
+  const [monitoringGame, setMonitoringGame] = useState<{
+    gameId: number;
+    sessionId: string;
+  } | null>(null);
 
   const handleGameSelect = (gameId: string) => {
     const game = gameCategories.find((g) => g.id === gameId);
@@ -83,6 +88,25 @@ export const GamesPage: React.FC = () => {
     setSelectedGame(gameId);
   };
 
+  const handleGameCreated = (gameId: number, sessionId: string) => {
+    setMonitoringGame({ gameId, sessionId });
+  };
+
+  // Show monitoring page
+  if (monitoringGame) {
+    return (
+      <GameMonitoringPage
+        gameId={monitoringGame.gameId}
+        sessionId={monitoringGame.sessionId}
+        onBack={() => {
+          setMonitoringGame(null);
+          setShowCreation(false);
+          setSelectedGame(null);
+        }}
+      />
+    );
+  }
+
   if (showCreation && selectedGame === "chain-answer") {
     return (
       <ChainAnswerGameCreation
@@ -90,6 +114,7 @@ export const GamesPage: React.FC = () => {
           setShowCreation(false);
           setSelectedGame(null);
         }}
+        onGameCreated={handleGameCreated}
       />
     );
   }
