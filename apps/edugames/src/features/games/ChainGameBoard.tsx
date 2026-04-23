@@ -3,7 +3,7 @@ import type { ChainGameState, ChainGameActions } from "./types";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { useGameSync } from "./useGameSync";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, AlertCircle, Send, Wifi, WifiOff } from "lucide-react";
+import { Clock, AlertCircle, Send, Square, Wifi, WifiOff } from "lucide-react";
 
 interface ChainGameBoardProps {
   gameState?: ChainGameState;
@@ -80,6 +80,16 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
       setStartTime(Date.now());
     } catch (error) {
       console.error("Error submitting word:", error);
+    }
+  };
+
+  const handleStudentEndGame = async () => {
+    if (!window.confirm("End this game for everyone?")) return;
+
+    try {
+      await endGame();
+    } catch (error) {
+      console.error("Error ending game:", error);
     }
   };
 
@@ -293,6 +303,22 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           </motion.form>
         )}
       </AnimatePresence>
+
+      {userType === "student" && gameStatus === "active" && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleStudentEndGame}
+            className="px-4 py-2 rounded-lg font-semibold text-white flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform"
+            style={{
+              background: "linear-gradient(135deg, #ef4444, #dc2626)",
+            }}
+          >
+            <Square size={16} />
+            End Game
+          </button>
+        </div>
+      )}
 
       {/* Error Message */}
       <AnimatePresence>

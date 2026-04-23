@@ -303,14 +303,19 @@ export const useGameSync = ({
     }
   }, [useWebSocket, isConnected, sendMessage]);
 
-  // End game (teacher only)
-  const endGame = useCallback(() => {
+  // End game
+  const endGame = useCallback(async () => {
     if (useWebSocket && isConnected) {
       sendMessage({
         type: "game_ended",
       });
+      return;
     }
-  }, [useWebSocket, isConnected, sendMessage]);
+
+    if (gameId > 0) {
+      await gameAPI.endGame(gameId);
+    }
+  }, [gameId, useWebSocket, isConnected, sendMessage]);
 
   // Timer countdown effect
   useEffect(() => {
