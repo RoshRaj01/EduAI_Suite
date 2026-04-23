@@ -52,7 +52,6 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     for s in submissions:
         if s.grade is not None:
             try:
-                # Format is "02:45 PM, Apr 23"
                 date_val = datetime.strptime(s.submitted_at, "%I:%M %p, %b %d")
                 date_val = date_val.replace(year=datetime.now().year)
             except:
@@ -86,23 +85,20 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     df = pd.DataFrame(all_data)
     avg_score = df["score"].mean()
     total_students = df["student_name"].nunique()
-    pass_rate = (df["score"] >= 50).mean() * 100
+    pass_rate = (df["score"] >= 40).mean() * 100 # New pass threshold 40
     
-    # Simple risk logic
     student_avgs = df.groupby('student_name')['score'].mean()
-    at_risk_count = int((student_avgs < 50).sum())
+    at_risk_count = int((student_avgs < 40).sum())
     
-    # Performance trend
     df['date'] = pd.to_datetime(df['date'])
     df['month'] = df['date'].dt.strftime('%b')
     month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     trend_df = df.groupby('month')['score'].mean().reindex(month_order).dropna().reset_index()
     trend = trend_df.replace([np.inf, -np.inf], 0).fillna(0).to_dict(orient='records')
     
-    # Risk Students list
     risk_list = []
     for sname, savg in student_avgs.items():
-        if savg < 70:
+        if savg < 55: # Moderate risk threshold
             risk_list.append({
                 "id": f"ST-{hash(sname) % 10000}",
                 "name": sname,
@@ -140,7 +136,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
 @router.post("/upload")
 async def upload_analytics_data(
     file: UploadFile = File(...),
-    impute_method: str = Form("auto") # auto, zero, mean, blank
+    impute_method: str = Form("auto")
 ):
     contents = await file.read()
     if file.filename.endswith('.csv'):
@@ -150,88 +146,96 @@ async def upload_analytics_data(
     else:
         raise HTTPException(status_code=400, detail="Invalid file type")
 
-    # Clean column names
-    original_cols = list(df.columns)
     df.columns = [c.strip().lower().replace(' ', '_') for c in df.columns]
-    
-    # Identify numeric columns
     numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-    # Avoid columns that look like IDs
-    id_keywords = ['id', 'reg', 'number', 'roll', 'serial', 'sn', 'index']
+    id_keywords = ['id', 'reg', 'number', 'roll', 'serial', 'sn', 'index', 'phone', 'mobile', 'code', 'year', 'semester']
     valid_numeric_cols = [c for c in numeric_cols if not any(k in c for k in id_keywords)]
     
-    # --- Smart Imputation ---
     if impute_method == "auto" or impute_method == "zero":
         for col in valid_numeric_cols:
-            if 'total' in col:
-                # Try to find component columns (score, exam, quiz, assignment, mid, final)
+            if any(k in col for k in ['total', 'sum', 'grand', 'final']):
                 components = [c for c in valid_numeric_cols if any(k in c for k in ['score', 'exam', 'quiz', 'assign', 'mid', 'final', 'test']) and c != col]
                 if components:
-                    # Fill missing totals by summing components
                     df[col] = df[col].fillna(df[components].sum(axis=1))
                 else:
                     df[col] = df[col].fillna(0)
             else:
-                # Component or exam columns should be zero if missing
                 df[col] = df[col].fillna(0)
     elif impute_method == "mean":
         df[valid_numeric_cols] = df[valid_numeric_cols].fillna(df[valid_numeric_cols].mean().fillna(0))
     
-    # Final sweep for JSON compatibility
     df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    # Score Column Identification (Prioritize keywords, avoid IDs)
     score_col = None
-    for col in ['total', 'score', 'marks', 'percentage', 'grade', 'final_score']:
-        if col in df.columns:
-            score_col = col
-            break
+    priority_keywords = ['grand_total', 'final_score', 'total_marks', 'total', 'final', 'score', 'marks', 'percentage']
+    for kw in priority_keywords:
+        matching = [c for c in df.columns if kw in c]
+        if matching:
+            for m in matching:
+                if m in valid_numeric_cols:
+                    score_col = m
+                    break
+        if score_col: break
     
     if not score_col and valid_numeric_cols:
         score_col = valid_numeric_cols[0]
     
     if score_col:
-        avg_score = float(df[score_col].mean())
-        pass_rate = (df[score_col] >= 50).mean() * 100 # Assuming 100 base
+        max_val = df[score_col].max()
+        scale = 100
+        if 0 < max_val <= 10: scale = 10
+        elif 10 < max_val <= 20: scale = 20
+        elif 20 < max_val <= 50: scale = 50
         
-        # Grade Distribution
-        bins = [0, 60, 70, 80, 90, 101]
-        labels = ['Below 60%', 'B+ (60-69%)', 'A (70-79%)', 'A+ (80-89%)', 'O (90-100%)']
-        df['grade_group'] = pd.cut(df[score_col], bins=bins, labels=labels, right=False)
+        normalized_series = (df[score_col] / scale) * 100
+        avg_score = float(df[score_col].mean())
+        pass_rate = (normalized_series >= 40).mean() * 100 
+        
+        # Grading System Integration
+        # Details of Grade - 80-Above (O) 70-79.99 (A+) 60-69.99 (A) 55-59.99 (B+) 50-54.99 (B) 45-49.99 (C) 40-44.99 (P) <40 (F)
+        bins = [0, 40, 45, 50, 55, 60, 70, 80, 101]
+        labels = ['F (Fail)', 'P (Pass)', 'C (Fair)', 'B (Satisfactory)', 'B+ (Good)', 'A (Very Good)', 'A+ (Excellent)', 'O (Outstanding)']
+        df['grade_group'] = pd.cut(normalized_series, bins=bins, labels=labels, right=False)
         df['grade_group'] = df['grade_group'].astype(str)
         distribution = df['grade_group'].value_counts().to_dict()
-        dist_list = [{"grade": k, "pct": int((v / len(df)) * 100)} for k, v in distribution.items() if k != 'nan']
+        dist_list = [{"grade": k, "pct": int((v / len(df)) * 100), "count": int(v)} for k, v in distribution.items() if k != 'nan']
         
-        # Risk identification
+        # Classification (Result Details)
+        # 75+ (Distinction), 60-74 (First Class), 50-59 (Second Class), <50 (Fail)
+        res_bins = [0, 50, 60, 75, 101]
+        res_labels = ['Fail', 'Second Class', 'First Class', 'First Class with Distinction']
+        df['result_class'] = pd.cut(normalized_series, bins=res_bins, labels=res_labels, right=False)
+        df['result_class'] = df['result_class'].astype(str)
+        res_dist = df['result_class'].value_counts().to_dict()
+        res_list = [{"subject": k, "avg": int(v)} for k, v in res_dist.items() if k != 'nan']
+
         risk_students = []
         name_col = 'name' if 'name' in df.columns else 'student_name' if 'student_name' in df.columns else df.columns[0]
-        
-        for _, row in df[df[score_col] < 60].iterrows():
+        for _, row in df[normalized_series < 50].iterrows():
             risk_students.append({
                 "id": str(row.get('id', 'N/A')),
                 "name": str(row.get(name_col, 'Unknown')),
                 "avgScore": float(row[score_col]),
-                "risk": int(100 - row[score_col]),
-                "level": "high" if row[score_col] < 40 else "moderate"
+                "risk": int(100 - (row[score_col]/scale)*100),
+                "level": "high" if (row[score_col]/scale)*100 < 40 else "moderate"
             })
     else:
-        avg_score = 0
-        pass_rate = 0
-        dist_list = []
-        risk_students = []
+        avg_score, pass_rate, scale = 0, 0, 100
+        dist_list, res_list, risk_students = [], [], []
 
-    # Map back original names for raw data if needed, but keeping slugs is often cleaner for JSON
     return {
         "summary": {
             "rows": len(df),
             "columns": list(df.columns),
-            "avg_score": f"{avg_score:.1f}%" if score_col else "N/A",
+            "score_column": score_col,
+            "scale": scale,
+            "avg_score": f"{avg_score:.1f}",
             "pass_rate": f"{pass_rate:.0f}%",
-            "high_score": f"{df[score_col].max():.1f}%" if score_col else "0%",
-            "low_score": f"{df[score_col].min():.1f}%" if score_col else "0%"
+            "high_score": f"{df[score_col].max():.1f}" if score_col else "0",
+            "low_score": f"{df[score_col].min():.1f}" if score_col else "0"
         },
         "distribution": dist_list,
         "risk_students": risk_students,
+        "subject_breakdown": res_list, # Repurposing this for classification in upload view
         "raw_data": df.to_dict(orient='records')[:100] 
     }

@@ -3,7 +3,8 @@ import {
   BarChart3, TrendingUp, AlertTriangle, Users, Download,
   ChevronDown, Filter, RefreshCw, Activity, ArrowUp, ArrowDown,
   BrainCircuit, Eye, Info, Upload, FileSpreadsheet, Check, X,
-  PieChart as PieChartIcon, LayoutDashboard, Database
+  PieChart as PieChartIcon, LayoutDashboard, Database,
+  CheckCircle2, Award, Target
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { 
@@ -40,6 +41,8 @@ interface UploadedData {
     pass_rate?: string;
     high_score?: string;
     low_score?: string;
+    score_column?: string;
+    scale?: number;
   };
   distribution: { grade: string; pct: number }[];
   risk_students: any[];
@@ -77,6 +80,7 @@ export const AnalyticsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [imputeMethod, setImputeMethod] = useState("auto");
+  const [fileName, setFileName] = useState("");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -123,6 +127,7 @@ export const AnalyticsPage: React.FC = () => {
     if (!file) return;
 
     setUploading(true);
+    setFileName(file.name);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("impute_method", imputeMethod);
@@ -164,12 +169,12 @@ export const AnalyticsPage: React.FC = () => {
           { label: "Low Score", value: (analytics?.overview as any)?.low_score || "N/A", color: "#9333ea", icon: <Target size={16}/> },
         ]
       : [
-          { label: "File Average", value: uploadedData?.summary?.avg_score || "0%", color: "#264796", icon: <TrendingUp size={16}/> },
-          { label: "Total Rows", value: uploadedData?.summary?.rows || 0, color: "#16a34a", icon: <Users size={16}/> },
+          { label: "Class Average", value: `${uploadedData?.summary?.avg_score}${uploadedData?.summary?.scale === 100 ? '%' : ''}`, color: "#264796", icon: <TrendingUp size={16}/> },
+          { label: "Total Students", value: uploadedData?.summary?.rows || 0, color: "#16a34a", icon: <Users size={16}/> },
           { label: "At-Risk", value: uploadedData?.risk_students?.length || 0, color: "#dc2626", icon: <AlertTriangle size={16}/> },
           { label: "Pass Rate", value: uploadedData?.summary?.pass_rate || "N/A", color: "#1d4ed8", icon: <CheckCircle2 size={16}/> },
-          { label: "High Score", value: uploadedData?.summary?.high_score || "N/A", color: "#d97706", icon: <Award size={16}/> },
-          { label: "Low Score", value: uploadedData?.summary?.low_score || "N/A", color: "#9333ea", icon: <Target size={16}/> },
+          { label: "Analyzed Column", value: uploadedData?.summary?.score_column || "N/A", color: "#d97706", icon: <Database size={16}/> },
+          { label: "Grading Scale", value: `Out of ${uploadedData?.summary?.scale || 100}`, color: "#9333ea", icon: <Target size={16}/> },
         ];
 
     return (
@@ -213,10 +218,16 @@ export const AnalyticsPage: React.FC = () => {
               ) : (
                 <BarChart data={uploadedData?.distribution}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                  <XAxis dataKey="grade" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                  <Tooltip />
-                  <Bar dataKey="pct" fill="#3460c4" radius={[4, 4, 0, 0]} barSize={40}>
+                  <XAxis dataKey="grade" axisLine={false} tickLine={false} tick={{fontSize: 9}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} label={{ value: 'Students', angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                  <Tooltip 
+                    formatter={(value: any, name: any, props: any) => [
+                      `${props.payload.count} Students (${value}%)`, 
+                      "% of Class"
+                    ]}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  />
+                  <Bar dataKey="pct" name="% of Class" fill="#3460c4" radius={[4, 4, 0, 0]} barSize={40}>
                     {uploadedData?.distribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -229,7 +240,7 @@ export const AnalyticsPage: React.FC = () => {
           {/* Secondary Stats */}
           <GlassCard padding="md" className="h-[350px]">
             <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-              <PieChartIcon size={16} /> Subject/Category Breakdown
+              <PieChartIcon size={16} /> {dataSource === "platform" ? "Subject Breakdown" : "Result Classification"}
             </h3>
             <ResponsiveContainer width="100%" height="90%">
               <PieChart>
@@ -369,7 +380,7 @@ export const AnalyticsPage: React.FC = () => {
             <>
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active File:</span>
               <span className="text-sm font-bold text-gold-600 flex items-center gap-1">
-                <FileSpreadsheet size={14} /> analysis_export_v1.xlsx
+                <FileSpreadsheet size={14} /> {fileName || "analysis_export_v1.xlsx"}
               </span>
               <button onClick={() => fileInputRef.current?.click()} className="text-[10px] text-blue-500 font-bold hover:underline ml-2">Change File</button>
             </>
