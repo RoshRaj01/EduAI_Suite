@@ -9,7 +9,8 @@ import {
 import { GlassCard } from "../../shared/components/GlassCard";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
+  LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
+  ScatterChart, Scatter, ZAxis, ComposedChart
 } from 'recharts';
 
 const API_BASE = "http://localhost:8000";
@@ -38,14 +39,16 @@ interface UploadedData {
     rows: number;
     columns: string[];
     avg_score: string;
+    std_dev?: number;
     pass_rate?: string;
     high_score?: string;
     low_score?: string;
     score_column?: string;
     scale?: number;
   };
-  distribution: { grade: string; pct: number }[];
+  distribution: { grade: string; pct: number; count: number }[];
   risk_students: any[];
+  student_points?: { name: string; roll: string; score: number }[];
   raw_data: any[];
 }
 
@@ -237,28 +240,102 @@ export const AnalyticsPage: React.FC = () => {
             </ResponsiveContainer>
           </GlassCard>
 
-          {/* Secondary Stats */}
+          {/* Secondary Stats: Bell Curve */}
           <GlassCard padding="md" className="h-[350px]">
             <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-              <PieChartIcon size={16} /> {dataSource === "platform" ? "Subject Breakdown" : "Result Classification"}
+              <Activity size={16} /> {dataSource === "platform" ? "Subject Breakdown" : "Student Distribution"}
             </h3>
             <ResponsiveContainer width="100%" height="90%">
-              <PieChart>
-                <Pie
-                  data={dataSource === "platform" ? analytics?.subject_breakdown : uploadedData?.distribution}
-                  cx="50%" cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey={dataSource === "platform" ? "avg" : "pct"}
-                  nameKey={dataSource === "platform" ? "subject" : "grade"}
-                >
-                  {(dataSource === "platform" ? analytics?.subject_breakdown : uploadedData?.distribution)?.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
+              {dataSource === "platform" ? (
+                <PieChart>
+                  <Pie
+                    data={analytics?.subject_breakdown}
+                    cx="50%" cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="avg"
+                    nameKey="subject"
+                  >
+                    {analytics?.subject_breakdown?.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              ) : (() => {
+                const mean = parseFloat(uploadedData?.summary?.avg_score || "0");
+                const stdDev = uploadedData?.summary?.std_dev || 10;
+                const scale = uploadedData?.summary?.scale || 100;
+                
+                // Generate normal distribution curve
+                const curvePoints = [];
+                for (let x = 0; x <= scale; x += scale/40) {
+                  const y = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - mean) / stdDev, 2));
+                  curvePoints.push({ x, y: y * 100 }); // Scaled for visibility
+                }
+
+                // Plot students on the curve with slight jitter if scores are identical
+                const studentPoints = (uploadedData?.student_points || []).map((s, idx) => {
+                  const x = s.score;
+                  const y = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - mean) / stdDev, 2));
+                  // Add tiny offset to y for overlapping points to make them "thicker"
+                  const jitter = (idx % 3 - 1) * 0.5;
+                  return { ...s, x, y: (y * 100) + jitter };
+                });
+
+                return (
+                  <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                    <XAxis 
+                      type="number" 
+                      dataKey="x" 
+                      name="Score" 
+                      domain={[0, scale]} 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fontSize: 10}} 
+                    />
+                    <YAxis type="number" dataKey="y" hide />
+                    <ZAxis type="number" range={[100, 100]} />
+                    <Tooltip 
+                      cursor={{ strokeDasharray: '3 3' }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length > 0) {
+                          const data = payload[0].payload;
+                          if (data.name) {
+                            return (
+                              <div className="bg-white p-3 rounded-xl shadow-xl border border-slate-100 min-w-[140px] z-50">
+                                <p className="text-xs font-bold text-blue-900">{data.name}</p>
+                                <p className="text-[10px] text-slate-500 font-medium">Reg: {data.roll}</p>
+                                <div className="h-px bg-slate-100 my-1.5" />
+                                <p className="text-[10px] font-black text-gold-600 uppercase tracking-tighter">Score: {data.score.toFixed(1)}</p>
+                              </div>
+                            );
+                          }
+                        }
+                        return null;
+                      }}
+                    />
+                    {/* The Curve */}
+                    <Scatter 
+                      data={curvePoints} 
+                      line={{ stroke: '#264796', strokeWidth: 2 }} 
+                      shape={() => null} 
+                      isAnimationActive={false}
+                    />
+                    {/* The Students */}
+                    <Scatter 
+                      name="Students"
+                      data={studentPoints} 
+                      fill="#d97706" 
+                      stroke="#fff" 
+                      strokeWidth={2}
+                      shape="circle"
+                    />
+                  </ScatterChart>
+                );
+              })()}
             </ResponsiveContainer>
           </GlassCard>
         </div>

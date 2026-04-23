@@ -85,7 +85,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     df = pd.DataFrame(all_data)
     avg_score = df["score"].mean()
     total_students = df["student_name"].nunique()
-    pass_rate = (df["score"] >= 40).mean() * 100 # New pass threshold 40
+    pass_rate = (df["score"] >= 40).mean() * 100 
     
     student_avgs = df.groupby('student_name')['score'].mean()
     at_risk_count = int((student_avgs < 40).sum())
@@ -98,7 +98,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     
     risk_list = []
     for sname, savg in student_avgs.items():
-        if savg < 55: # Moderate risk threshold
+        if savg < 55:
             risk_list.append({
                 "id": f"ST-{hash(sname) % 10000}",
                 "name": sname,
@@ -189,39 +189,41 @@ async def upload_analytics_data(
         
         normalized_series = (df[score_col] / scale) * 100
         avg_score = float(df[score_col].mean())
+        std_dev = float(df[score_col].std())
         pass_rate = (normalized_series >= 40).mean() * 100 
         
-        # Grading System Integration
-        # Details of Grade - 80-Above (O) 70-79.99 (A+) 60-69.99 (A) 55-59.99 (B+) 50-54.99 (B) 45-49.99 (C) 40-44.99 (P) <40 (F)
+        # Grading Distribution
         bins = [0, 40, 45, 50, 55, 60, 70, 80, 101]
-        labels = ['F (Less than 40)', 'P (40-44.99)', 'C (45-49.99)', 'B (50-54.99)', 'B+ (55-59.99)', 'A (60-69.99)', 'A+ (70-79.99)', 'O (80-Above)']
+        labels = ['F (Fail)', 'P (Pass)', 'C (Fair)', 'B (Satisfactory)', 'B+ (Good)', 'A (Very Good)', 'A+ (Excellent)', 'O (Outstanding)']
         df['grade_group'] = pd.cut(normalized_series, bins=bins, labels=labels, right=False)
         df['grade_group'] = df['grade_group'].astype(str)
         distribution = df['grade_group'].value_counts().to_dict()
         dist_list = [{"grade": k, "pct": int((v / len(df)) * 100), "count": int(v)} for k, v in distribution.items() if k != 'nan']
         
-        # Classification (Result Details)
-        # 75+ (Distinction), 60-74 (First Class), 50-59 (Second Class), <50 (Fail)
-        res_bins = [0, 50, 60, 75, 101]
-        res_labels = ['Fail', 'Second Class', 'First Class', 'First Class with Distinction']
-        df['result_class'] = pd.cut(normalized_series, bins=res_bins, labels=res_labels, right=False)
-        df['result_class'] = df['result_class'].astype(str)
-        res_dist = df['result_class'].value_counts().to_dict()
-        res_list = [{"subject": k, "avg": int(v)} for k, v in res_dist.items() if k != 'nan']
+        # Student List for Bell Curve
+        name_col = 'name' if 'name' in df.columns else 'student_name' if 'student_name' in df.columns else df.columns[0]
+        roll_col = 'id' if 'id' in df.columns else 'roll_no' if 'roll_no' in df.columns else 'roll' if 'roll' in df.columns else df.columns[1] if len(df.columns) > 1 else 'N/A'
+        
+        student_points = []
+        for _, row in df.iterrows():
+            student_points.append({
+                "name": str(row.get(name_col, 'Unknown')),
+                "roll": str(row.get(roll_col, 'N/A')),
+                "score": float(row[score_col])
+            })
 
         risk_students = []
-        name_col = 'name' if 'name' in df.columns else 'student_name' if 'student_name' in df.columns else df.columns[0]
         for _, row in df[normalized_series < 50].iterrows():
             risk_students.append({
-                "id": str(row.get('id', 'N/A')),
+                "id": str(row.get(roll_col, 'N/A')),
                 "name": str(row.get(name_col, 'Unknown')),
                 "avgScore": float(row[score_col]),
                 "risk": int(100 - (row[score_col]/scale)*100),
                 "level": "high" if (row[score_col]/scale)*100 < 40 else "moderate"
             })
     else:
-        avg_score, pass_rate, scale = 0, 0, 100
-        dist_list, res_list, risk_students = [], [], []
+        avg_score, std_dev, pass_rate, scale = 0, 0, 0, 100
+        dist_list, student_points, risk_students = [], [], []
 
     return {
         "summary": {
@@ -230,12 +232,13 @@ async def upload_analytics_data(
             "score_column": score_col,
             "scale": scale,
             "avg_score": f"{avg_score:.1f}",
+            "std_dev": std_dev,
             "pass_rate": f"{pass_rate:.0f}%",
             "high_score": f"{df[score_col].max():.1f}" if score_col else "0",
             "low_score": f"{df[score_col].min():.1f}" if score_col else "0"
         },
         "distribution": dist_list,
         "risk_students": risk_students,
-        "subject_breakdown": res_list, # Repurposing this for classification in upload view
+        "student_points": student_points,
         "raw_data": df.to_dict(orient='records')[:100] 
     }
