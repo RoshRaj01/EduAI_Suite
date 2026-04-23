@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { ArrowLeft, Pause, Play, Stop, Zap } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
-import { gameAPI, GameResponse } from "../../shared/utils/gameAPI";
+import { gameAPI } from "../../shared/utils/gameAPI";
+import type { GameResponse } from "../../shared/utils/gameAPI";
 import { motion } from "framer-motion";
 
 interface GameMonitoringPageProps {
