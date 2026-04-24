@@ -300,7 +300,7 @@ export const AnalyticsPage: React.FC = () => {
                     <ZAxis type="number" range={[100, 100]} />
                     <Tooltip 
                       cursor={{ strokeDasharray: '3 3' }}
-                      content={({ active, payload }) => {
+                      content={({ active, payload }: any) => {
                         if (active && payload && payload.length > 0) {
                           const data = payload[0].payload;
                           if (data.name) {

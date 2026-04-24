@@ -1,0 +1,455 @@
+"""
+Calendar routes – aggregate assignments, exams, appointments, lessons,
+and custom teacher events into a unified calendar feed.
+"""
+
+from datetime import datetime, timedelta
+from typing import Optional, List
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
+from app.database import Base, get_db
+
+# ── Custom Calendar Event model ──────────────────────────────
+class CalendarEvent(Base):
+    __tablename__ = "calendar_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    event_type = Column(String, default="custom")  # custom, class, meeting, reminder, deadline
+    color = Column(String, default="#264796")
+    location = Column(String, nullable=True)
+    is_all_day = Column(Boolean, default=False)
+    recurrence = Column(String, nullable=True)  # none, daily, weekly, monthly
+    teacher_name = Column(String, nullable=True)
+    course_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ── Pydantic Schemas ─────────────────────────────────────────
+class CalendarEventCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    start_time: str
+    end_time: str
+    event_type: str = "custom"
+    color: str = "#264796"
+    location: Optional[str] = None
+    is_all_day: bool = False
+    recurrence: Optional[str] = None
+    teacher_name: Optional[str] = None
+    course_id: Optional[int] = None
+
+
+class CalendarEventUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    event_type: Optional[str] = None
+    color: Optional[str] = None
+    location: Optional[str] = None
+    is_all_day: Optional[bool] = None
+    recurrence: Optional[str] = None
+    teacher_name: Optional[str] = None
+    course_id: Optional[int] = None
+
+
+router = APIRouter(prefix="/calendar", tags=["Calendar"])
+
+
+def _parse_date_safe(value: str) -> Optional[datetime]:
+    """Try multiple date formats."""
+    formats = [
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%m/%d/%Y",
+        "%d/%m/%Y",
+        "%b %d, %Y",
+        "%B %d, %Y",
+    ]
+    for fmt in formats:
+        try:
+            return datetime.strptime(value.strip(), fmt)
+        except (ValueError, AttributeError):
+            continue
+    return None
+
+
+@router.get("/events")
+def get_calendar_events(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    teacher_name: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Return all calendar events (custom + aggregated from other tables)
+    within an optional date range.
+    """
+    from app.models.assignment import Assignment
+    from app.models.exam import Exam
+    from app.models.appointment import Appointment
+    from app.models.lesson import Lesson
+    from app.models.course import Course
+
+    range_start = _parse_date_safe(start) if start else datetime.utcnow() - timedelta(days=90)
+    range_end = _parse_date_safe(end) if end else datetime.utcnow() + timedelta(days=90)
+
+    events: List[dict] = []
+
+    # ── Custom events ────────────────────────────────────────
+    custom_query = db.query(CalendarEvent)
+    if range_start:
+        custom_query = custom_query.filter(CalendarEvent.start_time >= range_start)
+    if range_end:
+        custom_query = custom_query.filter(CalendarEvent.start_time <= range_end)
+    if teacher_name:
+        custom_query = custom_query.filter(CalendarEvent.teacher_name == teacher_name)
+
+    for ev in custom_query.all():
+        events.append({
+            "id": f"custom-{ev.id}",
+            "raw_id": ev.id,
+            "title": ev.title,
+            "description": ev.description or "",
+            "start": ev.start_time.isoformat(),
+            "end": ev.end_time.isoformat(),
+            "type": ev.event_type,
+            "color": ev.color,
+            "location": ev.location or "",
+            "is_all_day": ev.is_all_day,
+            "source": "custom",
+            "editable": True,
+        })
+
+    # ── Assignment deadlines ─────────────────────────────────
+    courses_map = {}
+    for course in db.query(Course).all():
+        courses_map[course.id] = course
+
+    for assg in db.query(Assignment).all():
+        dt = _parse_date_safe(assg.due_date) if assg.due_date else None
+        if not dt:
+            continue
+        if range_start and dt < range_start:
+            continue
+        if range_end and dt > range_end:
+            continue
+        course = courses_map.get(assg.course_id)
+        if teacher_name and course and course.teacher_name != teacher_name:
+            continue
+        events.append({
+            "id": f"assignment-{assg.id}",
+            "raw_id": assg.id,
+            "title": f"📝 Due: {assg.title}",
+            "description": assg.description or "",
+            "start": dt.isoformat(),
+            "end": (dt + timedelta(hours=1)).isoformat(),
+            "type": "deadline",
+            "color": "#d97706",
+            "location": course.name if course else "",
+            "is_all_day": False,
+            "source": "assignment",
+            "editable": False,
+        })
+
+    # ── Exams ────────────────────────────────────────────────
+    for exam in db.query(Exam).all():
+        dt = exam.created_at
+        if not dt:
+            continue
+        if range_start and dt < range_start:
+            continue
+        if range_end and dt > range_end:
+            continue
+        course = courses_map.get(exam.course_id)
+        if teacher_name and course and course.teacher_name != teacher_name:
+            continue
+        events.append({
+            "id": f"exam-{exam.id}",
+            "raw_id": exam.id,
+            "title": f"📋 Exam: {exam.title}",
+            "description": exam.description or "",
+            "start": dt.isoformat(),
+            "end": (dt + timedelta(minutes=exam.time_limit or 60)).isoformat(),
+            "type": "exam",
+            "color": "#dc2626",
+            "location": course.name if course else "",
+            "is_all_day": False,
+            "source": "exam",
+            "editable": False,
+        })
+
+    # ── Appointments ─────────────────────────────────────────
+    for appt in db.query(Appointment).all():
+        dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
+        if not dt:
+            continue
+        if range_start and dt < range_start:
+            continue
+        if range_end and dt > range_end:
+            continue
+        if teacher_name and appt.teacher_name != teacher_name:
+            continue
+        status_colors = {"pending": "#d97706", "approved": "#16a34a", "rejected": "#dc2626"}
+        events.append({
+            "id": f"appointment-{appt.id}",
+            "raw_id": appt.id,
+            "title": f"👤 {appt.student_name}: {appt.topic}",
+            "description": f"Mode: {appt.meeting_mode} | Slot: {appt.time_slot}",
+            "start": dt.isoformat(),
+            "end": (dt + timedelta(minutes=30)).isoformat(),
+            "type": "appointment",
+            "color": status_colors.get(appt.status, "#264796"),
+            "location": appt.meeting_mode or "",
+            "is_all_day": False,
+            "source": "appointment",
+            "editable": False,
+            "status": appt.status,
+        })
+
+    # ── Lessons ──────────────────────────────────────────────
+    for lesson in db.query(Lesson).all():
+        dt = lesson.posted_at or lesson.created_at
+        if not dt:
+            continue
+        if range_start and dt < range_start:
+            continue
+        if range_end and dt > range_end:
+            continue
+        course = courses_map.get(lesson.course_id)
+        if teacher_name and course and course.teacher_name != teacher_name:
+            continue
+        events.append({
+            "id": f"lesson-{lesson.id}",
+            "raw_id": lesson.id,
+            "title": f"📖 {lesson.title or lesson.topic}",
+            "description": lesson.topic,
+            "start": dt.isoformat(),
+            "end": (dt + timedelta(hours=1)).isoformat(),
+            "type": "class",
+            "color": "#7c3aed",
+            "location": course.name if course else "",
+            "is_all_day": False,
+            "source": "lesson",
+            "editable": False,
+        })
+
+    # Sort by start time
+    events.sort(key=lambda e: e["start"])
+    return events
+
+
+@router.post("/events")
+def create_calendar_event(payload: CalendarEventCreate, db: Session = Depends(get_db)):
+    """Create a new custom calendar event."""
+    start_dt = _parse_date_safe(payload.start_time)
+    end_dt = _parse_date_safe(payload.end_time)
+    if not start_dt or not end_dt:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+
+    event = CalendarEvent(
+        title=payload.title,
+        description=payload.description,
+        start_time=start_dt,
+        end_time=end_dt,
+        event_type=payload.event_type,
+        color=payload.color,
+        location=payload.location,
+        is_all_day=payload.is_all_day,
+        recurrence=payload.recurrence,
+        teacher_name=payload.teacher_name,
+        course_id=payload.course_id,
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return {
+        "id": f"custom-{event.id}",
+        "raw_id": event.id,
+        "title": event.title,
+        "start": event.start_time.isoformat(),
+        "end": event.end_time.isoformat(),
+        "type": event.event_type,
+        "color": event.color,
+        "source": "custom",
+        "editable": True,
+    }
+
+
+@router.put("/events/{event_id}")
+def update_calendar_event(event_id: int, payload: CalendarEventUpdate, db: Session = Depends(get_db)):
+    """Update a custom calendar event."""
+    event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    if payload.title is not None:
+        event.title = payload.title
+    if payload.description is not None:
+        event.description = payload.description
+    if payload.start_time is not None:
+        dt = _parse_date_safe(payload.start_time)
+        if dt:
+            event.start_time = dt
+    if payload.end_time is not None:
+        dt = _parse_date_safe(payload.end_time)
+        if dt:
+            event.end_time = dt
+    if payload.event_type is not None:
+        event.event_type = payload.event_type
+    if payload.color is not None:
+        event.color = payload.color
+    if payload.location is not None:
+        event.location = payload.location
+    if payload.is_all_day is not None:
+        event.is_all_day = payload.is_all_day
+    if payload.recurrence is not None:
+        event.recurrence = payload.recurrence
+    if payload.teacher_name is not None:
+        event.teacher_name = payload.teacher_name
+    if payload.course_id is not None:
+        event.course_id = payload.course_id
+
+    db.commit()
+    db.refresh(event)
+    return {
+        "id": f"custom-{event.id}",
+        "raw_id": event.id,
+        "title": event.title,
+        "start": event.start_time.isoformat(),
+        "end": event.end_time.isoformat(),
+        "type": event.event_type,
+        "color": event.color,
+        "source": "custom",
+        "editable": True,
+    }
+
+
+@router.delete("/events/{event_id}")
+def delete_calendar_event(event_id: int, db: Session = Depends(get_db)):
+    """Delete a custom calendar event."""
+    event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    db.delete(event)
+    db.commit()
+    return {"deleted": True, "id": event_id}
+
+
+@router.get("/notifications")
+def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session = Depends(get_db)):
+    """
+    Return events happening tomorrow (24h window) for in-app reminders.
+    Aggregates from all sources just like /events.
+    """
+    from app.models.assignment import Assignment
+    from app.models.exam import Exam
+    from app.models.appointment import Appointment
+    from app.models.lesson import Lesson
+    from app.models.course import Course
+
+    now = datetime.utcnow()
+    tomorrow_start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow_end = tomorrow_start + timedelta(days=1)
+
+    notifications: List[dict] = []
+
+    # Custom events tomorrow
+    custom_query = db.query(CalendarEvent).filter(
+        CalendarEvent.start_time >= tomorrow_start,
+        CalendarEvent.start_time < tomorrow_end,
+    )
+    if teacher_name:
+        custom_query = custom_query.filter(CalendarEvent.teacher_name == teacher_name)
+        
+    for ev in custom_query.all():
+        notifications.append({
+            "id": f"custom-{ev.id}",
+            "title": ev.title,
+            "start": ev.start_time.isoformat(),
+            "type": ev.event_type,
+            "color": ev.color,
+            "source": "custom",
+            "message": f"📅 Tomorrow: {ev.title} at {ev.start_time.strftime('%I:%M %p')}",
+        })
+
+    # Assignment deadlines tomorrow
+    courses_map = {c.id: c for c in db.query(Course).all()}
+    for assg in db.query(Assignment).all():
+        dt = _parse_date_safe(assg.due_date) if assg.due_date else None
+        if dt and tomorrow_start <= dt < tomorrow_end:
+            course = courses_map.get(assg.course_id)
+            if teacher_name and course and course.teacher_name != teacher_name:
+                continue
+            notifications.append({
+                "id": f"assignment-{assg.id}",
+                "title": f"📝 Due: {assg.title}",
+                "start": dt.isoformat(),
+                "type": "deadline",
+                "color": "#d97706",
+                "source": "assignment",
+                "message": f"📝 Assignment \"{assg.title}\" is due tomorrow" + (f" ({course.name})" if course else ""),
+            })
+
+    # Exams tomorrow
+    for exam in db.query(Exam).all():
+        dt = exam.created_at
+        if dt and tomorrow_start <= dt < tomorrow_end:
+            course = courses_map.get(exam.course_id)
+            if teacher_name and course and course.teacher_name != teacher_name:
+                continue
+            notifications.append({
+                "id": f"exam-{exam.id}",
+                "title": f"📋 Exam: {exam.title}",
+                "start": dt.isoformat(),
+                "type": "exam",
+                "color": "#dc2626",
+                "source": "exam",
+                "message": f"📋 Exam \"{exam.title}\" is scheduled for tomorrow" + (f" ({course.name})" if course else ""),
+            })
+
+    # Appointments tomorrow
+    for appt in db.query(Appointment).all():
+        dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
+        if dt and tomorrow_start <= dt < tomorrow_end:
+            if teacher_name and appt.teacher_name != teacher_name:
+                continue
+            notifications.append({
+                "id": f"appointment-{appt.id}",
+                "title": f"👤 {appt.student_name}: {appt.topic}",
+                "start": dt.isoformat(),
+                "type": "appointment",
+                "color": "#16a34a",
+                "source": "appointment",
+                "message": f"👤 Meeting with {appt.student_name} about \"{appt.topic}\" tomorrow",
+            })
+
+    # Lessons tomorrow
+    for lesson in db.query(Lesson).all():
+        dt = lesson.posted_at or lesson.created_at
+        if dt and tomorrow_start <= dt < tomorrow_end:
+            course = courses_map.get(lesson.course_id)
+            if teacher_name and course and course.teacher_name != teacher_name:
+                continue
+            notifications.append({
+                "id": f"lesson-{lesson.id}",
+                "title": f"📖 {lesson.title or lesson.topic}",
+                "start": dt.isoformat(),
+                "type": "class",
+                "color": "#7c3aed",
+                "source": "lesson",
+                "message": f"📖 Lesson \"{lesson.title or lesson.topic}\" is scheduled for tomorrow" + (f" ({course.name})" if course else ""),
+            })
+
+    notifications.sort(key=lambda n: n["start"])
+    return {"count": len(notifications), "notifications": notifications}

@@ -5,7 +5,7 @@ import { EvaluationPage } from "../features/evaluation/EvaluationPage";
 import { ReportsPage } from "../features/reports/ReportsPage";
 import { FormsPage } from "../features/forms/FormsPage";
 import { AnalyticsPage } from "../features/analytics/AnalyticsPage";
-import { WellbeingPage } from "../features/wellbeing/WellbeingPage";
+import { CalendarPage } from "../features/calendar/CalendarPage";
 import { AIChatPage } from "../features/ai-chat/AIChatPage";
 import { AuthPage } from "../features/auth/AuthPage";
 import { GamesPage } from "../features/games/GamesPage";
@@ -33,7 +33,7 @@ export const router = createBrowserRouter([
       { path: "tools",          element: <TeacherToolsPage />},
       { path: "classrooms",     element: <ClassroomsPage />  },
       { path: "analytics",      element: <AnalyticsPage />   },
-      { path: "wellbeing",      element: <WellbeingPage />   },
+      { path: "calendar",       element: <CalendarPage />    },
       { path: "chat",           element: <AIChatPage />      },
       { path: "settings",       element: <ConstructionPage />},
       { path: "exams",          element: <ExamsPage />       },
