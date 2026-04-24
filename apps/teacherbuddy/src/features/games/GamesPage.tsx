@@ -146,11 +146,11 @@ export const GamesPage: React.FC = () => {
           >
             <GlassCard className="h-full relative overflow-hidden group">
               <div
-                className={`absolute inset-0 opacity-10 bg-gradient-to-br ${category.color} transition-opacity group-hover:opacity-20`}
+                className={`absolute inset-0 opacity-10 bg-linear-to-br ${category.color} transition-opacity group-hover:opacity-20`}
               />
               <div className="p-6">
                 <div
-                  className={`w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-gradient-to-br ${category.color} text-white shadow-lg`}
+                  className={`w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-linear-to-br ${category.color} text-white shadow-lg`}
                 >
                   <category.icon size={24} />
                 </div>
