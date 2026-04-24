@@ -20,6 +20,7 @@ import {
   Wrench,
   Calendar,
   ClipboardList,
+  Mail,
 } from "lucide-react";
 import logo from "../assets/logo (5).png";
 
@@ -34,6 +35,7 @@ const navItems = [
   { icon: FileSpreadsheet, label: "Reports", href: "/reports", keywords: "export download pdf analytics" },
   { icon: FileSignature, label: "Form Automation", href: "/forms", keywords: "template auto-fill document" },
   { icon: Activity, label: "Analytics & Risk", href: "/analytics", keywords: "risk alert attendance prediction" },
+  { icon: Mail, label: "Mail Students", href: "/mail", keywords: "email send students parents bulk communication" },
   { icon: Calendar, label: "Calendar", href: "/calendar", keywords: "calendar events schedule deadlines" },
   { icon: MessageSquare, label: "AI Assistant", href: "/chat", keywords: "chat ask help bot" },
   { icon: Settings, label: "Settings", href: "/settings", keywords: "preferences config account" },

@@ -13,6 +13,7 @@ import { TeacherAppointmentsPage } from "../features/appointments/TeacherAppoint
 import { TeacherToolsPage } from "../features/tools/TeacherToolsPage";
 import { ClassroomsPage } from "../features/classroom/ClassroomsPage";
 import { ExamsPage } from "../features/exam/ExamsPage";
+import { MailStudentsPage } from "../features/mail/MailStudentsPage";
 import { ConstructionPage } from "../shared/components/ConstructionPage";
 
 export const router = createBrowserRouter([
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
       { path: "tools",          element: <TeacherToolsPage />},
       { path: "classrooms",     element: <ClassroomsPage />  },
       { path: "analytics",      element: <AnalyticsPage />   },
+      { path: "mail",           element: <MailStudentsPage />},
       { path: "calendar",       element: <CalendarPage />    },
       { path: "chat",           element: <AIChatPage />      },
       { path: "settings",       element: <ConstructionPage />},
