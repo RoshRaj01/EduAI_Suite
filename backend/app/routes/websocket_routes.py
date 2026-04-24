@@ -2,13 +2,13 @@ from fastapi import WebSocket, WebSocketDisconnect, APIRouter, Query, Depends
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer, ChainAnswerGameWord
+from app.models.quiz import Quiz, QuizQuestion, QuizOption, QuizSession, QuizPlayer, QuizAnswer
 import json
+import random
 from typing import Dict, Set
 from datetime import datetime
 
 # Store active WebSocket connections per game session
-
-
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, Set[WebSocket]] = {}
@@ -27,250 +27,174 @@ class ConnectionManager:
 
     async def broadcast(self, game_session_id: str, message: dict):
         if game_session_id in self.active_connections:
-            for connection in self.active_connections[game_session_id]:
+            for connection in list(self.active_connections[game_session_id]):
                 try:
                     await connection.send_json(message)
                 except Exception as e:
                     print(f"Error sending message: {e}")
-
+                    self.disconnect(game_session_id, connection)
 
 manager = ConnectionManager()
-
-# WebSocket router
 ws_router = APIRouter()
 
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-@ws_router.websocket("/ws/games/chain-answer/{session_id}")
-async def websocket_endpoint(
+@ws_router.websocket("/ws/quiz/{pin}")
+async def quiz_websocket_endpoint(
     websocket: WebSocket,
-    session_id: str,
-    user_type: str = Query("student")  # 'teacher' or 'student'
+    pin: str,
+    user_type: str = Query("student"),
+    nickname: str = Query(None)
 ):
-    """
-    WebSocket endpoint for real-time game synchronization
-
-    Messages sent from clients:
-    - {"type": "join", "player_id": "player_1"}
-    - {"type": "submit_word", "word": "apple", "player_id": "player_1"}
-    - {"type": "ping"}
-
-    Messages sent to clients:
-    - {"type": "player_joined", "player": {...}}
-    - {"type": "game_started", "game": {...}}
-    - {"type": "word_submitted", "word": {...}, "chain": [...]}
-    - {"type": "game_ended", "results": {...}}
-    - {"type": "pong"}
-    """
-
-    await manager.connect(session_id, websocket)
+    await manager.connect(pin, websocket)
     db = SessionLocal()
 
     try:
-        # Send initial game state
-        game = db.query(ChainAnswerGame).filter(
-            ChainAnswerGame.session_id == session_id
-        ).first()
-
-        if not game:
-            await websocket.send_json({
-                "type": "error",
-                "message": "Game session not found"
-            })
-            await websocket.close(code=1008)
+        session = db.query(QuizSession).filter(QuizSession.pin == pin).first()
+        if not session:
+            await websocket.send_json({"type": "error", "message": "Session not found"})
+            await websocket.close()
             return
 
-        # Send current game state
-        chain = [
-            {
-                "id": w.id,
-                "word": w.word,
-                "submitted_by": w.submitted_by,
-                "submitted_at": w.submitted_at.isoformat(),
-                "is_valid": w.is_valid,
-                "position": w.position
-            }
-            for w in game.words
-        ]
+        player = None
+        if user_type == "student" and nickname:
+            player = db.query(QuizPlayer).filter(
+                QuizPlayer.session_id == session.id, 
+                QuizPlayer.nickname == nickname
+            ).first()
+            
+            if not player:
+                emojis = ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🐤", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐜", "🦗", "🕷", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏", "🐑", "🐐", "🦌", "🐕", "🐩", "🐈", "🐓", "🦃", "🦚", "🦜", "🦢", "🕊", "🐇", "🦝", "🦡", "🐁", "🐀", "🐿", "🦔"]
+                avatar = random.choice(emojis)
+                player = QuizPlayer(session_id=session.id, nickname=nickname, avatar=avatar)
+                db.add(player)
+                db.commit()
+                db.refresh(player)
 
-        # Get players in join order to ensure correct turn sequence
-        players = [
-            {
-                "id": p.id,
-                "name": p.name,
-                "student_id": p.student_id,
-                "score": p.score,
-                "words_submitted": p.words_submitted,
-                "words_valid": p.words_valid,
-                "status": p.status
-            }
-            for p in sorted(game.players, key=lambda x: x.join_order or 0)
-        ]
+            players_list = [{"id": p.id, "nickname": p.nickname, "avatar": p.avatar} for p in session.players]
+            await manager.broadcast(pin, {
+                "type": "lobby_update",
+                "players": players_list
+            })
 
-        # Calculate current player index based on number of words in chain
-        # The turn order cycles through players based on word count
-        if players:
-            # Skip the starting word (position 0 is system)
-            valid_words_count = len([w for w in chain if w.get("position", 0) > 0])
-            current_player_index = valid_words_count % len(players)
-        else:
-            current_player_index = 0
-
-        await websocket.send_json({
-            "type": "initial_state",
-            "game": {
-                "id": game.id,
-                "session_id": game.session_id,
-                "name": game.name,
-                "status": game.status,
-                "chain_variation": game.chain_variation,
-                "difficulty_level": game.difficulty_level,
-                "starting_word": game.starting_word,
-                "created_at": game.created_at.isoformat(),
-                "started_at": game.started_at.isoformat() if game.started_at else None,
-            },
-            "players": players,
-            "chain": chain,
-            "currentPlayerIndex": current_player_index,
-            "user_type": user_type
-        })
-
-        # Listen for messages
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
 
-            if message["type"] == "ping":
-                await websocket.send_json({"type": "pong"})
-                continue
-
-            if message["type"] == "join":
-                # Broadcast player joined
-                await manager.broadcast(session_id, {
-                    "type": "player_joined",
-                    "player_id": message.get("player_id"),
-                    "timestamp": datetime.utcnow().isoformat()
-                })
-
-            elif message["type"] == "submit_word":
-                word = message.get("word", "").strip()
-                player_id = message.get("player_id")
-
-                if not word:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": "Word cannot be empty"
-                    })
-                    continue
-
-                # Create word entry in database
-                try:
-                    max_position = db.query(ChainAnswerGameWord).filter(
-                        ChainAnswerGameWord.game_id == game.id
-                    ).order_by(ChainAnswerGameWord.position.desc()).first()
-
-                    next_position = (max_position.position +
-                                     1) if max_position else 1
-
-                    new_word = ChainAnswerGameWord(
-                        game_id=game.id,
-                        word=word,
-                        submitted_by=player_id,
-                        is_valid=True,
-                        position=next_position
-                    )
-
-                    db.add(new_word)
+            if message["type"] == "start_game":
+                if user_type == "teacher":
+                    session.status = "active"
+                    session.current_question_index = 0
                     db.commit()
-                    db.refresh(new_word)
+                    
+                    quiz = session.quiz
+                    if quiz.questions:
+                        question = sorted(quiz.questions, key=lambda x: x.order)[0]
+                        await manager.broadcast(pin, {
+                            "type": "new_question",
+                            "question": {
+                                "id": question.id,
+                                "text": question.question_text,
+                                "type": question.question_type,
+                                "time_limit": question.time_limit,
+                                "image_url": question.image_url,
+                                "options": [{"id": o.id, "text": o.option_text, "color": o.color} for o in question.options]
+                            },
+                            "index": 0,
+                            "total": len(quiz.questions)
+                        })
 
-                    # Update player stats
-                    player = db.query(ChainAnswerGamePlayer).filter(
-                        ChainAnswerGamePlayer.game_id == game.id,
-                        ChainAnswerGamePlayer.student_id == player_id
-                    ).first()
+            elif message["type"] == "submit_answer":
+                if user_type == "student" and player:
+                    question_id = message.get("question_id")
+                    option_id = message.get("option_id")
+                    response_time = message.get("response_time", 0)
 
-                    if player:
-                        player.words_submitted += 1
-                        player.words_valid += 1
-                        player.score += 10
-                        db.commit()
+                    option = db.query(QuizOption).filter(QuizOption.id == option_id).first()
+                    is_correct = option.is_correct if option else False
+                    
+                    points = 0
+                    if is_correct:
+                        question = db.query(QuizQuestion).filter(QuizQuestion.id == question_id).first()
+                        time_limit_ms = (question.time_limit * 1000) if question else 20000
+                        
+                        if response_time <= time_limit_ms:
+                            # Kahoot formula: 1000 * (1 - ((response_time / time_limit) / 2))
+                            speed_bonus = 1 - ((response_time / time_limit_ms) / 2)
+                            points = int(1000 * speed_bonus)
+                            
+                        player.score += points
+                        player.streak += 1
+                    else:
+                        player.streak = 0
+                    
+                    db.add(QuizAnswer(
+                        player_id=player.id,
+                        question_id=question_id,
+                        option_id=option_id,
+                        is_correct=is_correct,
+                        points_earned=points,
+                        response_time_ms=response_time
+                    ))
+                    db.commit()
 
-                    # Broadcast word submitted to all players
-                    await manager.broadcast(session_id, {
-                        "type": "word_submitted",
-                        "word": {
-                            "id": new_word.id,
-                            "word": new_word.word,
-                            "submitted_by": new_word.submitted_by,
-                            "submitted_at": new_word.submitted_at.isoformat(),
-                            "position": new_word.position
-                        },
-                        "player_stats": {
-                            "words_submitted": player.words_submitted,
-                            "words_valid": player.words_valid,
-                            "score": player.score
-                        } if player else {}
-                    })
-
-                except Exception as e:
-                    print(f"Error submitting word: {e}")
                     await websocket.send_json({
-                        "type": "error",
-                        "message": "Failed to submit word"
+                        "type": "answer_submitted",
+                        "is_correct": is_correct, # Will be hidden on client until show_results
+                        "points": points
+                    })
+                    
+                    # Notify teacher
+                    await manager.broadcast(pin, {
+                        "type": "answer_count_update",
+                        "count": db.query(QuizAnswer).filter(QuizAnswer.question_id == question_id).count()
                     })
 
-            elif message["type"] == "game_started":
-                game.status = "active"
-                game.started_at = datetime.utcnow()
-                db.commit()
+            elif message["type"] == "time_up":
+                if user_type == "teacher":
+                    question_id = message.get("question_id")
+                    # Calculate stats
+                    stats = {}
+                    answers = db.query(QuizAnswer).filter(QuizAnswer.question_id == question_id).all()
+                    for a in answers:
+                        stats[a.option_id] = stats.get(a.option_id, 0) + 1
+                    
+                    question = db.query(QuizQuestion).filter(QuizQuestion.id == question_id).first()
+                    correct_option_ids = [o.id for o in question.options if o.is_correct] if question else []
+                    
+                    await manager.broadcast(pin, {
+                        "type": "show_results",
+                        "stats": stats,
+                        "correct_option_ids": correct_option_ids
+                    })
 
-                await manager.broadcast(session_id, {
-                    "type": "game_started",
-                    "started_at": game.started_at.isoformat()
-                })
-
-            elif message["type"] == "game_ended":
-                game.status = "completed"
-                game.ended_at = datetime.utcnow()
-                db.commit()
-
-                # Get final scores
-                final_players = [
-                    {
-                        "id": p.id,
-                        "name": p.name,
-                        "score": p.score,
-                        "words_submitted": p.words_submitted,
-                        "words_valid": p.words_valid
-                    }
-                    for p in game.players
-                ]
-
-                await manager.broadcast(session_id, {
-                    "type": "game_ended",
-                    "ended_at": game.ended_at.isoformat(),
-                    "final_scores": final_players
-                })
+            elif message["type"] == "next_question":
+                if user_type == "teacher":
+                    session.current_question_index += 1
+                    quiz = session.quiz
+                    if session.current_question_index < len(quiz.questions):
+                        question = sorted(quiz.questions, key=lambda x: x.order)[session.current_question_index]
+                        await manager.broadcast(pin, {
+                            "type": "new_question",
+                            "question": {
+                                "id": question.id,
+                                "text": question.question_text,
+                                "type": question.question_type,
+                                "time_limit": question.time_limit,
+                                "image_url": question.image_url,
+                                "options": [{"id": o.id, "text": o.option_text, "color": o.color} for o in question.options]
+                            },
+                            "index": session.current_question_index,
+                            "total": len(quiz.questions)
+                        })
+                    else:
+                        session.status = "completed"
+                        db.commit()
+                        leaderboard = sorted(session.players, key=lambda x: x.score, reverse=True)[:5]
+                        await manager.broadcast(pin, {
+                            "type": "game_over",
+                            "leaderboard": [{"nickname": p.nickname, "score": p.score, "avatar": p.avatar} for p in leaderboard]
+                        })
 
     except WebSocketDisconnect:
-        manager.disconnect(session_id, websocket)
-        # Notify others that player disconnected
-        await manager.broadcast(session_id, {
-            "type": "player_disconnected",
-            "timestamp": datetime.utcnow().isoformat()
-        })
-
-    except Exception as e:
-        print(f"WebSocket error: {e}")
-        manager.disconnect(session_id, websocket)
-
+        manager.disconnect(pin, websocket)
     finally:
         db.close()

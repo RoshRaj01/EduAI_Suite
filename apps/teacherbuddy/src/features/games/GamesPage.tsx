@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { ChainAnswerGameCreation } from "./ChainAnswerGameCreation";
 import { GameMonitoringPage } from "./GameMonitoringPage";
 
@@ -37,6 +38,7 @@ const gameCategories = [
       "Students answer MCQs in real time. Points = speed + accuracy. Live leaderboard with Kahoot-style gameplay.",
     icon: Gamepad2,
     color: "from-blue-400 to-indigo-500",
+    hasImplementation: true,
   },
   {
     id: "team-puzzle",
@@ -73,6 +75,7 @@ const gameCategories = [
 ];
 
 export const GamesPage: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [showCreation, setShowCreation] = useState(false);
   const [monitoringGame, setMonitoringGame] = useState<{
@@ -82,6 +85,10 @@ export const GamesPage: React.FC = () => {
 
   const handleGameSelect = (gameId: string) => {
     const game = gameCategories.find((g) => g.id === gameId);
+    if (gameId === "quiz-battle-royale") {
+      navigate("/games/quiz/create");
+      return;
+    }
     if (game?.hasImplementation) {
       setShowCreation(true);
     }

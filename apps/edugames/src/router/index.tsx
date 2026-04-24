@@ -7,6 +7,7 @@ import { StudentExams } from "../features/exam/StudentExams";
 import { AuthPage } from "../features/auth/AuthPage";
 import { GamesPage } from "../features/games/GamesPage";
 import { ChainAnswerGamePage } from "../features/games/ChainAnswerGamePage";
+import { QuizController } from "../features/games/QuizController";
 import { AppointmentBookingPage } from "../features/appointments/AppointmentBookingPage";
 import { ConstructionPage } from "../shared/components/ConstructionPage";
 
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: "classroom", element: <StudentClassrooms /> },
       { path: "exams", element: <StudentExams /> },
       { path: "games/chain-answer", element: <ChainAnswerGamePage /> },
+      { path: "games/quiz/play", element: <QuizController /> },
       { path: "games", element: <GamesPage /> },
       { path: "appointments", element: <AppointmentBookingPage /> },
       { path: "*", element: <ConstructionPage /> },

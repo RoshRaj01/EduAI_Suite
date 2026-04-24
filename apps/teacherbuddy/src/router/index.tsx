@@ -9,6 +9,8 @@ import { CalendarPage } from "../features/calendar/CalendarPage";
 import { AIChatPage } from "../features/ai-chat/AIChatPage";
 import { AuthPage } from "../features/auth/AuthPage";
 import { GamesPage } from "../features/games/GamesPage";
+import { QuizCreator } from "../features/games/QuizCreator";
+import { QuizMonitoring } from "../features/games/QuizMonitoring";
 import { TeacherAppointmentsPage } from "../features/appointments/TeacherAppointmentsPage";
 import { TeacherToolsPage } from "../features/tools/TeacherToolsPage";
 import { ClassroomsPage } from "../features/classroom/ClassroomsPage";
@@ -30,6 +32,8 @@ export const router = createBrowserRouter([
       { path: "reports",        element: <ReportsPage />     },
       { path: "forms",          element: <FormsPage />       },
       { path: "games",          element: <GamesPage />       },
+      { path: "games/quiz/create", element: <QuizCreator />  },
+      { path: "games/quiz/host/:quizId", element: <QuizMonitoring /> },
       { path: "appointments",   element: <TeacherAppointmentsPage /> },
       { path: "tools",          element: <TeacherToolsPage />},
       { path: "classrooms",     element: <ClassroomsPage />  },

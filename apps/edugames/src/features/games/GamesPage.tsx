@@ -99,6 +99,8 @@ export const GamesPage: React.FC = () => {
             onClick={() => {
               if (category.id === 'chain-answer') {
                 navigate('/games/chain-answer');
+              } else if (category.id === 'quiz-battle-royale') {
+                navigate('/games/quiz/play');
               } else {
                 setSelectedGame(category.id);
               }
