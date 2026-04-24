@@ -471,6 +471,18 @@ export const MailStudentsPage: React.FC = () => {
                      >
                       + Reg No.
                      </button>
+                     <button 
+                      className="px-2 py-1 text-[9px] font-bold bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+                      onClick={() => setMailBody(prev => prev + "{{attendance}}")}
+                     >
+                      + Attendance
+                     </button>
+                     <button 
+                      className="px-2 py-1 text-[9px] font-bold bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+                      onClick={() => setMailBody(prev => prev + "{{marks}}")}
+                     >
+                      + Marks
+                     </button>
                   </div>
                 </div>
               </div>

@@ -68,7 +68,10 @@ def send_bulk_mail(req: MailRequest, background_tasks: BackgroundTasks, db: Sess
     sent_count = 0
     for student in students:
         # Personalize body
-        personalized_body = req.body.replace("{{name}}", student.name).replace("{{reg_num}}", student.registration_number)
+        personalized_body = req.body.replace("{{name}}", student.name) \
+                                    .replace("{{reg_num}}", student.registration_number) \
+                                    .replace("{{attendance}}", f"{student.attendance}%") \
+                                    .replace("{{marks}}", f"{student.avg_score}%")
         
         # Add to background tasks to avoid blocking
         background_tasks.add_task(send_email, student.email, req.subject, personalized_body)
