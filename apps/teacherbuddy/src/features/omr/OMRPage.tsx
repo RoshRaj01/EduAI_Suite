@@ -99,6 +99,9 @@ export const OMRPage: React.FC = () => {
     const formData = new FormData();
     formData.append("student_id", uploadStudentId);
     formData.append("file", file);
+    
+    // Reset file input so the same file can be selected again if needed
+    if (fileInputRef.current) fileInputRef.current.value = '';
 
     try {
       const res = await fetch(`${API_URL}/jobs/${selectedJob.id}/upload`, {
@@ -386,9 +389,23 @@ export const OMRPage: React.FC = () => {
                </div>
             </GlassCard>
           ) : (
-            <div className="h-full flex items-center justify-center p-6 border-2 border-dashed rounded-3xl" style={{ borderColor: 'var(--color-border)' }}>
-              <p style={{ color: 'var(--color-text-muted)' }}>Select a submission to review its contents.</p>
-            </div>
+            <GlassCard className="h-full flex flex-col overflow-hidden p-6">
+              <h2 className="text-xl font-bold mb-2" style={{ color: "var(--color-text-primary)" }}>Master Answer Key</h2>
+              <p className="text-sm mb-6" style={{ color: "var(--color-text-secondary)" }}>Correct answers expected for this evaluation batch.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 overflow-y-auto pr-2 pb-4 content-start">
+                {Object.entries(selectedJob?.answer_key || {}).map(([qNo, ans]: [string, any]) => (
+                  <div key={qNo} className="p-3 rounded-xl border flex items-center justify-between shadow-sm" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-base)" }}>
+                    <span className="font-bold text-sm text-gray-500">Q{qNo}</span>
+                    <span className="font-bold text-lg" style={{ color: "var(--color-brand-blue)" }}>{ans}</span>
+                  </div>
+                ))}
+              </div>
+              {Object.keys(selectedJob?.answer_key || {}).length === 0 && (
+                <div className="text-center p-8 border-2 border-dashed rounded-xl mt-4" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
+                  No answer key mapped.
+                </div>
+              )}
+            </GlassCard>
           )}
         </div>
       </div>

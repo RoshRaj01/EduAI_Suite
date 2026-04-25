@@ -14,3 +14,4 @@ groq
 dotenv
 pandas
 openpyxl
+Pillow
