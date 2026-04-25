@@ -63,3 +63,4 @@ backend/uploads/announcements/
 backend/uploads/courses/
 backend/uploads/submissions/
 calendar_replica/
+trello_replica/

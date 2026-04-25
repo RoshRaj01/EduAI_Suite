@@ -101,6 +101,8 @@ export const GamesPage: React.FC = () => {
                 navigate('/games/chain-answer');
               } else if (category.id === 'quiz-battle-royale') {
                 navigate('/games/quiz/play');
+              } else if (category.id === 'trello-projects') {
+                navigate('/games/trello');
               } else {
                 setSelectedGame(category.id);
               }
