@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { DashboardShell } from "../layouts/DashboardShell";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { EvaluationPage } from "../features/evaluation/EvaluationPage";
+import { OMRPage } from "../features/omr/OMRPage";
 import { ReportsPage } from "../features/reports/ReportsPage";
 import { FormsPage } from "../features/forms/FormsPage";
 import { AnalyticsPage } from "../features/analytics/AnalyticsPage";
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
     element: <DashboardShell />,
     children: [
       { index: true,            element: <DashboardPage />   },
+      { path: "omr",            element: <OMRPage />         },
       { path: "evaluation",     element: <EvaluationPage />  },
       { path: "reports",        element: <ReportsPage />     },
       { path: "forms",          element: <FormsPage />       },
