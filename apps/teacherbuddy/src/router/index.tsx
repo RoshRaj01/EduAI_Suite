@@ -18,6 +18,8 @@ import { ClassroomsPage } from "../features/classroom/ClassroomsPage";
 import { ExamsPage } from "../features/exam/ExamsPage";
 import { MailStudentsPage } from "../features/mail/MailStudentsPage";
 import { ConstructionPage } from "../shared/components/ConstructionPage";
+import { TrelloBoardsPage } from "../features/trello/TrelloBoardsPage";
+import { TrelloBoardView } from "../features/trello/TrelloBoardView";
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +47,8 @@ export const router = createBrowserRouter([
       { path: "chat",           element: <AIChatPage />      },
       { path: "settings",       element: <ConstructionPage />},
       { path: "exams",          element: <ExamsPage />       },
+      { path: "games/trello",   element: <TrelloBoardsPage />},
+      { path: "games/trello/:boardId", element: <TrelloBoardView /> },
       { path: "*",              element: <ConstructionPage />},
     ],
   },

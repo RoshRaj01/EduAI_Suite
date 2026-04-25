@@ -71,6 +71,7 @@ const gameCategories = [
       "Kanban-style boards for managing group projects and tasks. Organize work with cards and columns.",
     icon: FlaskConical,
     color: "from-red-400 to-orange-500",
+    hasImplementation: true,
   },
 ];
 
@@ -85,6 +86,10 @@ export const GamesPage: React.FC = () => {
 
   const handleGameSelect = (gameId: string) => {
     const game = gameCategories.find((g) => g.id === gameId);
+    if (gameId === "trello-projects") {
+      navigate("/games/trello");
+      return;
+    }
     if (gameId === "quiz-battle-royale") {
       navigate("/games/quiz/create");
       return;

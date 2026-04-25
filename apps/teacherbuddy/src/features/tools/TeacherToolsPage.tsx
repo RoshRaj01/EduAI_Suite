@@ -7,6 +7,7 @@ import {
   Clock,
   RefreshCw,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { AutoLessonPlannerComponent } from "./AutoLessonPlannerComponent";
 
@@ -38,6 +39,7 @@ const tools = [
 ];
 
 export const TeacherToolsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedTool, setSelectedTool] = useState<string>("planner");
   const [courseId, setCourseId] = useState<number | null>(null);
 
