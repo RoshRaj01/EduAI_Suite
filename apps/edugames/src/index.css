@@ -476,7 +476,6 @@
 }
 .trello-column-dragging {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-  transform: rotate(2deg);
 }
 
 .trello-column-header {
@@ -507,7 +506,7 @@
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.4rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   border: 1px solid rgba(0, 0, 0, 0.04);
 }
@@ -517,7 +516,6 @@
 }
 .trello-card-dragging {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18) !important;
-  transform: rotate(3deg);
   opacity: 0.95;
 }
 

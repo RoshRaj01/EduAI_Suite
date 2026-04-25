@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useTrelloStore, BOARD_BACKGROUNDS } from '../../../store/useTrelloStore';
+import { useAuthStore } from '../../../store/useAuthStore';
 
 interface Props {
   onClose: () => void;
@@ -9,12 +10,13 @@ interface Props {
 
 export const CreateBoardModal: React.FC<Props> = ({ onClose, onCreated }) => {
   const { addBoard } = useTrelloStore();
+  const user = useAuthStore((s) => s.user);
   const [name, setName] = useState('');
   const [bg, setBg] = useState(BOARD_BACKGROUNDS[0].value);
 
   const handleCreate = () => {
     if (!name.trim()) return;
-    const id = addBoard(name.trim(), bg);
+    const id = addBoard(name.trim(), bg, user?.email || 'guest@eduai.com');
     onCreated(id);
   };
 

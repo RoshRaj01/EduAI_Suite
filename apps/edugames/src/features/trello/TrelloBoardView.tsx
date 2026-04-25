@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
-import { ArrowLeft, Star, Plus, X, MoreHorizontal, Trash2, Pencil } from 'lucide-react';
+import { ArrowLeft, Star, Plus, X, MoreHorizontal, Trash2, Pencil, Users } from 'lucide-react';
 import { useTrelloStore, type TrelloCard } from '../../store/useTrelloStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { BoardColumn } from './components/BoardColumn';
 import { CardDetailModal } from './components/CardDetailModal';
+import { ShareModal } from './components/ShareModal';
 
 export const TrelloBoardView: React.FC = () => {
   const { boardId } = useParams<{ boardId: string }>();
@@ -23,6 +25,8 @@ export const TrelloBoardView: React.FC = () => {
   const [editingName, setEditingName] = useState(false);
   const [boardName, setBoardName] = useState(board?.name || '');
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const user = useAuthStore((s) => s.user);
 
   if (!board) {
     return (
@@ -129,6 +133,18 @@ export const TrelloBoardView: React.FC = () => {
 
         <div className="flex-1" />
 
+        <button
+          onClick={() => setShowShareModal(true)}
+          className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-2 mr-2"
+        >
+          <Users size={16} /> Share
+          {board.joinRequests && board.joinRequests.length > 0 && (user?.email || 'guest@eduai.com') === board.creatorEmail && (
+            <span className="bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+              {board.joinRequests.length}
+            </span>
+          )}
+        </button>
+
         <div className="relative">
           <button
             onClick={() => setBoardMenuOpen(!boardMenuOpen)}
@@ -228,6 +244,11 @@ export const TrelloBoardView: React.FC = () => {
           columnTitle={selectedColumn.title}
           onClose={() => setSelectedCard(null)}
         />
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <ShareModal board={board} onClose={() => setShowShareModal(false)} />
       )}
     </div>
   );

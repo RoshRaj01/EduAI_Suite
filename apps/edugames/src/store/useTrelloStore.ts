@@ -40,6 +40,9 @@ export interface TrelloBoard {
   background: string;
   createdAt: string;
   starred: boolean;
+  creatorEmail: string;
+  members: string[];
+  joinRequests: string[];
 }
 
 interface TrelloState {
@@ -47,10 +50,15 @@ interface TrelloState {
   columns: TrelloColumn[];
   cards: TrelloCard[];
 
-  addBoard: (name: string, background: string) => string;
+  addBoard: (name: string, background: string, creatorEmail: string) => string;
   updateBoard: (id: string, updates: Partial<TrelloBoard>) => void;
   deleteBoard: (id: string) => void;
   toggleStar: (id: string) => void;
+  requestJoinBoard: (boardId: string, email: string) => void;
+  approveJoinRequest: (boardId: string, email: string) => void;
+  rejectJoinRequest: (boardId: string, email: string) => void;
+  removeMember: (boardId: string, email: string) => void;
+  addMemberDirectly: (boardId: string, email: string) => void;
 
   addColumn: (boardId: string, title: string) => void;
   updateColumn: (id: string, title: string) => void;
@@ -98,10 +106,13 @@ export const useTrelloStore = create<TrelloState>()(
       cards: [],
 
       // ── Board actions ──────────────────────────────────────
-      addBoard: (name, background) => {
+      addBoard: (name, background, creatorEmail) => {
         const id = uid();
         set((s) => ({
-          boards: [...s.boards, { id, name, background, createdAt: new Date().toISOString(), starred: false }],
+          boards: [
+            ...s.boards,
+            { id, name, background, createdAt: new Date().toISOString(), starred: false, creatorEmail, members: [], joinRequests: [] },
+          ],
         }));
         return id;
       },
@@ -115,6 +126,56 @@ export const useTrelloStore = create<TrelloState>()(
         })),
       toggleStar: (id) =>
         set((s) => ({ boards: s.boards.map((b) => (b.id === id ? { ...b, starred: !b.starred } : b)) })),
+
+      requestJoinBoard: (boardId, email) =>
+        set((s) => ({
+          boards: s.boards.map((b) => {
+            if (b.id !== boardId) return b;
+            if (b.members?.includes(email) || b.joinRequests?.includes(email) || b.creatorEmail === email) return b;
+            return { ...b, joinRequests: [...(b.joinRequests || []), email] };
+          }),
+        })),
+
+      approveJoinRequest: (boardId, email) =>
+        set((s) => ({
+          boards: s.boards.map((b) => {
+            if (b.id !== boardId) return b;
+            return {
+              ...b,
+              joinRequests: (b.joinRequests || []).filter((e) => e !== email),
+              members: [...(b.members || []), email],
+            };
+          }),
+        })),
+
+      rejectJoinRequest: (boardId, email) =>
+        set((s) => ({
+          boards: s.boards.map((b) => {
+            if (b.id !== boardId) return b;
+            return { ...b, joinRequests: (b.joinRequests || []).filter((e) => e !== email) };
+          }),
+        })),
+
+      removeMember: (boardId, email) =>
+        set((s) => ({
+          boards: s.boards.map((b) => {
+            if (b.id !== boardId) return b;
+            return { ...b, members: (b.members || []).filter((e) => e !== email) };
+          }),
+        })),
+
+      addMemberDirectly: (boardId, email) =>
+        set((s) => ({
+          boards: s.boards.map((b) => {
+            if (b.id !== boardId) return b;
+            if (b.members?.includes(email) || b.creatorEmail === email) return b;
+            return {
+              ...b,
+              members: [...(b.members || []), email],
+              joinRequests: (b.joinRequests || []).filter((e) => e !== email), // remove if they had a pending request
+            };
+          }),
+        })),
 
       // ── Column actions ─────────────────────────────────────
       addColumn: (boardId, title) => {

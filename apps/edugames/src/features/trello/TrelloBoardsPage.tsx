@@ -2,16 +2,25 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Star, LayoutGrid, Trash2, MoreHorizontal } from 'lucide-react';
 import { useTrelloStore } from '../../store/useTrelloStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { CreateBoardModal } from './components/CreateBoardModal';
+import { JoinBoardModal } from './components/JoinBoardModal';
 
 export const TrelloBoardsPage: React.FC = () => {
   const navigate = useNavigate();
   const { boards, toggleStar, deleteBoard } = useTrelloStore();
+  const user = useAuthStore((s) => s.user);
+  const fallbackEmail = user?.email || 'guest@eduai.com';
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
-  const starredBoards = boards.filter((b) => b.starred);
-  const recentBoards = [...boards].sort(
+  const accessibleBoards = boards.filter(
+    (b) => b.creatorEmail === fallbackEmail || b.members?.includes(fallbackEmail)
+  );
+
+  const starredBoards = accessibleBoards.filter((b) => b.starred);
+  const recentBoards = [...accessibleBoards].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
@@ -32,10 +41,15 @@ export const TrelloBoardsPage: React.FC = () => {
             Organize your team projects with Kanban boards
           </p>
         </div>
-        <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
-          <Plus size={18} />
-          Create Board
-        </button>
+        <div className="flex gap-3">
+          <button onClick={() => setShowJoinModal(true)} className="btn hover:bg-slate-100 transition-colors bg-white font-semibold shadow-sm border border-slate-200" style={{ color: 'var(--color-brand-blue)' }}>
+            Join Board
+          </button>
+          <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
+            <Plus size={18} />
+            Create Board
+          </button>
+        </div>
       </div>
 
       {/* Starred Boards */}
@@ -70,7 +84,7 @@ export const TrelloBoardsPage: React.FC = () => {
           <h2 className="text-base font-bold" style={{ color: 'var(--color-text-primary)' }}>
             All Boards
           </h2>
-          <span className="badge badge-blue ml-1">{boards.length}</span>
+          <span className="badge badge-blue ml-1">{accessibleBoards.length}</span>
         </div>
         <div className="trello-boards-grid">
           {recentBoards.map((board) => (
@@ -96,7 +110,7 @@ export const TrelloBoardsPage: React.FC = () => {
       </section>
 
       {/* Empty State */}
-      {boards.length === 0 && (
+      {accessibleBoards.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20">
           <div
             className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5"
@@ -110,23 +124,29 @@ export const TrelloBoardsPage: React.FC = () => {
           <p className="text-sm mb-6" style={{ color: 'var(--color-text-secondary)' }}>
             Create your first project board to get started
           </p>
-          <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
-            <Plus size={18} />
-            Create Your First Board
-          </button>
+          <div className="flex gap-4">
+            <button onClick={() => setShowJoinModal(true)} className="btn hover:bg-slate-100 transition-colors bg-white font-semibold shadow-sm border border-slate-200" style={{ color: 'var(--color-brand-blue)' }}>
+              Join a Board
+            </button>
+            <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
+              <Plus size={18} />
+              Create Your First Board
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Overlay for menu close */}
-      {menuOpenId && (
-        <div className="fixed inset-0 z-30" onClick={() => setMenuOpenId(null)} />
-      )}
+
 
       {showCreateModal && (
         <CreateBoardModal
           onClose={() => setShowCreateModal(false)}
           onCreated={handleBoardCreated}
         />
+      )}
+
+      {showJoinModal && (
+        <JoinBoardModal onClose={() => setShowJoinModal(false)} />
       )}
     </div>
   );
@@ -144,7 +164,7 @@ interface BoardTileProps {
 
 const BoardTile: React.FC<BoardTileProps> = ({ board, onOpen, onStar, onDelete, menuOpen, onMenuToggle }) => {
   return (
-    <div className="trello-board-tile" style={{ background: board.background }} onClick={onOpen}>
+    <div className="trello-board-tile" style={{ background: board.background, zIndex: menuOpen ? 40 : 1 }} onClick={onOpen}>
       {/* Overlay for text readability */}
       <div className="absolute inset-0 bg-black/10 rounded-xl" />
 
@@ -173,18 +193,21 @@ const BoardTile: React.FC<BoardTileProps> = ({ board, onOpen, onStar, onDelete, 
                 <MoreHorizontal size={15} className="text-white/60" />
               </button>
               {menuOpen && (
-                <div
-                  className="absolute right-0 top-8 glass-card py-1 z-50 min-w-[140px]"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ borderRadius: 10 }}
-                >
+                <>
+                  <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); onMenuToggle(); }} />
+                  <div
+                    className="absolute right-0 top-8 glass-card py-1 z-50 min-w-[140px]"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ borderRadius: 10 }}
+                  >
                   <button
-                    onClick={onDelete}
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
                     className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2 transition-colors"
                   >
                     <Trash2 size={14} /> Delete Board
                   </button>
-                </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
