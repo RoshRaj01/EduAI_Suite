@@ -378,3 +378,25 @@ def debug_groq():
     }
 
     return debug_info
+
+
+# Delete a game
+@router.delete("/chain-answer/{game_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_chain_answer_game(
+    game_id: int,
+    db: Session = Depends(get_db)
+):
+    """Delete a Chain Answer game"""
+    game = db.query(ChainAnswerGame).filter(
+        ChainAnswerGame.id == game_id).first()
+
+    if not game:
+        raise HTTPException(
+            status_code=404,
+            detail="Game not found"
+        )
+
+    db.delete(game)
+    db.commit()
+
+    return None

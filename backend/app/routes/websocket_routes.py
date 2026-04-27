@@ -1,7 +1,7 @@
 from fastapi import WebSocket, WebSocketDisconnect, APIRouter, Query, Depends
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
-from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer, ChainAnswerGameWord
+from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer, ChainAnswerGameWord, WordCloudSession, WordCloudSubmission
 from app.models.quiz import Quiz, QuizQuestion, QuizOption, QuizSession, QuizPlayer, QuizAnswer
 import json
 import random
@@ -193,6 +193,77 @@ async def quiz_websocket_endpoint(
                             "type": "game_over",
                             "leaderboard": [{"nickname": p.nickname, "score": p.score, "avatar": p.avatar} for p in leaderboard]
                         })
+
+    except WebSocketDisconnect:
+        manager.disconnect(pin, websocket)
+    finally:
+        db.close()
+
+@ws_router.websocket("/ws/wordcloud/{pin}")
+async def wordcloud_websocket_endpoint(
+    websocket: WebSocket,
+    pin: str,
+    role: str = Query("student"),
+    student_name: str = Query(None)
+):
+    await manager.connect(pin, websocket)
+    db = SessionLocal()
+
+    try:
+        session = db.query(WordCloudSession).filter(WordCloudSession.pin == pin).first()
+        if not session:
+            await websocket.send_json({"type": "error", "message": "Session not found"})
+            await websocket.close()
+            return
+
+        if role == "teacher":
+            # Send initial word frequencies
+            submissions = db.query(WordCloudSubmission).filter(WordCloudSubmission.session_id == session.id).all()
+            words_dict = {}
+            for sub in submissions:
+                words_dict[sub.word] = words_dict.get(sub.word, 0) + 1
+            words_list = [{"text": k, "value": v} for k, v in words_dict.items()]
+            await websocket.send_json({
+                "type": "cloud_update",
+                "words": words_list
+            })
+
+        while True:
+            data = await websocket.receive_text()
+            message = json.loads(data)
+
+            if message["type"] == "submit_word" and role == "student":
+                word = message.get("word", "").strip().lower()
+                if word:
+                    # Save submission
+                    submission = WordCloudSubmission(
+                        session_id=session.id,
+                        word=word,
+                        submitted_by=student_name
+                    )
+                    db.add(submission)
+                    db.commit()
+
+                    # Re-calculate frequencies and broadcast
+                    submissions = db.query(WordCloudSubmission).filter(WordCloudSubmission.session_id == session.id).all()
+                    words_dict = {}
+                    for sub in submissions:
+                        words_dict[sub.word] = words_dict.get(sub.word, 0) + 1
+                    words_list = [{"text": k, "value": v} for k, v in words_dict.items()]
+
+                    await manager.broadcast(pin, {
+                        "type": "cloud_update",
+                        "words": words_list
+                    })
+                    
+                    await websocket.send_json({"type": "word_submitted", "word": word})
+
+            elif message["type"] == "end_session" and role == "teacher":
+                session.status = "completed"
+                db.commit()
+                await manager.broadcast(pin, {
+                    "type": "session_ended"
+                })
 
     except WebSocketDisconnect:
         manager.disconnect(pin, websocket)

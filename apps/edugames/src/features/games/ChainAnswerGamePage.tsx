@@ -17,6 +17,7 @@ export const ChainAnswerGamePage: React.FC = () => {
     const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>();
     const { role } = useAuthStore();
     const [gameStarted, setGameStarted] = useState(false);
+    const [gameEndedScreen, setGameEndedScreen] = useState(false);
     const storedPlayerSession = loadChainAnswerPlayerSession();
     const [joinedGameId, setJoinedGameId] = useState<number | null>(
       storedPlayerSession?.gameId ?? null,
@@ -134,14 +135,39 @@ export const ChainAnswerGamePage: React.FC = () => {
             localStorage.removeItem("chain_answer_player_session");
           }}
           onGameEnded={() => {
-            // Game ended by teacher, reset student state
-            setJoinedSessionId(null);
-            setJoinedGameId(null);
-            setJoinedPlayerId(null);
-            setJoinedPlayerName(null);
+            // Game ended by teacher, show ended screen
+            setGameEndedScreen(true);
             localStorage.removeItem("chain_answer_player_session");
           }}
         />
+      );
+    }
+
+    if (gameEndedScreen) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+          <GlassCard className="w-full max-w-md p-8 text-center space-y-6">
+            <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              <Check size={32} className="text-blue-600" />
+            </div>
+            <h1 className="text-4xl font-bold font-display text-blue-600 mb-4">Game Ended!</h1>
+            <p className="text-gray-600">The teacher has concluded this Chain Answer game. Great job participating!</p>
+            <button
+              onClick={() => {
+                setGameEndedScreen(false);
+                setJoinedSessionId(null);
+                setJoinedGameId(null);
+                setJoinedPlayerId(null);
+                setJoinedPlayerName(null);
+                setGameStarted(false);
+              }}
+              className="w-full py-4 rounded-xl font-bold text-white text-lg transition-transform hover:scale-105 active:scale-95"
+              style={{ background: "var(--color-brand-blue)" }}
+            >
+              Back to Home
+            </button>
+          </GlassCard>
+        </div>
       );
     }
 

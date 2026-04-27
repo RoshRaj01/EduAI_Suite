@@ -70,3 +70,28 @@ class ChainAnswerGameWord(Base):
 
     # Relationships
     game = relationship("ChainAnswerGame", back_populates="words")
+
+
+class WordCloudSession(Base):
+    __tablename__ = "word_cloud_sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    pin = Column(String, unique=True, index=True)
+    teacher_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    prompt = Column(String) # e.g., "Describe the Renaissance in one word"
+    status = Column(String, default="active") # active, completed
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    submissions = relationship("WordCloudSubmission", back_populates="session", cascade="all, delete-orphan")
+
+
+class WordCloudSubmission(Base):
+    __tablename__ = "word_cloud_submissions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("word_cloud_sessions.id"))
+    word = Column(String, index=True) # Normalized to lowercase
+    submitted_by = Column(String, nullable=True) # Student name/ID (optional)
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+
+    session = relationship("WordCloudSession", back_populates="submissions")

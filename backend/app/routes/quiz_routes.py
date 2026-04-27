@@ -125,6 +125,20 @@ def create_session(quiz_id: int, db: Session = Depends(get_db)):
     
     return session
 
+@router.get("/sessions")
+def get_all_sessions(db: Session = Depends(get_db)):
+    sessions = db.query(QuizSession).order_by(QuizSession.id.desc()).all()
+    return [
+        {
+            "id": session.id,
+            "quiz_title": session.quiz.title if session.quiz else "Unknown Quiz",
+            "status": session.status,
+            "pin": session.pin,
+            "current_question": session.current_question_index
+        }
+        for session in sessions
+    ]
+
 @router.get("/sessions/{pin}")
 def get_session(pin: str, db: Session = Depends(get_db)):
     session = db.query(QuizSession).filter(QuizSession.pin == pin).first()
@@ -138,3 +152,24 @@ def get_session(pin: str, db: Session = Depends(get_db)):
         "pin": session.pin,
         "current_question": session.current_question_index
     }
+
+
+@router.delete("/{quiz_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_quiz(quiz_id: int, db: Session = Depends(get_db)):
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    db.delete(quiz)
+    db.commit()
+    return None
+
+@router.delete("/sessions/{pin}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(pin: str, db: Session = Depends(get_db)):
+    session = db.query(QuizSession).filter(QuizSession.pin == pin).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    db.delete(session)
+    db.commit()
+    return None

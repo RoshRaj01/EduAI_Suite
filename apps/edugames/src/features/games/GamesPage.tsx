@@ -103,6 +103,8 @@ export const GamesPage: React.FC = () => {
                 navigate('/games/quiz/play');
               } else if (category.id === 'trello-projects') {
                 navigate('/games/trello');
+              } else if (category.id === 'word-cloud-battle') {
+                navigate('/games/word-cloud');
               } else {
                 setSelectedGame(category.id);
               }

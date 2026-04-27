@@ -1,0 +1,188 @@
+import React, { useState, useEffect } from "react";
+import WordCloud from "react-d3-cloud";
+import { GlassCard } from "../../shared/components/GlassCard";
+import { BarChart, Share2, ArrowLeft } from "lucide-react";
+
+interface WordData {
+  text: string;
+  value: number;
+}
+
+interface WordCloudHostProps {
+  onBack?: () => void;
+  initialPin?: string;
+}
+
+export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, initialPin }) => {
+  const [prompt, setPrompt] = useState("");
+  const [pin, setPin] = useState<string | null>(initialPin || null);
+  const [words, setWords] = useState<WordData[]>([]);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+
+  const startSession = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/wordcloud/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPin(data.pin);
+      }
+    } catch (e) {
+      console.error("Failed to start session", e);
+    }
+  };
+
+  useEffect(() => {
+    if (pin) {
+      // If we joined an existing session without a prompt, fetch it
+      if (!prompt) {
+        fetch(`http://localhost:8000/wordcloud/${pin}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.prompt) {
+              setPrompt(data.prompt);
+            }
+          })
+          .catch(e => console.error("Failed to fetch session info", e));
+      }
+
+      const ws = new WebSocket(`ws://localhost:8000/ws/wordcloud/${pin}?role=teacher`);
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        if (message.type === "cloud_update") {
+          setWords(message.words);
+        }
+      };
+      setSocket(ws);
+      return () => ws.close();
+    }
+  }, [pin]);
+
+  const endSession = async () => {
+    if (!pin) return;
+    try {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "end_session" }));
+      }
+      const response = await fetch(`http://localhost:8000/wordcloud/${pin}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        setPin(null);
+        if (onBack) onBack();
+      }
+    } catch (e) {
+      console.error("Failed to end session", e);
+    }
+  };
+
+  const customColors = ["#264796", "#2a4fa7", "#d0ae61", "#ddb867"];
+
+  if (!pin) {
+    return (
+      <div className="space-y-4">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-sm font-medium transition-colors hover:opacity-70 mb-4"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            <ArrowLeft size={16} /> Back to Games
+          </button>
+        )}
+        <GlassCard className="p-6">
+          <h2 className="text-xl font-bold mb-4 font-display" style={{ color: "var(--color-text-primary)" }}>
+            Host Live Word Cloud Battle
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>
+                What question would you like to ask your students?
+              </label>
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="e.g., Describe the Renaissance in one word"
+                className="w-full px-4 py-2 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                style={{ background: "var(--color-bg-secondary)", color: "var(--color-text-primary)", border: "1px solid var(--color-border)" }}
+              />
+            </div>
+            <button
+              onClick={startSession}
+              disabled={!prompt.trim()}
+              className="w-full py-3 rounded-xl font-bold text-white transition-all disabled:opacity-50"
+              style={{ background: "var(--color-brand-blue)" }}
+            >
+              Start Word Cloud Session
+            </button>
+          </div>
+        </GlassCard>
+      </div>
+    );
+  }
+
+return (
+  <div className="space-y-4">
+    {onBack && (
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-sm font-medium transition-colors hover:opacity-70 mb-4"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
+        <ArrowLeft size={16} /> Back to Games
+      </button>
+    )}
+    <GlassCard className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>
+            {prompt}
+          </h2>
+          <p className="text-lg mt-1" style={{ color: "var(--color-text-secondary)" }}>
+            Join at <strong>edugames.app</strong> with PIN: <span className="font-mono text-xl text-blue-500 font-bold tracking-widest">{pin}</span>
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
+            <Share2 size={20} />
+          </button>
+          <button 
+            onClick={endSession}
+            className="px-4 py-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition-colors font-semibold"
+          >
+            End Session
+          </button>
+        </div>
+      </div>
+
+      <div className="w-full h-96 flex items-center justify-center rounded-xl bg-gray-50/50">
+        {words.length === 0 ? (
+          <div className="text-center" style={{ color: "var(--color-text-secondary)" }}>
+            <BarChart size={48} className="mx-auto mb-4 opacity-50" />
+            <p className="text-lg">Waiting for responses...</p>
+          </div>
+        ) : (
+          <WordCloud
+            data={words}
+            width={800}
+            height={400}
+            font="Inter"
+            fontStyle="italic"
+            fontWeight="bold"
+            fontSize={(word: any) => Math.log2(word.value + 1) * 30 + 15}
+            spiral="rectangular"
+            rotate={(word: any) => (Math.random() > 0.5 ? 0 : 90)}
+            padding={5}
+            random={Math.random}
+            fill={(d: any, i: number) => customColors[i % customColors.length]}
+          />
+        )}
+      </div>
+    </GlassCard>
+  </div>
+);
+};

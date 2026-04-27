@@ -331,6 +331,30 @@ class ChainAnswerGameAPI {
       throw error;
     }
   }
+
+  /**
+   * Delete a game
+   */
+  async deleteGame(gameId: number): Promise<void> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/chain-answer/${gameId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete game: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error("Error deleting game:", error);
+      throw error;
+    }
+  }
 }
 
 export const gameAPI = new ChainAnswerGameAPI();
