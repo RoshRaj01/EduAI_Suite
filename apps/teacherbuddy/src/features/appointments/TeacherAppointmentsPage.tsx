@@ -134,8 +134,6 @@ export const TeacherAppointmentsPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    const timer = window.setInterval(fetchData, 15000);
-    return () => window.clearInterval(timer);
   }, [fetchData]);
 
   useEffect(() => {
