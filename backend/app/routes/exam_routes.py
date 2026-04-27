@@ -179,40 +179,67 @@ async def extract_exam_questions(file: UploadFile = File(...)):
             text += page.extract_text() + "\n"
     elif file.filename.endswith(".docx"):
         doc = docx.Document(io.BytesIO(contents))
-        text = "\n".join([para.text for para in doc.paragraphs])
+        text_parts = []
+        for para in doc.paragraphs:
+            text_parts.append(para.text)
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = "  ".join([cell.text.strip() for cell in row.cells])
+                text_parts.append(row_text)
+        text = "\n".join(text_parts)
     else:
         raise HTTPException(status_code=400, detail="Unsupported format")
 
-    # Simple MCQ Extraction Logic
-    # Looking for Question followed by options A, B, C, D and Answer
+    # Advanced MCQ Extraction Logic
+    has_explicit_q = bool(re.search(r'(?:^|\n)\s*(?:Q|Question)\s*\d+', text, re.IGNORECASE))
+    if has_explicit_q:
+        q_pattern = r'(?:^|\n)\s*(?:Q(?:uestion)?\s*\d+[\.\)\:\-]?)\s*'
+    else:
+        q_pattern = r'(?:^|\n)\s*(?:Q(?:uestion)?\s*\d+[\.\)\:\-]?|\d+[\.\)\:\-])\s*'
+
+    q_blocks = re.split(q_pattern, text, flags=re.IGNORECASE)
+    
     questions = []
-    # This is a very basic heuristic parser
-    q_blocks = re.split(r'\n\s*\d+[\.\)]\s*', text)
     for block in q_blocks:
         if not block.strip(): continue
         
-        lines = block.strip().split('\n')
-        q_text = lines[0]
-        options = []
+        # Extract correct answer if present in the block
         correct_answer = ""
+        ans_match = re.search(r'(?:^|\n|\s)(?:Answer|Ans)[^\w]*([A-Ea-e])', block, re.IGNORECASE)
+        if ans_match:
+            correct_answer = ans_match.group(1).upper()
+            block = block[:ans_match.start()] + block[ans_match.end():]
         
-        for line in lines[1:]:
-            opt_match = re.match(r'^\s*([A-D])[\.\)]\s*(.*)', line, re.IGNORECASE)
-            if opt_match:
-                options.append({
-                    "label": opt_match.group(1).upper(),
-                    "text": opt_match.group(2).strip()
-                })
+        # Try to find where options start
+        label_pattern_str = r'(?:^|\n|\s)(?:\()?([A-Ea-e])(?:(?:\)|\.)\s+|(?:\)|\.)?\s*\n)'
+        opt_start_match = re.search(label_pattern_str, block, re.IGNORECASE)
+        
+        options = []
+        if opt_start_match:
+            q_text = block[:opt_start_match.start()].strip()
+            options_text = block[opt_start_match.start():]
             
-            ans_match = re.search(r'Answer\s*[:\-]\s*([A-D])', line, re.IGNORECASE)
-            if ans_match:
-                correct_answer = ans_match.group(1).upper()
-
+            label_pattern = re.compile(label_pattern_str, re.IGNORECASE)
+            labels = list(label_pattern.finditer(options_text))
+            
+            for i, match in enumerate(labels):
+                label = match.group(1).upper()
+                start_idx = match.end()
+                if i + 1 < len(labels):
+                    end_idx = labels[i+1].start()
+                else:
+                    end_idx = len(options_text)
+                    
+                opt_text = options_text[start_idx:end_idx].strip()
+                options.append({"label": label, "text": opt_text})
+        else:
+            q_text = block.strip()
+            
         if q_text and options:
             questions.append({
-                "question_text": q_text,
+                "question_text": q_text.replace('\n', '\n').strip(),
                 "choices": [
-                    {"choice_text": o["text"], "is_correct": (o["label"] == correct_answer)}
+                    {"choice_text": o["text"].replace('\n', ' ').strip(), "is_correct": (o["label"] == correct_answer)}
                     for o in options
                 ]
             })
@@ -230,17 +257,22 @@ async def extract_exam_answers(file: UploadFile = File(...)):
             text += page.extract_text() + "\n"
     elif file.filename.endswith(".docx"):
         doc = docx.Document(io.BytesIO(contents))
-        text = "\n".join([para.text for para in doc.paragraphs])
+        text_parts = []
+        for para in doc.paragraphs:
+            text_parts.append(para.text)
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = "  ".join([cell.text.strip() for cell in row.cells])
+                text_parts.append(row_text)
+        text = "\n".join(text_parts)
     else:
         raise HTTPException(status_code=400, detail="Unsupported format")
 
-    # Basic mapping: looks for "1. A" or "1) C" or "1 - B"
-    # Returns { "1": "A", "2": "C", ... }
     answers = {}
-    pattern = re.compile(r'(\d+)\s*[\.\-\)]\s*([A-D])', re.IGNORECASE)
+    pattern = re.compile(r'(?:^|\n|\s)(?:Q|Question\s*)?(\d+)\s*[\.\-\:\)]?\s*(?:\()?([A-Ea-e])(?:\)|\.)?(?=\s|$|\n)', re.IGNORECASE)
     matches = pattern.findall(text)
     for q_num, ans in matches:
-        answers[q_num] = ans.upper()
+        answers[str(int(q_num))] = ans.upper()
     
     return answers
 
