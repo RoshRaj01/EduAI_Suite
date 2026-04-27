@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Upload, Plus, CheckSquare, AlertTriangle, FileImage, ArrowLeft, ChevronRight, CheckCircle2, Save, X } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
@@ -16,7 +17,7 @@ export const OMRPage: React.FC = () => {
   const [newAnswerKeyStr, setNewAnswerKeyStr] = useState("{\n  \"1\": \"A\",\n  \"2\": \"B\",\n  \"3\": \"C\",\n  \"4\": \"D\"\n}");
   const [creationMode, setCreationMode] = useState<'image' | 'manual'>('image');
   const [keyImageFile, setKeyImageFile] = useState<File | null>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keyImageRef = useRef<HTMLInputElement>(null);
   const [uploadStudentId, setUploadStudentId] = useState("");
@@ -60,7 +61,7 @@ export const OMRPage: React.FC = () => {
 
     const formData = new FormData();
     formData.append('title', newJobTitle);
-    
+
     if (creationMode === 'manual') {
       formData.append('answer_key', newAnswerKeyStr);
     } else {
@@ -94,12 +95,12 @@ export const OMRPage: React.FC = () => {
       alert("Please enter a student ID first");
       return;
     }
-    
+
     const file = e.target.files[0];
     const formData = new FormData();
     formData.append("student_id", uploadStudentId);
     formData.append("file", file);
-    
+
     // Reset file input so the same file can be selected again if needed
     if (fileInputRef.current) fileInputRef.current.value = '';
 
@@ -121,7 +122,7 @@ export const OMRPage: React.FC = () => {
 
   const verifyAndSave = async () => {
     if (!selectedSub) return;
-    
+
     const formData = new FormData();
     formData.append("score", selectedSub.score);
     formData.append("detected_answers", JSON.stringify(selectedSub.detected_answers));
@@ -185,8 +186,8 @@ export const OMRPage: React.FC = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-primary)" }}>Job Title</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={newJobTitle}
               onChange={e => setNewJobTitle(e.target.value)}
               className="w-full px-4 py-2 rounded-xl border focus:ring-2 outline-none"
@@ -196,13 +197,13 @@ export const OMRPage: React.FC = () => {
           </div>
 
           <div className="flex gap-4 border-b pb-2 mb-4" style={{ borderColor: 'var(--color-border)' }}>
-            <button 
+            <button
               className={`text-sm font-bold pb-2 border-b-2 ${creationMode === 'image' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}
               onClick={() => setCreationMode('image')}
             >
               Upload Image (AI Extract)
             </button>
-            <button 
+            <button
               className={`text-sm font-bold pb-2 border-b-2 ${creationMode === 'manual' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}
               onClick={() => setCreationMode('manual')}
             >
@@ -213,7 +214,7 @@ export const OMRPage: React.FC = () => {
           {creationMode === 'manual' ? (
             <div>
               <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text-primary)" }}>Answer Key (JSON)</label>
-              <textarea 
+              <textarea
                 rows={8}
                 value={newAnswerKeyStr}
                 onChange={e => setNewAnswerKeyStr(e.target.value)}
@@ -223,12 +224,12 @@ export const OMRPage: React.FC = () => {
             </div>
           ) : (
             <div className="border-2 border-dashed rounded-xl p-8 text-center" style={{ borderColor: "var(--color-border)" }}>
-              <input 
-                type="file" 
-                ref={keyImageRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={e => setKeyImageFile(e.target.files?.[0] || null)} 
+              <input
+                type="file"
+                ref={keyImageRef}
+                className="hidden"
+                accept="image/*"
+                onChange={e => setKeyImageFile(e.target.files?.[0] || null)}
               />
               <FileImage size={40} className="mx-auto mb-3" style={{ color: "var(--color-brand-blue)" }} />
               {keyImageFile ? (
@@ -236,8 +237,8 @@ export const OMRPage: React.FC = () => {
               ) : (
                 <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Select the master answer key image</p>
               )}
-              <button 
-                onClick={() => keyImageRef.current?.click()} 
+              <button
+                onClick={() => keyImageRef.current?.click()}
                 className="btn btn-secondary mt-4 text-sm shadow-sm"
               >
                 Browse Image
@@ -256,7 +257,7 @@ export const OMRPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button onClick={() => setView('list')} className="p-2 rounded-full hover:bg-black/5">
-            <ArrowLeft size={20} style={{ color: "var(--color-text-primary)" }}/>
+            <ArrowLeft size={20} style={{ color: "var(--color-text-primary)" }} />
           </button>
           <div>
             <h1 className="text-2xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>{selectedJob?.title}</h1>
@@ -264,18 +265,18 @@ export const OMRPage: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3 bg-white/50 p-2 rounded-xl border border-white/20 shadow-sm">
-           <input 
-             type="text" 
-             placeholder="Student ID (Reg No)" 
-             value={uploadStudentId}
-             onChange={e => setUploadStudentId(e.target.value)}
-             className="px-3 py-1.5 rounded-lg text-sm border outline-none"
-             style={{ borderColor: "var(--color-border)", background: "var(--color-surface-base)", color: "var(--color-text-primary)" }}
-           />
-           <button onClick={() => fileInputRef.current?.click()} className="btn btn-primary text-sm py-1.5 px-4 shadow flex items-center gap-2">
-             <Upload size={14} /> Upload Sheet Image
-           </button>
-           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleUploadSheet} />
+          <input
+            type="text"
+            placeholder="Student ID (Reg No)"
+            value={uploadStudentId}
+            onChange={e => setUploadStudentId(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm border outline-none"
+            style={{ borderColor: "var(--color-border)", background: "var(--color-surface-base)", color: "var(--color-text-primary)" }}
+          />
+          <button onClick={() => fileInputRef.current?.click()} className="btn btn-primary text-sm py-1.5 px-4 shadow flex items-center gap-2">
+            <Upload size={14} /> Upload Sheet Image
+          </button>
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleUploadSheet} />
         </div>
       </div>
 
@@ -288,8 +289,8 @@ export const OMRPage: React.FC = () => {
             </div>
           )}
           {submissions.map(sub => (
-            <GlassCard 
-              key={sub.id} 
+            <GlassCard
+              key={sub.id}
               className={`p-4 cursor-pointer transition-all ${selectedSub?.id === sub.id ? 'ring-2 ring-blue-500' : 'hover:scale-[1.02]'}`}
               onClick={() => setSelectedSub(sub)}
             >
@@ -298,14 +299,14 @@ export const OMRPage: React.FC = () => {
                   <p className="font-bold text-sm" style={{ color: "var(--color-text-primary)" }}>{sub.student_id}</p>
                 </div>
                 {sub.status === 'verified' ? (
-                  <span className="badge badge-green bg-green-50 text-green-600 flex items-center gap-1 text-[10px]"><CheckCircle2 size={12}/> Verified</span>
+                  <span className="badge badge-green bg-green-50 text-green-600 flex items-center gap-1 text-[10px]"><CheckCircle2 size={12} /> Verified</span>
                 ) : (
-                  <span className="badge badge-orange bg-orange-50 text-orange-600 flex items-center gap-1 text-[10px]"><AlertTriangle size={12}/> Pending</span>
+                  <span className="badge badge-orange bg-orange-50 text-orange-600 flex items-center gap-1 text-[10px]"><AlertTriangle size={12} /> Pending</span>
                 )}
               </div>
               <div className="flex justify-between items-end mt-4">
                 <p className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>AI Score: <strong className="text-lg" style={{ color: "var(--color-brand-blue)" }}>{sub.score?.toFixed(1)}</strong>%</p>
-                <ChevronRight size={16} style={{ color: "var(--color-text-muted)" }}/>
+                <ChevronRight size={16} style={{ color: "var(--color-text-muted)" }} />
               </div>
             </GlassCard>
           ))}
@@ -315,78 +316,78 @@ export const OMRPage: React.FC = () => {
         <div className="lg:col-span-2">
           {selectedSub ? (
             <GlassCard className="h-full flex flex-col overflow-hidden">
-               <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: "var(--color-border)" }}>
-                  <div>
-                    <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>Submission: {selectedSub.student_id}</h2>
-                    <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Review and correct AI evaluation.</p>
+              <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: "var(--color-border)" }}>
+                <div>
+                  <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>Submission: {selectedSub.student_id}</h2>
+                  <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Review and correct AI evaluation.</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right flex items-center gap-2">
+                    <p className="text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>FINAL SCORE</p>
+                    <input
+                      type="number"
+                      value={selectedSub.score}
+                      onChange={e => setSelectedSub({ ...selectedSub, score: parseFloat(e.target.value) })}
+                      className="w-20 text-center font-bold text-xl py-1 rounded-lg border focus:ring-2 outline-none"
+                      style={{ color: "var(--color-brand-blue)", borderColor: "var(--color-border)", background: "var(--color-surface-base)" }}
+                    />
                   </div>
-                  <div className="flex items-center gap-4">
-                     <div className="text-right flex items-center gap-2">
-                        <p className="text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>FINAL SCORE</p>
-                        <input 
-                          type="number" 
-                          value={selectedSub.score} 
-                          onChange={e => setSelectedSub({...selectedSub, score: parseFloat(e.target.value)})}
-                          className="w-20 text-center font-bold text-xl py-1 rounded-lg border focus:ring-2 outline-none"
-                          style={{ color: "var(--color-brand-blue)", borderColor: "var(--color-border)", background: "var(--color-surface-base)" }}
-                        />
-                     </div>
-                     <button onClick={verifyAndSave} className="btn btn-primary py-1.5 px-4 shadow flex items-center gap-2 text-sm">
-                       <CheckSquare size={16} /> Confirm Marks
-                     </button>
-                  </div>
-               </div>
-               
-               <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-                 {/* Image Viewer */}
-                 <div className="w-full md:w-1/2 p-4 border-r" style={{ borderColor: "var(--color-border)" }}>
-                    <div className="w-full h-full bg-black/5 rounded-xl border flex items-center justify-center overflow-hidden relative group" style={{ borderColor: "var(--color-border)" }}>
-                      {selectedSub.image_url ? (
-                         <img src={`http://localhost:8000${selectedSub.image_url}`} alt="Answer Sheet" className="max-w-full max-h-full object-contain" />
-                      ) : (
-                         <div className="text-center text-gray-400">
-                           <FileImage size={48} className="mx-auto mb-2 opacity-50" />
-                           <p className="text-sm">No Image</p>
-                         </div>
-                      )}
-                    </div>
-                 </div>
+                  <button onClick={verifyAndSave} className="btn btn-primary py-1.5 px-4 shadow flex items-center gap-2 text-sm">
+                    <CheckSquare size={16} /> Confirm Marks
+                  </button>
+                </div>
+              </div>
 
-                 {/* Questions List */}
-                 <div className="w-full md:w-1/2 p-4 overflow-y-auto space-y-3">
-                   <h3 className="font-bold text-sm mb-3 uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Detected Answers vs Key</h3>
-                   {Object.entries(selectedJob?.answer_key || {}).map(([qNo, correctAns]: [string, any]) => {
-                     const detected = selectedSub.detected_answers?.[qNo] || "-";
-                     const isCorrect = detected === correctAns;
-                     return (
-                       <div key={qNo} className={`p-3 rounded-xl border flex items-center justify-between ${isCorrect ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
-                         <div className="flex items-center gap-4">
-                           <span className="font-bold w-6 text-right" style={{ color: "var(--color-text-primary)" }}>Q{qNo}</span>
-                           <div className="flex items-center gap-2">
-                             <span className="text-xs text-gray-500">Detected:</span>
-                             <input 
-                               className="w-8 text-center font-bold text-sm py-0.5 rounded border focus:ring-1 outline-none uppercase"
-                               value={detected}
-                               onChange={(e) => {
-                                 const val = e.target.value.toUpperCase().slice(0,1);
-                                 setSelectedSub({
-                                   ...selectedSub, 
-                                   detected_answers: { ...selectedSub.detected_answers, [qNo]: val }
-                                 });
-                               }}
-                             />
-                           </div>
-                         </div>
-                         <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">Key:</span>
-                            <span className="font-bold text-sm w-6 text-center">{correctAns}</span>
-                            {isCorrect ? <CheckCircle2 size={16} className="text-green-500 ml-2" /> : <X size={16} className="text-red-500 ml-2" />}
-                         </div>
-                       </div>
-                     );
-                   })}
-                 </div>
-               </div>
+              <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+                {/* Image Viewer */}
+                <div className="w-full md:w-1/2 p-4 border-r" style={{ borderColor: "var(--color-border)" }}>
+                  <div className="w-full h-full bg-black/5 rounded-xl border flex items-center justify-center overflow-hidden relative group" style={{ borderColor: "var(--color-border)" }}>
+                    {selectedSub.image_url ? (
+                      <img src={`http://localhost:8000${selectedSub.image_url}`} alt="Answer Sheet" className="max-w-full max-h-full object-contain" />
+                    ) : (
+                      <div className="text-center text-gray-400">
+                        <FileImage size={48} className="mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No Image</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Questions List */}
+                <div className="w-full md:w-1/2 p-4 overflow-y-auto space-y-3">
+                  <h3 className="font-bold text-sm mb-3 uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Detected Answers vs Key</h3>
+                  {Object.entries(selectedJob?.answer_key || {}).map(([qNo, correctAns]: [string, any]) => {
+                    const detected = selectedSub.detected_answers?.[qNo] || "-";
+                    const isCorrect = detected === correctAns;
+                    return (
+                      <div key={qNo} className={`p-3 rounded-xl border flex items-center justify-between ${isCorrect ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
+                        <div className="flex items-center gap-4">
+                          <span className="font-bold w-6 text-right" style={{ color: "var(--color-text-primary)" }}>Q{qNo}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Detected:</span>
+                            <input
+                              className="w-8 text-center font-bold text-sm py-0.5 rounded border focus:ring-1 outline-none uppercase"
+                              value={detected}
+                              onChange={(e) => {
+                                const val = e.target.value.toUpperCase().slice(0, 1);
+                                setSelectedSub({
+                                  ...selectedSub,
+                                  detected_answers: { ...selectedSub.detected_answers, [qNo]: val }
+                                });
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Key:</span>
+                          <span className="font-bold text-sm w-6 text-center">{correctAns}</span>
+                          {isCorrect ? <CheckCircle2 size={16} className="text-green-500 ml-2" /> : <X size={16} className="text-red-500 ml-2" />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </GlassCard>
           ) : (
             <GlassCard className="h-full flex flex-col overflow-hidden p-6">
