@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
-import { Upload, Plus, CheckSquare, AlertTriangle, FileImage, ArrowLeft, ChevronRight, CheckCircle2, Save, X } from "lucide-react";
+import { Upload, Plus, CheckSquare, AlertTriangle, FileImage, ArrowLeft, ChevronRight, CheckCircle2, Save, X, Trash2, Edit } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
 const API_URL = "http://localhost:8000/api/omr";
@@ -73,20 +73,42 @@ export const OMRPage: React.FC = () => {
     }
 
     try {
-      const res = await fetch(`${API_URL}/jobs`, {
-        method: "POST",
+      const url = selectedJob ? `${API_URL}/jobs/${selectedJob.id}` : `${API_URL}/jobs`;
+      const method = selectedJob ? "PUT" : "POST";
+      
+      const res = await fetch(url, {
+        method: method,
         body: formData
       });
       if (res.ok) {
         setView('list');
         setNewJobTitle("");
         setKeyImageFile(null);
+        setSelectedJob(null);
       } else {
         alert("Error creating job. Please check your inputs.");
       }
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const deleteJob = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this job and all its submissions?")) return;
+    try {
+      const res = await fetch(`${API_URL}/jobs/${id}`, { method: "DELETE" });
+      if (res.ok) fetchJobs();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const editJob = (job: any) => {
+    setSelectedJob(job);
+    setNewJobTitle(job.title);
+    setNewAnswerKeyStr(JSON.stringify(job.answer_key, null, 2));
+    setCreationMode('manual');
+    setView('create');
   };
 
   const handleUploadSheet = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,7 +177,21 @@ export const OMRPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {jobs.map(job => (
-          <GlassCard key={job.id} className="p-6 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => { setSelectedJob(job); setView('detail'); fetchSubmissions(job.id); }}>
+          <GlassCard key={job.id} className="p-6 cursor-pointer hover:scale-[1.02] transition-transform relative group" onClick={() => { setSelectedJob(job); setView('detail'); fetchSubmissions(job.id); }}>
+            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button 
+                onClick={(e) => { e.stopPropagation(); editJob(job); }}
+                className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100"
+              >
+                <Edit size={14} />
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); deleteJob(job.id); }}
+                className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
             <h3 className="font-bold text-lg mb-2" style={{ color: "var(--color-text-primary)" }}>{job.title}</h3>
             <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>Questions: {Object.keys(job.answer_key).length}</p>
             <div className="text-sm font-medium text-blue-600 flex items-center justify-between">

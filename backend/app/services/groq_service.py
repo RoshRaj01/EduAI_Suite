@@ -18,6 +18,13 @@ AVAILABLE_MODELS = [
 ]
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
+VISION_MODELS = [
+    "llama-3.2-11b-vision-preview",
+    "llama-3.2-90b-vision-preview",
+    "llama-3.2-11b-vision",
+    "llama-3.2-90b-vision",
+    "llava-v1.5-7b-4096-preview" 
+]
 
 logger.info(f"Groq service configured with default model: {DEFAULT_MODEL}")
 
@@ -506,6 +513,65 @@ Important: Each section must have real, detailed content below its header. Do no
                 "activities": "",
                 "quiz_questions": ""
             }
+
+    @staticmethod
+    def evaluate_omr_image(image_base64: str, question_count: int) -> dict:
+        """
+        Extract answers from an OMR sheet image using Groq Vision.
+        Handles multi-column layouts and detects filled bubbles.
+        """
+        if not GroqService._client:
+            return {}
+
+        prompt = f"""Analyze this OMR Answer Key/Student Sheet.
+Identify all questions and their corresponding filled bubbles (A, B, C, or D).
+The sheet might have multiple columns or blocks (e.g., 1-5, 11-15, etc.). 
+
+Instructions:
+1. Locate every question number.
+2. For each number, determine which bubble is darkened/filled.
+3. If a question is present but no bubble is filled, use "-".
+4. Return a flat JSON object where keys are the question numbers and values are the letters.
+Example: {{"1": "B", "2": "A", "3": "C", "4": "D", ...}}
+
+Provide the full mapping for all questions you see on the page."""
+
+        import json
+        last_error = None
+        
+        for model_id in VISION_MODELS:
+            try:
+                message = GroqService._client.chat.completions.create(
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{image_base64}",
+                                    },
+                                },
+                            ],
+                        }
+                    ],
+                    model=model_id,
+                    temperature=0,
+                    max_tokens=1000,
+                    response_format={"type": "json_object"}
+                )
+                
+                detected = json.loads(message.choices[0].message.content)
+                logger.info(f"OMR extraction success using {model_id}: {len(detected)} answers found")
+                return detected
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Groq Vision model {model_id} failed: {e}")
+                continue
+                
+        logger.error(f"All OMR Vision models failed. Last error: {last_error}")
+        return {}
 
 
 class WordValidationWithFallback:

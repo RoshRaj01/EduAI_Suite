@@ -15,3 +15,7 @@ dotenv
 pandas
 openpyxl
 Pillow
+opencv-python
+numpy
+imutils
+scipy
