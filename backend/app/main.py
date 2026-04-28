@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from app.services.groq_service import GroqService
-from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes, analytics_routes, calendar_routes, mail_routes, quiz_routes, omr_routes, wordcloud_routes
+from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes, analytics_routes, calendar_routes, mail_routes, quiz_routes, omr_routes, wordcloud_routes, report_routes
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.models.user import User
@@ -8,6 +8,7 @@ from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer, ChainAnswerG
 from app.models.quiz import Quiz, QuizQuestion, QuizOption, QuizSession, QuizPlayer, QuizAnswer
 from app.models.lesson import Lesson
 from app.models.omr import OMRJob, OMRSubmission
+from app.models.report import Report
 from app.routes.calendar_routes import CalendarEvent
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -73,6 +74,13 @@ with engine.begin() as connection:
         # Table might not exist yet, SQLAlchemy will create it
         print(f"Note: chain_answer_games migration skipped: {e}")
 
+    try:
+        report_columns = {column["name"] for column in inspector.get_columns("reports")}
+        if "target_id" not in report_columns:
+            connection.execute(text("ALTER TABLE reports ADD COLUMN target_id INTEGER"))
+    except Exception as e:
+        print(f"Note: reports migration skipped: {e}")
+
 app = FastAPI()
 
 app.add_middleware(
@@ -107,6 +115,7 @@ app.include_router(mail_routes.router)
 app.include_router(quiz_routes.router)
 app.include_router(omr_routes.router)
 app.include_router(wordcloud_routes.router)
+app.include_router(report_routes.router)
 app.include_router(websocket_routes.ws_router)
 
 
