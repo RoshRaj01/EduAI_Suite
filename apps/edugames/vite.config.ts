@@ -8,4 +8,15 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
   },
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom'],
+  },
+  build: {
+    commonjsOptions: {
+      include: [/react/, /react-dom/],
+    },
+  },
 })
