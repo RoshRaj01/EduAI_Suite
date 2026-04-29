@@ -65,3 +65,4 @@ backend/uploads/submissions/
 calendar_replica/
 trello_replica/
 mentimeter_replica/
+slido_replica/

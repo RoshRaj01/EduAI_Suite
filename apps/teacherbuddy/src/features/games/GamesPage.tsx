@@ -99,17 +99,29 @@ export const GamesPage: React.FC = () => {
       navigate("/games/quiz/create");
       return;
     }
+    if (gameId === "slido-polling") {
+      navigate("/games/slido/assignments");
+      return;
+    }
     if (game?.hasImplementation) {
       setShowCreation(true);
     }
     setSelectedGame(gameId);
   };
 
-  const handleGameCreated = (gameId: number | string, sessionId: string, type: string = "chain-answer") => {
+  const handleGameCreated = (
+    gameId: number | string,
+    sessionId: string,
+    type: string = "chain-answer",
+  ) => {
     setMonitoringGame({ gameId, sessionId, type });
   };
 
-  const handleRejoinGame = (type: string, id: number | string, sessionId: string) => {
+  const handleRejoinGame = (
+    type: string,
+    id: number | string,
+    sessionId: string,
+  ) => {
     if (type === "quiz") {
       navigate(`/games/quiz/host/${sessionId}`);
       return;
@@ -132,7 +144,7 @@ export const GamesPage: React.FC = () => {
         />
       );
     }
-    
+
     // Default to Chain Answer monitoring
     return (
       <GameMonitoringPage
@@ -186,7 +198,10 @@ export const GamesPage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-4 border-b pb-2" style={{ borderColor: "var(--color-border)" }}>
+      <div
+        className="flex gap-4 border-b pb-2"
+        style={{ borderColor: "var(--color-border)" }}
+      >
         <button
           onClick={() => setActiveTab("modules")}
           className={`px-4 py-2 font-semibold text-sm transition-colors border-b-2 ${
@@ -292,7 +307,10 @@ export const GamesPage: React.FC = () => {
                     >
                       The{" "}
                       <strong>
-                        {gameCategories.find((c) => c.id === selectedGame)?.title}
+                        {
+                          gameCategories.find((c) => c.id === selectedGame)
+                            ?.title
+                        }
                       </strong>{" "}
                       module is currently being built by our engineering team.
                       Please check back later for updates.

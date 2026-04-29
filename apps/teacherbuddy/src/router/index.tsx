@@ -12,6 +12,8 @@ import { AuthPage } from "../features/auth/AuthPage";
 import { GamesPage } from "../features/games/GamesPage";
 import { QuizCreator } from "../features/games/QuizCreator";
 import { QuizMonitoring } from "../features/games/QuizMonitoring";
+import SlidoAssignmentDashboard from "../features/games/SlidoAssignmentDashboard";
+import LiveGradingForm from "../features/games/LiveGradingForm";
 import { TeacherAppointmentsPage } from "../features/appointments/TeacherAppointmentsPage";
 import { TeacherToolsPage } from "../features/tools/TeacherToolsPage";
 import { ClassroomsPage } from "../features/classroom/ClassroomsPage";
@@ -30,30 +32,35 @@ export const router = createBrowserRouter([
     path: "/",
     element: <DashboardShell />,
     children: [
-      { index: true,            element: <DashboardPage />   },
-      { path: "omr",            element: <OMRPage />         },
-      { path: "evaluation",     element: <EvaluationPage />  },
-      { path: "reports",        element: <ReportsPage />     },
-      { path: "forms",          element: <FormsPage />       },
-      { path: "games",          element: <GamesPage />       },
-      { path: "games/quiz/create", element: <QuizCreator />  },
+      { index: true, element: <DashboardPage /> },
+      { path: "omr", element: <OMRPage /> },
+      { path: "evaluation", element: <EvaluationPage /> },
+      { path: "reports", element: <ReportsPage /> },
+      { path: "forms", element: <FormsPage /> },
+      { path: "games", element: <GamesPage /> },
+      { path: "games/quiz/create", element: <QuizCreator /> },
       { path: "games/quiz/host/:quizId", element: <QuizMonitoring /> },
-      { path: "appointments",   element: <TeacherAppointmentsPage /> },
-      { path: "tools",          element: <TeacherToolsPage />},
-      { path: "classrooms",     element: <ClassroomsPage />  },
-      { path: "analytics",      element: <AnalyticsPage />   },
-      { path: "mail",           element: <MailStudentsPage />},
-      { path: "calendar",       element: <CalendarPage />    },
-      { path: "chat",           element: <AIChatPage />      },
-      { path: "settings",       element: <ConstructionPage />},
-      { path: "exams",          element: <ExamsPage />       },
-      { path: "games/trello",   element: <TrelloBoardsPage />},
+      {
+        path: "games/slido/assignments",
+        element: <SlidoAssignmentDashboard />,
+      },
+      { path: "games/slido/grade/:submissionId", element: <LiveGradingForm /> },
+      { path: "appointments", element: <TeacherAppointmentsPage /> },
+      { path: "tools", element: <TeacherToolsPage /> },
+      { path: "classrooms", element: <ClassroomsPage /> },
+      { path: "analytics", element: <AnalyticsPage /> },
+      { path: "mail", element: <MailStudentsPage /> },
+      { path: "calendar", element: <CalendarPage /> },
+      { path: "chat", element: <AIChatPage /> },
+      { path: "settings", element: <ConstructionPage /> },
+      { path: "exams", element: <ExamsPage /> },
+      { path: "games/trello", element: <TrelloBoardsPage /> },
       { path: "games/trello/:boardId", element: <TrelloBoardView /> },
-      { path: "*",              element: <ConstructionPage />},
+      { path: "*", element: <ConstructionPage /> },
     ],
   },
   {
     path: "*",
-    element: <ConstructionPage />
-  }
+    element: <ConstructionPage />,
+  },
 ]);

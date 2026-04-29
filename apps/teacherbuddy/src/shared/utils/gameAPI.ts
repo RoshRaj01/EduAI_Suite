@@ -1,5 +1,5 @@
 // API service for Chain Answer Game backend integration
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export interface GamePlayer {
   student_id: number;
@@ -57,15 +57,12 @@ class ChainAnswerGameAPI {
    */
   async getActiveStudents(courseId: number): Promise<Student[]> {
     try {
-      const response = await fetch(
-        `${this.studentUrl}/${courseId}/active`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
+      const response = await fetch(`${this.studentUrl}/${courseId}/active`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch students: ${response.statusText}`);
@@ -337,15 +334,12 @@ class ChainAnswerGameAPI {
    */
   async deleteGame(gameId: number): Promise<void> {
     try {
-      const response = await fetch(
-        `${this.baseUrl}/chain-answer/${gameId}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
+      const response = await fetch(`${this.baseUrl}/chain-answer/${gameId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to delete game: ${response.statusText}`);

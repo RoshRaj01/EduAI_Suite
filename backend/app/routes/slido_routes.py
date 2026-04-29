@@ -22,9 +22,7 @@ import os
 import secrets
 import mimetypes
 
-router = APIRouter(prefix="/api/slido", tags=["Slido"])
-
-
+router = APIRouter(prefix="/slido", tags=["Slido"])
 def get_db():
     db = SessionLocal()
     try:

@@ -97,14 +97,16 @@ export const GamesPage: React.FC = () => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => {
-              if (category.id === 'chain-answer') {
-                navigate('/games/chain-answer');
-              } else if (category.id === 'quiz-battle-royale') {
-                navigate('/games/quiz/play');
-              } else if (category.id === 'trello-projects') {
-                navigate('/games/trello');
-              } else if (category.id === 'word-cloud-battle') {
-                navigate('/games/word-cloud');
+              if (category.id === "chain-answer") {
+                navigate("/games/chain-answer");
+              } else if (category.id === "quiz-battle-royale") {
+                navigate("/games/quiz/play");
+              } else if (category.id === "trello-projects") {
+                navigate("/games/trello");
+              } else if (category.id === "word-cloud-battle") {
+                navigate("/games/word-cloud");
+              } else if (category.id === "slido-polling") {
+                navigate("/games/slido/submit");
               } else {
                 setSelectedGame(category.id);
               }

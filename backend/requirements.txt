@@ -19,3 +19,5 @@ opencv-python
 numpy
 imutils
 scipy
+boto3>=1.26.0
+aiohttp
