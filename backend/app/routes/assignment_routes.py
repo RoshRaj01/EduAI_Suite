@@ -23,7 +23,7 @@ def get_assignments(course_id: int, db: Session = Depends(get_db)):
     return db.query(Assignment).filter(Assignment.course_id == course_id).all()
 
 @router.post("/{course_id}", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
-async def create_assignment(
+def create_assignment(
     course_id: int,
     title: str = Form(...),
     description: str = Form(""),
@@ -60,7 +60,7 @@ async def create_assignment(
     return new_assignment
 
 @router.put("/{assignment_id}", response_model=AssignmentResponse)
-async def update_assignment(
+def update_assignment(
     assignment_id: int,
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
