@@ -29,7 +29,7 @@ export interface GameResponse {
   difficulty_level: string;
   subject?: string;
   ollama_suggestions?: string;
-  groq_suggestions?: string;
+  word_suggestions?: string;
   status: string;
   starting_word: string;
   players: any[];
@@ -48,8 +48,8 @@ export interface OllamaStatus {
   message: string;
 }
 
-export interface GroqStatus {
-  groq_available: boolean;
+export interface WordEngineStatus {
+  groq_available: boolean; // kept for backward compat — always true now
   service: string;
   message: string;
 }

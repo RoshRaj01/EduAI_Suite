@@ -55,39 +55,7 @@ export const ChainAnswerGameCreation: React.FC<
     session_id: string;
   } | null>(null);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
-  const [groqStatus, setGroqStatus] = useState<{
-    available: boolean;
-    loading: boolean;
-  }>({
-    available: false,
-    loading: true,
-  });
 
-  // Check Groq status on mount
-  React.useEffect(() => {
-    const checkGroqStatus = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
-        const response = await fetch(
-          `${baseUrl}/games/chain-answer/status/groq`,
-        );
-        if (response.ok) {
-          const status = await response.json();
-          setGroqStatus({
-            available: status.groq_available,
-            loading: false,
-          });
-        } else {
-          setGroqStatus({ available: false, loading: false });
-        }
-      } catch (err) {
-        console.warn("Could not check Groq status", err);
-        setGroqStatus({ available: false, loading: false });
-      }
-    };
-
-    checkGroqStatus();
-  }, []);
 
   const handleTogglePlayer = (studentId: number) => {
     setSelectedPlayerIds((prev) => {
@@ -407,32 +375,6 @@ export const ChainAnswerGameCreation: React.FC<
         </div>
       </div>
 
-      {/* Groq Status Indicator */}
-      {!groqStatus.loading && (
-        <div
-          className={`px-4 py-3 rounded-lg flex items-center gap-3 ${
-            groqStatus.available
-              ? "bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700"
-              : "bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-700"
-          }`}
-        >
-          <div
-            className={`w-3 h-3 rounded-full ${
-              groqStatus.available ? "bg-green-500" : "bg-yellow-500"
-            }`}
-          />
-          <p
-            style={{
-              color: groqStatus.available ? "#16a34a" : "#ca8a04",
-            }}
-            className="font-semibold text-sm"
-          >
-            {groqStatus.available
-              ? "✓ AI Word Generation Available (Groq Connected)"
-              : "⚠ AI Word Generation Offline (Using fallback dictionary)"}
-          </p>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Game Configuration */}
@@ -588,13 +530,13 @@ export const ChainAnswerGameCreation: React.FC<
                 />
               </div>
 
-              {/* Subject (for Ollama word generation) */}
+              {/* Subject (for topic-based word generation) */}
               <div>
                 <label
                   className="block text-sm font-semibold mb-2"
                   style={{ color: "var(--color-text-primary)" }}
                 >
-                  Subject (Optional - AI Word Generation)
+                  Subject (Optional — Topic Filter)
                 </label>
                 <input
                   type="text"
@@ -612,8 +554,8 @@ export const ChainAnswerGameCreation: React.FC<
                   style={{ color: "var(--color-text-secondary)" }}
                   className="text-xs mt-2"
                 >
-                  💡 Providing a subject enables AI to generate contextual word
-                  suggestions
+                  💡 Providing a subject filters word suggestions to match the
+                  topic
                 </p>
               </div>
 

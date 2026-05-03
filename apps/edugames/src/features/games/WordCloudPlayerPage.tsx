@@ -17,19 +17,6 @@ export const WordCloudPlayerPage: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setSession({ pin, prompt: data.prompt });
-        
-        const ws = new WebSocket(`ws://localhost:8000/ws/wordcloud/${pin}?role=student`);
-        setSocket(ws);
-        
-        ws.onmessage = (event) => {
-          const msg = JSON.parse(event.data);
-          if (msg.type === "word_submitted") {
-             setShowSuccess(true);
-             setTimeout(() => setShowSuccess(false), 2000);
-          } else if (msg.type === "session_ended") {
-             setSession(prev => prev ? { ...prev, ended: true } : null);
-          }
-        };
       } else {
         setError("Invalid PIN. Please try again.");
       }
@@ -37,6 +24,68 @@ export const WordCloudPlayerPage: React.FC = () => {
       setError("Failed to connect. Please check your connection.");
     }
   };
+
+  // Manage WebSocket lifecycle in useEffect — runs when session is established
+  useEffect(() => {
+    if (!session || session.ended) return;
+
+    let isCancelled = false;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      if (isCancelled) return;
+
+      ws = new WebSocket(`ws://localhost:8000/ws/wordcloud/${session.pin}?role=student`);
+
+      ws.onopen = () => {
+        if (isCancelled) {
+          ws?.close();
+          return;
+        }
+        console.log("[WordCloud Student] WebSocket connected");
+        setSocket(ws);
+      };
+
+      ws.onmessage = (event) => {
+        if (isCancelled) return;
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "word_submitted") {
+            setShowSuccess(true);
+            setTimeout(() => setShowSuccess(false), 2000);
+          } else if (msg.type === "session_ended") {
+            setSession(prev => prev ? { ...prev, ended: true } : null);
+          }
+        } catch (e) {
+          console.error("[WordCloud Student] Failed to parse message", e);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error("[WordCloud Student] WebSocket error", err);
+      };
+
+      ws.onclose = () => {
+        if (!isCancelled) {
+          console.log("[WordCloud Student] Connection lost, reconnecting in 2s...");
+          reconnectTimer = setTimeout(connect, 2000);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      isCancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      }
+    };
+  }, [session?.pin, session?.ended]);
 
   const submitWord = (e: React.FormEvent) => {
     e.preventDefault();

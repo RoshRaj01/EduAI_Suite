@@ -32,6 +32,57 @@ export const useGameSync = ({
   const [useWebSocket, setUseWebSocket] = useState(true);
   const [gameState, setGameState] = useState<GameResponse | null>(null);
 
+  // Stop polling
+  const stopPolling = useCallback(() => {
+    if (pollingTimer.current) {
+      clearInterval(pollingTimer.current);
+      pollingTimer.current = null;
+    }
+  }, []);
+
+  // Send message via WebSocket
+  const sendMessage = useCallback((message: GameUpdateMessage) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify(message));
+    }
+  }, []);
+
+  // Fallback polling function
+  const startPolling = useCallback(() => {
+    if (pollingTimer.current) return;
+    if (gameId <= 0 && !sessionId) return;
+
+    const poll = async () => {
+      try {
+        const updatedGame =
+          gameId > 0
+            ? await gameAPI.getGameById(gameId)
+            : await gameAPI.getGameBySessionId(sessionId);
+        setGameState(updatedGame);
+
+        // Emit update event
+        if (onGameUpdate) {
+          onGameUpdate({
+            type: "game_state_update",
+            game: updatedGame,
+          });
+        }
+      } catch (error: any) {
+        console.error("Polling error:", error);
+        if (error.message?.includes("Not Found")) {
+          stopPolling();
+          if (onError) onError("Game session not found. Please rejoin.");
+        }
+      }
+    };
+
+    // Initial poll
+    poll();
+
+    // Set up polling interval
+    pollingTimer.current = setInterval(poll, pollingInterval);
+  }, [gameId, sessionId, pollingInterval, onGameUpdate, stopPolling, onError]);
+
   // Connect to WebSocket
   const connectWebSocket = useCallback(() => {
     try {
@@ -164,6 +215,7 @@ export const useGameSync = ({
         console.error("WebSocket error:", error);
         setUseWebSocket(false);
         setIsConnected(false);
+        startPolling();
         if (onError) {
           onError("WebSocket connection failed. Falling back to polling.");
         }
@@ -172,110 +224,43 @@ export const useGameSync = ({
       ws.current.onclose = () => {
         console.log("WebSocket disconnected");
         setIsConnected(false);
-        // Don't automatically set useWebSocket to false on close
-        // The reconnection logic in useEffect will handle fallback
+        // Start polling if it was unexpectedly closed and we aren't already using it
+        if (useWebSocket) {
+          setUseWebSocket(false);
+          startPolling();
+        }
       };
     } catch (error) {
       console.error("Failed to connect WebSocket:", error);
       setUseWebSocket(false);
+      startPolling();
       if (onError) {
         onError("Failed to establish WebSocket connection");
       }
     }
-  }, [sessionId, userType, playerId, onGameUpdate, onError]);
-
-  // Send message via WebSocket
-  const sendMessage = useCallback((message: GameUpdateMessage) => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(message));
-    }
-  }, []);
-
-  // Fallback polling function
-  const startPolling = useCallback(() => {
-    if (pollingTimer.current) return;
-    if (gameId <= 0 && !sessionId) return;
-
-    const poll = async () => {
-      try {
-        const updatedGame =
-          gameId > 0
-            ? await gameAPI.getGameById(gameId)
-            : await gameAPI.getGameBySessionId(sessionId);
-        setGameState(updatedGame);
-
-        // Emit update event
-        if (onGameUpdate) {
-          onGameUpdate({
-            type: "game_state_update",
-            game: updatedGame,
-          });
-        }
-      } catch (error: any) {
-        console.error("Polling error:", error);
-        if (error.message?.includes("Not Found")) {
-          stopPolling();
-          if (onError) onError("Game session not found. Please rejoin.");
-        }
-      }
-    };
-
-    // Initial poll
-    poll();
-
-    // Set up polling interval
-    pollingTimer.current = setInterval(poll, pollingInterval);
-  }, [gameId, sessionId, pollingInterval, onGameUpdate]);
-
-  // Stop polling
-  const stopPolling = useCallback(() => {
-    if (pollingTimer.current) {
-      clearInterval(pollingTimer.current);
-      pollingTimer.current = null;
-    }
-  }, []);
+  }, [sessionId, userType, playerId, onGameUpdate, onError, startPolling, useWebSocket, sendMessage]);
 
   // Initialize connection
   useEffect(() => {
     // Only connect if we have required parameters
     if (!sessionId) {
-      console.warn(
-        "useGameSync: sessionId is missing, skipping WebSocket connection",
-      );
+      console.warn("useGameSync: sessionId is missing, skipping WebSocket connection");
       return;
     }
 
     // Try WebSocket first
     connectWebSocket();
 
-    // Fallback to polling if WebSocket fails to connect
-    const fallbackTimer = setTimeout(() => {
-      if (!isConnected && useWebSocket) {
-        console.log("WebSocket connection timeout, falling back to polling");
-        setUseWebSocket(false);
-        startPolling();
-      }
-    }, 5000); // Increased timeout to allow more time for connection
-
     return () => {
-      clearTimeout(fallbackTimer);
       stopPolling();
 
       // Only close if the connection is already OPEN
-      // Avoid closing during CONNECTING state to prevent "WebSocket is closed before connection is established" error
       if (ws.current && ws.current.readyState === WebSocket.OPEN) {
         ws.current.close();
       }
       ws.current = null;
     };
-  }, [
-    connectWebSocket,
-    isConnected,
-    useWebSocket,
-    startPolling,
-    stopPolling,
-    sessionId,
-  ]);
+  }, [connectWebSocket, stopPolling, sessionId]);
 
   // Submit word
   const submitWord = useCallback(

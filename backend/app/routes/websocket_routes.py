@@ -225,6 +225,7 @@ async def wordcloud_websocket_endpoint(
     role: str = Query("student"),
     student_name: str = Query(None)
 ):
+    print(f"[WordCloud WS] {role} attempting to connect to pin={pin}")
     await manager.connect(pin, websocket)
     db = SessionLocal()
 
@@ -232,9 +233,12 @@ async def wordcloud_websocket_endpoint(
         session = db.query(WordCloudSession).filter(
             WordCloudSession.pin == pin).first()
         if not session:
+            print(f"[WordCloud WS] Session not found for pin={pin}")
             await websocket.send_json({"type": "error", "message": "Session not found"})
             await websocket.close()
             return
+
+        print(f"[WordCloud WS] {role} connected to session id={session.id}, pin={pin}")
 
         if role == "teacher":
             # Send initial word frequencies
@@ -245,6 +249,7 @@ async def wordcloud_websocket_endpoint(
                 words_dict[sub.word] = words_dict.get(sub.word, 0) + 1
             words_list = [{"text": k, "value": v}
                           for k, v in words_dict.items()]
+            print(f"[WordCloud WS] Sending initial cloud_update to teacher: {len(words_list)} words")
             await websocket.send_json({
                 "type": "cloud_update",
                 "words": words_list
@@ -253,6 +258,7 @@ async def wordcloud_websocket_endpoint(
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
+            print(f"[WordCloud WS] Received from {role}: {message}")
 
             if message["type"] == "submit_word" and role == "student":
                 word = message.get("word", "").strip().lower()
@@ -267,6 +273,7 @@ async def wordcloud_websocket_endpoint(
                     db.commit()
 
                     # Re-calculate frequencies and broadcast
+                    db.expire_all()
                     submissions = db.query(WordCloudSubmission).filter(
                         WordCloudSubmission.session_id == session.id).all()
                     words_dict = {}
@@ -275,6 +282,8 @@ async def wordcloud_websocket_endpoint(
                     words_list = [{"text": k, "value": v}
                                   for k, v in words_dict.items()]
 
+                    active = manager.active_connections.get(pin, set())
+                    print(f"[WordCloud WS] Broadcasting cloud_update to {len(active)} connections: {words_list}")
                     await manager.broadcast(pin, {
                         "type": "cloud_update",
                         "words": words_list
@@ -290,6 +299,10 @@ async def wordcloud_websocket_endpoint(
                 })
 
     except WebSocketDisconnect:
+        print(f"[WordCloud WS] {role} disconnected from pin={pin}")
+        manager.disconnect(pin, websocket)
+    except Exception as e:
+        print(f"[WordCloud WS] ERROR for {role} on pin={pin}: {type(e).__name__}: {e}")
         manager.disconnect(pin, websocket)
     finally:
         db.close()

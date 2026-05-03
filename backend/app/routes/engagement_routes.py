@@ -8,9 +8,9 @@ from app.models.submission import Submission
 from app.models.exam import Exam, ExamAttempt
 from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer, ChainAnswerGameWord
 from app.models.course import Course
-from app.services.groq_service import GroqService
 from datetime import datetime
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,12 @@ def _compute_engagement_level(score: float) -> str:
         return "at_risk"
 
 
-def _generate_ai_summary(student_name: str, engagement_data: dict) -> str:
-    """Generate an AI-powered engagement summary using Groq, with heuristic fallback."""
+def _generate_engagement_summary(student_name: str, engagement_data: dict) -> str:
+    """Generate a deterministic engagement summary using rule-based heuristics.
+
+    This is a mechanical, zero-dependency method — no LLM calls involved.
+    Grammatical variety is achieved through randomized introductory phrase pools.
+    """
 
     attendance = engagement_data.get("attendance", 0)
     eng_score = engagement_data.get("engagement_score", 0)
@@ -47,85 +51,88 @@ def _generate_ai_summary(student_name: str, engagement_data: dict) -> str:
     exams = engagement_data.get("exams", {})
     games = engagement_data.get("games", {})
 
-    context_prompt = (
-        f"You are an AI teaching assistant. Write a concise 2-3 sentence engagement summary for a student.\n"
-        f"Student: {student_name}\n"
-        f"Engagement Score: {eng_score}/100 (Level: {eng_level})\n"
-        f"Attendance: {attendance}%\n"
-        f"Assignments: {assign.get('submitted', 0)}/{assign.get('total', 0)} completed"
-        f", avg grade: {assign.get('avg_grade', 'N/A')}\n"
-        f"Exams: {exams.get('total_attempts', 0)} attempts, avg score: {exams.get('avg_score', 'N/A')}\n"
-        f"Games: {games.get('sessions_played', 0)} sessions, total score: {games.get('total_score', 0)}\n"
-        f"\nWrite a short, professional summary highlighting strengths, areas for improvement, "
-        f"and one actionable suggestion. Address the teacher, not the student. "
-        f"Be specific with numbers. Do NOT use bullet points."
-    )
-
-    # Try Groq first
-    if GroqService._available and GroqService._client:
-        try:
-            from app.services.groq_service import DEFAULT_MODEL, AVAILABLE_MODELS
-            try:
-                message = GroqService._client.chat.completions.create(
-                    messages=[{"role": "user", "content": context_prompt}],
-                    model=DEFAULT_MODEL,
-                    temperature=0.6,
-                    max_tokens=200,
-                )
-                summary = message.choices[0].message.content.strip()
-                if summary:
-                    return summary
-            except Exception:
-                for alt_model in AVAILABLE_MODELS[1:]:
-                    try:
-                        message = GroqService._client.chat.completions.create(
-                            messages=[{"role": "user", "content": context_prompt}],
-                            model=alt_model,
-                            temperature=0.6,
-                            max_tokens=200,
-                        )
-                        summary = message.choices[0].message.content.strip()
-                        if summary:
-                            return summary
-                    except Exception:
-                        continue
-        except Exception as e:
-            logger.warning(f"Groq AI summary failed, using heuristic: {e}")
-
-    # ── Heuristic fallback ────────────────────────────────────
     parts = []
 
-    # Engagement overview
+    # ── Engagement overview (with varied intros) ──────────────
     if eng_level == "excellent":
-        parts.append(f"{student_name} is performing exceptionally well with an engagement score of {eng_score}/100.")
+        intro = random.choice([
+            f"{student_name} is performing exceptionally well",
+            f"{student_name} demonstrates outstanding engagement",
+            f"{student_name} continues to excel across all metrics",
+        ])
+        parts.append(f"{intro} with an engagement score of {eng_score}/100.")
     elif eng_level == "good":
-        parts.append(f"{student_name} shows solid engagement at {eng_score}/100, with room for growth.")
+        intro = random.choice([
+            f"{student_name} shows solid engagement",
+            f"{student_name} maintains a healthy engagement level",
+            f"{student_name} is performing well overall",
+        ])
+        parts.append(f"{intro} at {eng_score}/100, with room for growth.")
     elif eng_level == "needs_attention":
-        parts.append(f"{student_name}'s engagement score of {eng_score}/100 indicates they may need additional support.")
+        intro = random.choice([
+            f"{student_name}'s engagement score of {eng_score}/100 indicates they may need additional support.",
+            f"With a score of {eng_score}/100, {student_name} could benefit from closer monitoring.",
+            f"{student_name} is showing signs of disengagement at {eng_score}/100 — proactive outreach is advised.",
+        ])
+        parts.append(intro)
     else:
-        parts.append(f"{student_name} is at risk with an engagement score of only {eng_score}/100 and requires immediate attention.")
+        intro = random.choice([
+            f"{student_name} is at risk with an engagement score of only {eng_score}/100 and requires immediate attention.",
+            f"Urgent: {student_name} has dropped to {eng_score}/100 — intervention is strongly recommended.",
+            f"{student_name}'s engagement has fallen critically to {eng_score}/100 — schedule a meeting as soon as possible.",
+        ])
+        parts.append(intro)
 
-    # Attendance insight
+    # ── Attendance insight ────────────────────────────────────
     if attendance >= 80:
-        parts.append(f"Attendance is strong at {attendance}%.")
+        parts.append(random.choice([
+            f"Attendance is strong at {attendance}%.",
+            f"Consistently present with {attendance}% attendance.",
+        ]))
     elif attendance >= 50:
-        parts.append(f"Attendance of {attendance}% is below expectations — consider a check-in.")
+        parts.append(random.choice([
+            f"Attendance of {attendance}% is below expectations — consider a check-in.",
+            f"Attendance at {attendance}% needs improvement — a brief conversation may help.",
+        ]))
     else:
-        parts.append(f"Critically low attendance at {attendance}% — this is the top priority to address.")
+        parts.append(random.choice([
+            f"Critically low attendance at {attendance}% — this is the top priority to address.",
+            f"Attendance has dropped to {attendance}% — immediate follow-up is essential.",
+        ]))
 
-    # Assignment insight
+    # ── Assignment insight ────────────────────────────────────
     total_a = assign.get("total", 0)
     submitted_a = assign.get("submitted", 0)
     if total_a > 0:
         rate = assign.get("completion_rate", 0)
         if rate >= 80:
-            parts.append(f"Assignment completion is excellent ({submitted_a}/{total_a}).")
+            parts.append(random.choice([
+                f"Assignment completion is excellent ({submitted_a}/{total_a}).",
+                f"Submissions are on track — {submitted_a} of {total_a} assignments completed.",
+            ]))
         elif rate >= 50:
-            parts.append(f"Has submitted {submitted_a} of {total_a} assignments — encourage timely submissions.")
+            parts.append(random.choice([
+                f"Has submitted {submitted_a} of {total_a} assignments — encourage timely submissions.",
+                f"{submitted_a}/{total_a} assignments submitted — some deadlines were missed.",
+            ]))
         else:
-            parts.append(f"Only {submitted_a} of {total_a} assignments submitted — follow up on missing work.")
+            parts.append(random.choice([
+                f"Only {submitted_a} of {total_a} assignments submitted — follow up on missing work.",
+                f"Significant gaps in submissions ({submitted_a}/{total_a}) — check for blockers.",
+            ]))
 
-    # Games insight
+    # ── Exam insight ──────────────────────────────────────────
+    exam_attempts = exams.get("total_attempts", 0)
+    avg_exam = exams.get("avg_score")
+    if exam_attempts > 0 and avg_exam is not None:
+        if avg_exam >= 70:
+            parts.append(f"Exam performance is solid with an average of {avg_exam} across {exam_attempts} attempt(s).")
+        elif avg_exam >= 40:
+            parts.append(f"Exam average of {avg_exam} across {exam_attempts} attempt(s) suggests room for improvement.")
+        else:
+            parts.append(f"Low exam average of {avg_exam} — consider remedial support or retake opportunities.")
+
+    # ── Games insight ─────────────────────────────────────────
     sessions = games.get("sessions_played", 0)
     if sessions > 0:
         parts.append(f"Participated in {sessions} EduGame session(s) with a total score of {games.get('total_score', 0)}.")
@@ -324,8 +331,8 @@ def _get_student_engagement(student, db: Session, assignments: list):
         "timeline": timeline[:20],  # Cap at 20 most recent
     }
 
-    # Generate AI insight summary
-    result["ai_summary"] = _generate_ai_summary(student.name, result)
+    # Generate engagement insight summary
+    result["engagement_summary"] = _generate_engagement_summary(student.name, result)
 
     return result
 

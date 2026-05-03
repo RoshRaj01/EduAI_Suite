@@ -36,29 +36,73 @@ export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, i
   };
 
   useEffect(() => {
-    if (pin) {
-      // If we joined an existing session without a prompt, fetch it
-      if (!prompt) {
-        fetch(`http://localhost:8000/wordcloud/${pin}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data && data.prompt) {
-              setPrompt(data.prompt);
-            }
-          })
-          .catch(e => console.error("Failed to fetch session info", e));
-      }
+    if (!pin) return;
 
-      const ws = new WebSocket(`ws://localhost:8000/ws/wordcloud/${pin}?role=teacher`);
+    let isCancelled = false;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // If we joined an existing session without a prompt, fetch it
+    if (!prompt) {
+      fetch(`http://localhost:8000/wordcloud/${pin}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.prompt && !isCancelled) {
+            setPrompt(data.prompt);
+          }
+        })
+        .catch(e => console.error("Failed to fetch session info", e));
+    }
+
+    const connect = () => {
+      if (isCancelled) return;
+
+      ws = new WebSocket(`ws://localhost:8000/ws/wordcloud/${pin}?role=teacher`);
+
+      ws.onopen = () => {
+        if (isCancelled) {
+          ws?.close();
+          return;
+        }
+        console.log("[WordCloud] Teacher WebSocket connected");
+        setSocket(ws);
+      };
+
       ws.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        if (message.type === "cloud_update") {
-          setWords(message.words);
+        if (isCancelled) return;
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === "cloud_update") {
+            setWords(message.words);
+          }
+        } catch (e) {
+          console.error("[WordCloud] Failed to parse message", e);
         }
       };
-      setSocket(ws);
-      return () => ws.close();
-    }
+
+      ws.onerror = (err) => {
+        console.error("[WordCloud] WebSocket error", err);
+      };
+
+      ws.onclose = () => {
+        if (!isCancelled) {
+          console.log("[WordCloud] Connection lost, reconnecting in 2s...");
+          reconnectTimer = setTimeout(connect, 2000);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      isCancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      }
+    };
   }, [pin]);
 
   const endSession = async () => {
@@ -167,6 +211,7 @@ return (
           </div>
         ) : (
           <WordCloud
+            key={JSON.stringify(words)}
             data={words}
             width={800}
             height={400}

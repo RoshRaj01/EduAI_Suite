@@ -2263,19 +2263,19 @@ export const ClassroomsPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* AI Insight Card */}
-                      {studentProfileData.ai_summary && (
-                        <div className="p-5 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-purple-50 shadow-sm">
+                      {/* Engagement Summary Card */}
+                      {(studentProfileData.engagement_summary || studentProfileData.ai_summary) && (
+                        <div className="p-5 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50 shadow-sm">
                           <div className="flex items-center gap-2.5 mb-3">
-                            <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-md shadow-indigo-300/40">
-                              <Sparkles size={14} className="text-white" />
+                            <div className="p-1.5 bg-gradient-to-br from-slate-600 to-blue-700 rounded-lg shadow-md shadow-slate-300/40">
+                              <Activity size={14} className="text-white" />
                             </div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">
-                              AI Engagement Insight
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                              Engagement Summary
                             </p>
                           </div>
                           <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                            {studentProfileData.ai_summary}
+                            {studentProfileData.engagement_summary || studentProfileData.ai_summary}
                           </p>
                         </div>
                       )}

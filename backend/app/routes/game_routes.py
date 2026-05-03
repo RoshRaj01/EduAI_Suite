@@ -11,7 +11,7 @@ from app.schemas.game import (
     GameWordCreate,
     GameWordResponse,
 )
-from app.services.groq_service import GroqService
+from app.services.word_service import WordService
 from datetime import datetime
 import uuid
 import json
@@ -39,10 +39,10 @@ def create_chain_answer_game(
     # Generate unique session ID
     session_id = f"game_{uuid.uuid4().hex[:8]}"
 
-    # Generate word suggestions from Groq if subject is provided
-    groq_suggestions = None
+    # Generate word suggestions from local dictionary if subject is provided
+    word_suggestions = None
     if game_data.subject:
-        suggestions = GroqService.generate_word_suggestions(
+        suggestions = WordService.generate_word_suggestions(
             subject=game_data.subject,
             difficulty=game_data.difficulty_level,
             count=5,
@@ -50,7 +50,7 @@ def create_chain_answer_game(
             starting_word=game_data.starting_word
         )
         if suggestions:
-            groq_suggestions = json.dumps(suggestions)
+            word_suggestions = json.dumps(suggestions)
 
     # Create the game
     new_game = ChainAnswerGame(
@@ -66,7 +66,7 @@ def create_chain_answer_game(
         max_words=game_data.max_words,
         penalty_on_invalid=game_data.penalty_on_invalid,
         penalty_type=game_data.penalty_type,
-        ollama_suggestions=groq_suggestions,
+        ollama_suggestions=word_suggestions,
         status="setup"
     )
 
@@ -353,31 +353,15 @@ def resume_chain_answer_game(
     return game
 
 
-# Groq status check
+# Word engine status check (replaces old Groq status endpoint)
 @router.get("/chain-answer/status/groq")
-def get_groq_status():
-    """Check Groq service availability"""
-    is_available = GroqService.is_groq_available()
-
+def get_word_engine_status():
+    """Check word engine availability — always available (local dictionary)"""
     return {
-        "groq_available": is_available,
-        "service": "Groq Cloud API",
-        "message": "Groq service is running" if is_available else "Groq service is not available"
+        "groq_available": True,
+        "service": "Local Dictionary Engine (nltk + Word Bank)",
+        "message": "Word engine is running — deterministic, no external API required"
     }
-
-
-# Groq debug endpoint - test connectivity
-@router.get("/chain-answer/debug/groq")
-def debug_groq():
-    """Debug Groq connectivity - detailed diagnostics"""
-
-    debug_info = {
-        "service": "Groq Cloud API",
-        "available": GroqService.is_groq_available(),
-        "model": "mixtral-8x7b-32768"
-    }
-
-    return debug_info
 
 
 # Delete a game
@@ -400,3 +384,4 @@ def delete_chain_answer_game(
     db.commit()
 
     return None
+
