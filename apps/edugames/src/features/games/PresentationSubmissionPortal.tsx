@@ -1,6 +1,6 @@
 // EduGames - Presentation Submission Portal
 // Students upload their presentation files (.pptx only) with deadline tracking
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Upload,
   FileCheck,
@@ -50,6 +50,7 @@ const formatRelativeTime = (date: Date) => {
 };
 
 const PresentationSubmissionPortal: React.FC = () => {
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -57,6 +58,37 @@ const PresentationSubmissionPortal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studentId = localStorage.getItem("student_id") || "1";
+
+  useEffect(() => {
+    const fetchAssignmentAndSubmission = async () => {
+      try {
+        // Fetch assignments
+        const assignmentsRes = await fetch("/api/slido/assignments");
+        if (assignmentsRes.ok) {
+          const assignmentsData = await assignmentsRes.json();
+          setAssignments(assignmentsData);
+          if (assignmentsData.length > 0) {
+            // Select the most recent assignment
+            const currentAssignment = assignmentsData[assignmentsData.length - 1];
+            setAssignment(currentAssignment);
+
+            // Fetch existing submission for this assignment and student
+            const submissionsRes = await fetch(`/api/slido/submissions?assignment_id=${currentAssignment.id}&student_id=${studentId}`);
+            if (submissionsRes.ok) {
+              const submissionsData = await submissionsRes.json();
+              if (submissionsData.length > 0) {
+                setSubmission(submissionsData[0]);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch assignment data", err);
+      }
+    };
+
+    fetchAssignmentAndSubmission();
+  }, [studentId]);
 
   const isDeadlinePassed = (deadline?: string) => {
     if (!deadline) return false;
@@ -163,6 +195,39 @@ const PresentationSubmissionPortal: React.FC = () => {
             Upload your .pptx presentation file here
           </p>
         </div>
+
+        {/* Assignment Selection */}
+        {assignments.length > 0 && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Select Assignment
+            </label>
+            <select
+              className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={assignment?.id || ""}
+              onChange={(e) => {
+                const selected = assignments.find((a) => a.id === parseInt(e.target.value));
+                setAssignment(selected || null);
+                setSubmission(null);
+                if (selected) {
+                  fetch(`/api/slido/submissions?assignment_id=${selected.id}&student_id=${studentId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                      if (data.length > 0) setSubmission(data[0]);
+                    })
+                    .catch(console.error);
+                }
+              }}
+            >
+              <option value="" disabled>Select an assignment...</option>
+              {assignments.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Assignment Card */}
         {assignment ? (

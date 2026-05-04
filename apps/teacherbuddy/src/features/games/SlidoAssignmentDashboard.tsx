@@ -88,13 +88,8 @@ const SlidoAssignmentDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchAssignments();
+    fetchAllSubmissions();
   }, []);
-
-  useEffect(() => {
-    if (selectedAssignment) {
-      fetchSubmissions(selectedAssignment);
-    }
-  }, [selectedAssignment]);
 
   const fetchAssignments = async () => {
     try {
@@ -116,11 +111,9 @@ const SlidoAssignmentDashboard: React.FC = () => {
     }
   };
 
-  const fetchSubmissions = async (assignmentId: number) => {
+  const fetchAllSubmissions = async () => {
     try {
-      const response = await fetch(
-        `/api/slido/submissions?assignment_id=${assignmentId}`,
-      );
+      const response = await fetch(`/api/slido/submissions`);
       const data = await response.json();
       if (response.ok && Array.isArray(data)) {
         setSubmissions(data);
@@ -354,7 +347,7 @@ const SlidoAssignmentDashboard: React.FC = () => {
                   </div>
 
                   {/* Submissions Table */}
-                  {isSelected && submissions.length > 0 && (
+                  {isSelected && submissions.filter(s => s.assignment_id === assignment.id).length > 0 && (
                     <div className="border-t bg-slate-50 overflow-x-auto">
                       <table className="w-full">
                         <thead className="bg-slate-100">
@@ -368,7 +361,7 @@ const SlidoAssignmentDashboard: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="text-sm">
-                          {submissions.map((sub) => (
+                          {submissions.filter(s => s.assignment_id === assignment.id).map((sub) => (
                             <tr
                               key={sub.id}
                               className="border-t hover:bg-slate-100 transition"

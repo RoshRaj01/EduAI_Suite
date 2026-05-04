@@ -44,7 +44,16 @@ class StorageService:
                 use_ssl=self.endpoint_url.startswith('https')
             )
 
-        self._ensure_bucket_exists()
+        self.offline_mode = False
+        self.local_storage_path = os.path.join(os.getcwd(), 'local_uploads')
+        if not os.path.exists(self.local_storage_path):
+            os.makedirs(self.local_storage_path, exist_ok=True)
+
+        try:
+            self._ensure_bucket_exists()
+        except Exception as e:
+            logger.warning(f"Could not connect to storage provider: {e}. Falling back to local offline mode.")
+            self.offline_mode = True
 
     def _ensure_bucket_exists(self):
         """Create bucket if it doesn't exist"""
@@ -84,6 +93,13 @@ class StorageService:
         try:
             object_key = f"{folder}/{file_name}"
 
+            if self.offline_mode:
+                local_path = os.path.join(self.local_storage_path, object_key.replace('/', '_'))
+                with open(local_path, 'wb') as f:
+                    f.write(file_content)
+                logger.info(f"Offline mode: Saved file locally to {local_path}")
+                return object_key
+
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
                 Key=object_key,
@@ -116,6 +132,9 @@ class StorageService:
             Presigned URL or None if generation fails
         """
         try:
+            if self.offline_mode:
+                return f"/local_uploads/{object_key.replace('/', '_')}"
+
             url = self.s3_client.generate_presigned_url(
                 operation,
                 Params={'Bucket': self.bucket_name, 'Key': object_key},

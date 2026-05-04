@@ -183,8 +183,8 @@ async def upload_presentation(
 
     # Verify student exists
     student = db.query(User).filter(User.id == student_id).first()
-    if not student or student.role != "student":
-        raise HTTPException(status_code=403, detail="Only students can submit")
+    if not student:
+        raise HTTPException(status_code=403, detail="Student not found")
 
     # Read and validate file
     file_content = await file.read()
