@@ -14,20 +14,28 @@ class OMRService:
             if image is None:
                 return {}
 
+            # Resize for consistent contour filtering
+            image = imutils.resize(image, width=800)
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            gray = clahe.apply(gray)
+
+            # --- Pass 1: Detection (Find the empty bubble rings) ---
             blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-            thresh = cv2.adaptiveThreshold(
-                blurred, 255,
-                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                cv2.THRESH_BINARY_INV, 31, 10
+            thresh_contours = cv2.adaptiveThreshold(
+                blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 31, 10
             )
 
-            height, width = thresh.shape
+            # --- Pass 2: Scoring (Image Subtraction for pencil marks) ---
+            # Create a heavily blurred background approximation
+            blur_bg = cv2.GaussianBlur(gray, (85, 85), 0)
+            # Subtract original from background. Dark pencil marks become bright white.
+            subtracted = cv2.subtract(blur_bg, gray)
+            # Threshold the subtracted image to isolate the filled regions
+            _, thresh_score = cv2.threshold(subtracted, 40, 255, cv2.THRESH_BINARY)
+
+            height, width = thresh_contours.shape
 
             # ── Detect all bubble candidates ───────────────────────────────────
-            cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cnts = cv2.findContours(thresh_contours.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cnts = imutils.grab_contours(cnts)
 
             all_bubbles = []
@@ -123,17 +131,25 @@ class OMRService:
                                     best_d, best_p = d, p
                             option_bubbles.append(best_p)
 
-                        # Score by fill density
+                        # Score by fill density using Image Subtraction
                         scores = []
                         for p in option_bubbles:
                             if p is None:
                                 scores.append(0)
                                 continue
-                            mask = np.zeros(thresh.shape, dtype="uint8")
-                            cv2.drawContours(mask, [p["c"]], -1, 255, -1)
-                            scores.append(cv2.countNonZero(
-                                cv2.bitwise_and(thresh, thresh, mask=mask)
-                            ))
+                            
+                            # Extract bounding box of the bubble
+                            bx, by, bw, bh = cv2.boundingRect(p["c"])
+                            
+                            # Shrink ROI by 25% on all sides to focus STRICTLY on the inner fill
+                            # This completely ignores the printed dark ring of the bubble
+                            margin_x = int(bw * 0.25)
+                            margin_y = int(bh * 0.25)
+                            
+                            roi = thresh_score[by + margin_y : by + bh - margin_y, 
+                                               bx + margin_x : bx + bw - margin_x]
+                            
+                            scores.append(cv2.countNonZero(roi))
 
                         if not scores:
                             results[str(q_num)] = "-"
@@ -141,10 +157,11 @@ class OMRService:
 
                         best_idx = int(np.argmax(scores))
                         max_score = scores[best_idx]
-                        avg_score = sum(scores) / len(scores)
 
-                        # Filled = clearly brighter than average AND above noise floor
-                        if max_score > 40 and max_score > avg_score * 1.35:
+                        # Since we are using inner-ROI on a subtracted background, 
+                        # an empty bubble has ~0 pixels. A filled one has many.
+                        # 10 pixels is a safe noise floor for a 800px wide image.
+                        if max_score > 10:
                             results[str(q_num)] = options[min(best_idx, 3)]
                         else:
                             results[str(q_num)] = "-"

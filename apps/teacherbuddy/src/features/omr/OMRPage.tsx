@@ -237,7 +237,7 @@ export const OMRPage: React.FC = () => {
               className={`text-sm font-bold pb-2 border-b-2 ${creationMode === 'image' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}
               onClick={() => setCreationMode('image')}
             >
-              Upload Image (AI Extract)
+              Upload Image (Extract)
             </button>
             <button
               className={`text-sm font-bold pb-2 border-b-2 ${creationMode === 'manual' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}
@@ -341,7 +341,7 @@ export const OMRPage: React.FC = () => {
                 )}
               </div>
               <div className="flex justify-between items-end mt-4">
-                <p className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>AI Score: <strong className="text-lg" style={{ color: "var(--color-brand-blue)" }}>{sub.score?.toFixed(1)}</strong>%</p>
+                <p className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>OMR Score: <strong className="text-lg" style={{ color: "var(--color-brand-blue)" }}>{sub.score?.toFixed(1)}</strong>%</p>
                 <ChevronRight size={16} style={{ color: "var(--color-text-muted)" }} />
               </div>
             </GlassCard>
@@ -355,7 +355,7 @@ export const OMRPage: React.FC = () => {
               <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: "var(--color-border)" }}>
                 <div>
                   <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>Submission: {selectedSub.student_id}</h2>
-                  <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Review and correct AI evaluation.</p>
+                  <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Review and correct OMR evaluation.</p>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right flex items-center gap-2">

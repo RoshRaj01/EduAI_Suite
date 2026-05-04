@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.omr import OMRJob, OMRSubmission
-from app.services.groq_service import GroqService
 from app.services.omr_service import OMRService
 from typing import List
 import os
@@ -50,12 +49,8 @@ async def create_omr_job(title: str = Form(...), answer_key: str = Form(None), f
             
             key_json = OMRService.process_omr_sheet(temp_path, num_questions=50)
             
-            # 2. If OpenCV fails to find enough questions, use Groq Vision as a smart backup
-            if not key_json or len(key_json) < 5:
-                key_json = GroqService.evaluate_omr_image(base64_image, 50)
-            
             if not key_json:
-                # If both CV and AI fail, return an empty key so the user knows it failed
+                # If CV fails, return an empty key so the user knows it failed
                 key_json = {str(i): "-" for i in range(1, 11)}
             
             # Cleanup temp file
@@ -124,8 +119,6 @@ async def update_omr_job(
                 f.write(content)
                 
             key_json = OMRService.process_omr_sheet(temp_path, num_questions=50)
-            if not key_json or len(key_json) < 5:
-                key_json = GroqService.evaluate_omr_image(base64_image, 50)
             
             if key_json:
                 job.answer_key = key_json
@@ -169,12 +162,6 @@ async def upload_omr_sheet(job_id: int, student_id: str = Form(...), file: Uploa
         
         # 1. OpenCV OMR
         detected_answers = OMRService.process_omr_sheet(file_path, num_questions=len(job.answer_key))
-        
-        # 2. AI Backup if CV results are suspicious or empty
-        if not detected_answers or len(detected_answers) < len(job.answer_key) * 0.5:
-            ai_answers = GroqService.evaluate_omr_image(base64_image, len(job.answer_key))
-            if ai_answers:
-                detected_answers = ai_answers
         
         if not detected_answers:
             # If all else fails, return placeholders
