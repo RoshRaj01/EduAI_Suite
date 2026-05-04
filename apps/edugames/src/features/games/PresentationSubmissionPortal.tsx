@@ -1,5 +1,6 @@
 // EduGames - Presentation Submission Portal
 // Students upload their presentation files (.pptx only) with deadline tracking
+// After upload, transitions to InteractionStudio for adding polls/Q&A before final submit
 import React, { useState, useRef, useEffect } from "react";
 import {
   Upload,
@@ -9,6 +10,7 @@ import {
   Clock,
   CheckCircle,
 } from "lucide-react";
+import InteractionStudio from "./InteractionStudio";
 
 interface Assignment {
   id: number;
@@ -21,6 +23,8 @@ interface Submission {
   id: number;
   assignment_id: number;
   file_name: string;
+  file_url: string;
+  status: string;
   submitted_at: string;
   is_late: boolean;
   grade?: number;
@@ -57,6 +61,7 @@ const PresentationSubmissionPortal: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [studioMode, setStudioMode] = useState(false);
   const studentId = localStorage.getItem("student_id") || "1";
 
   useEffect(() => {
@@ -77,7 +82,12 @@ const PresentationSubmissionPortal: React.FC = () => {
             if (submissionsRes.ok) {
               const submissionsData = await submissionsRes.json();
               if (submissionsData.length > 0) {
-                setSubmission(submissionsData[0]);
+                const sub = submissionsData[0];
+                setSubmission(sub);
+                // If the last submission is still a draft, go straight to studio
+                if (sub.status === "draft") {
+                  setStudioMode(true);
+                }
               }
             }
           }
@@ -166,6 +176,8 @@ const PresentationSubmissionPortal: React.FC = () => {
       const data = await response.json();
       setSubmission(data);
       setError(null);
+      // After upload, transition to Interaction Studio
+      setStudioMode(true);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Upload failed. Please try again.",
@@ -182,6 +194,29 @@ const PresentationSubmissionPortal: React.FC = () => {
   const isOverdue =
     assignment?.deadline && isDeadlinePassed(assignment.deadline);
   const deadlinePassed = isDeadlinePassed(assignment?.deadline);
+
+  // ─── InteractionStudio Mode ───────────────────────────────────
+  if (studioMode && submission) {
+    return (
+      <InteractionStudio
+        submissionId={submission.id}
+        fileUrl={submission.file_url}
+        fileName={submission.file_name}
+        onFinalize={() => {
+          setStudioMode(false);
+          // Refresh submission to get updated status
+          fetch(`/api/slido/submissions/${submission.id}`)
+            .then((r) => r.json())
+            .then((data) => setSubmission(data))
+            .catch(console.error);
+        }}
+        onBack={() => {
+          setStudioMode(false);
+          setSubmission(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="p-6 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">

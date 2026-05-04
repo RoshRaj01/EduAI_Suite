@@ -16,6 +16,8 @@ import {
   Users,
   AlertCircle,
   CheckCircle,
+  BarChart3,
+  Zap,
 } from "lucide-react";
 import PPTXViewer from "./PPTXViewer";
 
@@ -45,11 +47,19 @@ interface SessionState {
   user_type: string;
 }
 
+interface PreloadedInteraction {
+  id: number;
+  slide_number: number;
+  interaction_type: string;
+  config: { question: string; options?: string[] };
+}
+
 interface Props {
   sessionPin?: string;
   studentId?: number;
   isPresenter?: boolean;
   fileUrl?: string;
+  submissionId?: number;
 }
 
 const LiveSessionInterface: React.FC<Props> = ({
@@ -57,6 +67,7 @@ const LiveSessionInterface: React.FC<Props> = ({
   studentId: propsStudentId,
   isPresenter: propsIsPresenter,
   fileUrl: propsFileUrl,
+  submissionId: propsSubmissionId,
 } = {}) => {
   const { pin } = useParams<{ pin: string }>();
   const [searchParams] = useSearchParams();
@@ -86,6 +97,40 @@ const LiveSessionInterface: React.FC<Props> = ({
   const [isMuted, setIsMuted] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [preloadedInteractions, setPreloadedInteractions] = useState<PreloadedInteraction[]>([]);
+  const [pendingInteraction, setPendingInteraction] = useState<PreloadedInteraction | null>(null);
+  const [launchedInteractionIds, setLaunchedInteractionIds] = useState<Set<number>>(new Set());
+
+  // Fetch predefined interactions for this submission
+  useEffect(() => {
+    if (propsSubmissionId && isPresenter) {
+      fetch(`/api/slido/submissions/${propsSubmissionId}/interactions`)
+        .then((r) => r.json())
+        .then((data) => setPreloadedInteractions(Array.isArray(data) ? data : []))
+        .catch(console.error);
+    }
+  }, [propsSubmissionId, isPresenter]);
+
+  // Check for interactions when slide changes
+  useEffect(() => {
+    if (!isPresenter || preloadedInteractions.length === 0) return;
+    const slide = sessionState?.current_slide || 1;
+    const match = preloadedInteractions.find(
+      (i) => i.slide_number === slide && !launchedInteractionIds.has(i.id)
+    );
+    setPendingInteraction(match || null);
+  }, [sessionState?.current_slide, preloadedInteractions, launchedInteractionIds]);
+
+  const launchInteraction = (interaction: PreloadedInteraction) => {
+    sendWebSocketMessage("poll_launched", {
+      question: interaction.config.question,
+      poll_type: interaction.interaction_type.replace("poll_", ""),
+      options: interaction.config.options || [],
+      interaction_id: interaction.id,
+    });
+    setLaunchedInteractionIds((prev) => new Set([...prev, interaction.id]));
+    setPendingInteraction(null);
+  };
 
   useEffect(() => {
     connectWebSocket();
@@ -267,6 +312,31 @@ const LiveSessionInterface: React.FC<Props> = ({
             onError={(error) => console.error("Viewer error:", error)}
           />
         </div>
+
+        {/* Pending Interaction Banner */}
+        {isPresenter && pendingInteraction && (
+          <div
+            className="border-t border-indigo-500/30 px-4 py-3 flex items-center justify-between"
+            style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.10))" }}
+          >
+            <div className="flex items-center gap-3">
+              <BarChart3 className="w-5 h-5 text-indigo-400" />
+              <div>
+                <p className="text-sm font-medium text-indigo-200">Interaction Ready</p>
+                <p className="text-xs text-slate-400 truncate max-w-[250px]">
+                  {pendingInteraction.config.question}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => launchInteraction(pendingInteraction)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition"
+              style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 4px 12px rgba(99,102,241,0.4)" }}
+            >
+              <Zap className="w-4 h-4" /> Launch
+            </button>
+          </div>
+        )}
 
         {/* Presenter Controls - Bottom */}
         {isPresenter && (

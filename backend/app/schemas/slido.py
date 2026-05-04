@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
 
 
@@ -52,6 +52,7 @@ class PresentationSubmissionResponse(BaseModel):
     student_id: int
     file_name: str
     file_url: str
+    status: str
     submitted_at: datetime
     is_late: bool
     grade: Optional[float]
@@ -182,3 +183,34 @@ class QnAUpvoteResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ==================== SubmissionInteraction Schemas ====================
+
+class SubmissionInteractionCreate(BaseModel):
+    slide_number: int
+    interaction_type: str  # poll_multiple_choice, poll_open_text, poll_word_cloud, poll_rating, qna_prompt
+    config: dict  # {"question": "...", "options": [...], "settings": {...}}
+    order_index: int = 0
+
+
+class SubmissionInteractionUpdate(BaseModel):
+    slide_number: Optional[int] = None
+    interaction_type: Optional[str] = None
+    config: Optional[dict] = None
+    order_index: Optional[int] = None
+
+
+class SubmissionInteractionResponse(BaseModel):
+    id: int
+    submission_id: int
+    slide_number: int
+    interaction_type: str
+    config: Any
+    order_index: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+

@@ -24,12 +24,20 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
   onLoad,
   onError,
 }) => {
-  const [viewerType, setViewerType] = useState<"office" | "fallback">("office");
-  const [loading, setLoading] = useState(true);
+  // Detect if URL is local (not publicly accessible for Office/Google viewers)
+  const isLocalUrl = !fileUrl || fileUrl.startsWith("/") || fileUrl.startsWith("http://localhost");
+
+  const [viewerType, setViewerType] = useState<"office" | "fallback">(isLocalUrl ? "fallback" : "office");
+  const [loading, setLoading] = useState(!isLocalUrl);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"embed" | "download">("embed");
+  const [viewMode, setViewMode] = useState<"embed" | "download">(isLocalUrl ? "download" : "embed");
 
   useEffect(() => {
+    if (isLocalUrl) {
+      setLoading(false);
+      onLoad?.();
+      return;
+    }
     // Simulate load completion after iframe is ready
     const timer = setTimeout(() => {
       setLoading(false);
@@ -37,7 +45,7 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [onLoad]);
+  }, [onLoad, isLocalUrl]);
 
   const handleIframeError = () => {
     setError(
@@ -47,11 +55,14 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
     onError?.("Iframe load failed");
   };
 
-  // Office Web Viewer API URL - most reliable for PPTX
-  const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
+  // Office Web Viewer API URL - only works with publicly accessible URLs
+  const officeViewerUrl = isLocalUrl ? "" : `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
 
   // Fallback viewer URL using Google Viewer
-  const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+  const googleViewerUrl = isLocalUrl ? "" : `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+
+  // Build the actual download URL for local files
+  const downloadUrl = isLocalUrl ? `/api${fileUrl}` : fileUrl;
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-900 text-white">
@@ -88,7 +99,7 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
 
           {/* Download Button */}
           <a
-            href={fileUrl}
+            href={downloadUrl}
             download={fileName}
             className="p-2 hover:bg-slate-700 rounded transition"
             title="Download presentation"
@@ -98,7 +109,7 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
 
           {/* External Link */}
           <a
-            href={fileUrl}
+            href={downloadUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="p-2 hover:bg-slate-700 rounded transition"
@@ -131,7 +142,7 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
           </div>
         )}
 
-        {viewMode === "embed" ? (
+        {viewMode === "embed" && !isLocalUrl ? (
           <div className="w-full h-full flex items-center justify-center p-4">
             {viewerType === "office" ? (
               <iframe
@@ -148,7 +159,6 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
                 title={title}
               />
             ) : (
-              // Fallback viewer
               <iframe
                 src={googleViewerUrl}
                 width="100%"
@@ -161,35 +171,25 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
             )}
           </div>
         ) : (
-          // Download mode
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <Download className="w-16 h-16 text-slate-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">
-                Download Presentation
+                {isLocalUrl ? "Presentation Uploaded" : "Download Presentation"}
               </h3>
               <p className="text-slate-400 mb-6">
-                To view this presentation offline, download the file below.
+                {isLocalUrl
+                  ? "Your file is stored locally. Download to preview in PowerPoint."
+                  : "To view this presentation offline, download the file below."}
               </p>
               <a
-                href={fileUrl}
+                href={downloadUrl}
                 download={fileName}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition font-medium"
               >
                 <Download className="w-5 h-5" />
                 Download {fileName}
               </a>
-              <p className="text-sm text-slate-500 mt-4">
-                Or{" "}
-                <a
-                  href={fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300"
-                >
-                  view online
-                </a>
-              </p>
             </div>
           </div>
         )}

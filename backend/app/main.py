@@ -9,7 +9,7 @@ from app.models.quiz import Quiz, QuizQuestion, QuizOption, QuizSession, QuizPla
 from app.models.lesson import Lesson
 from app.models.omr import OMRJob, OMRSubmission
 from app.models.report import Report
-from app.models.slido import PresentationAssignment, PresentationSubmission, SlidoSession, SlidoPoll, PollResponse, SlidoQnA, QnAUpvote
+from app.models.slido import PresentationAssignment, PresentationSubmission, SlidoSession, SlidoPoll, PollResponse, SlidoQnA, QnAUpvote, SubmissionInteraction
 from app.routes.calendar_routes import CalendarEvent
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -84,6 +84,16 @@ with engine.begin() as connection:
     except Exception as e:
         print(f"Note: reports migration skipped: {e}")
 
+    # Presentation Submissions auto-migration: add status column
+    try:
+        submission_columns = {column["name"]
+                              for column in inspector.get_columns("presentation_submissions")}
+        if "status" not in submission_columns:
+            connection.execute(
+                text("ALTER TABLE presentation_submissions ADD COLUMN status VARCHAR DEFAULT 'submitted'"))
+    except Exception as e:
+        print(f"Note: presentation_submissions migration skipped: {e}")
+
 app = FastAPI()
 
 app.add_middleware(
@@ -95,6 +105,12 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
+# Mount local_uploads for offline storage mode (when MinIO is unavailable)
+local_uploads_dir = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "..", "local_uploads"))
+os.makedirs(local_uploads_dir, exist_ok=True)
+app.mount("/local_uploads", StaticFiles(directory=local_uploads_dir), name="local_uploads")
 
 # Initialize Groq service on startup
 GroqService.initialize()

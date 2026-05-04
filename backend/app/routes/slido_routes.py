@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.slido import (
     PresentationAssignment, PresentationSubmission, SlidoSession,
-    SlidoPoll, PollResponse, SlidoQnA, QnAUpvote
+    SlidoPoll, PollResponse, SlidoQnA, QnAUpvote, SubmissionInteraction
 )
 from app.models.user import User
 from app.schemas.slido import (
@@ -13,7 +13,8 @@ from app.schemas.slido import (
     SlidoPollCreate, SlidoPollResponse,
     PollResponseCreate, PollResponseResponse,
     SlidoQnACreate, SlidoQnAUpdate, SlidoQnAResponse,
-    QnAUpvoteResponse
+    QnAUpvoteResponse,
+    SubmissionInteractionCreate, SubmissionInteractionUpdate, SubmissionInteractionResponse
 )
 from app.services.storage_service import get_storage_service
 from datetime import datetime
@@ -232,7 +233,8 @@ async def upload_presentation(
         student_id=student_id,
         file_url=file_url,
         file_name=file.filename,
-        is_late=is_late
+        is_late=is_late,
+        status="draft"
     )
     db.add(submission)
     db.commit()
@@ -592,3 +594,141 @@ def answer_question(
     db.commit()
     db.refresh(question)
     return question
+
+
+# ==================== SubmissionInteraction Endpoints ====================
+
+@router.get("/submissions/{submission_id}/interactions", response_model=List[SubmissionInteractionResponse])
+def list_interactions(submission_id: int, db: Session = Depends(get_db)):
+    """Get all interactions for a submission, ordered by slide_number then order_index"""
+    submission = db.query(PresentationSubmission).filter(
+        PresentationSubmission.id == submission_id
+    ).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    return db.query(SubmissionInteraction).filter(
+        SubmissionInteraction.submission_id == submission_id
+    ).order_by(
+        SubmissionInteraction.slide_number,
+        SubmissionInteraction.order_index
+    ).all()
+
+
+@router.post("/submissions/{submission_id}/interactions", response_model=SubmissionInteractionResponse, status_code=status.HTTP_201_CREATED)
+def create_interaction(
+    submission_id: int,
+    interaction_data: SubmissionInteractionCreate,
+    db: Session = Depends(get_db)
+):
+    """Add an interaction to a submission (only while in draft status)"""
+    submission = db.query(PresentationSubmission).filter(
+        PresentationSubmission.id == submission_id
+    ).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if submission.status != "draft":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot add interactions to a finalized submission"
+        )
+
+    # Validate interaction_type
+    valid_types = ["poll_multiple_choice", "poll_open_text", "poll_word_cloud", "poll_rating", "qna_prompt"]
+    if interaction_data.interaction_type not in valid_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid interaction type. Must be one of: {', '.join(valid_types)}"
+        )
+
+    interaction = SubmissionInteraction(
+        submission_id=submission_id,
+        slide_number=interaction_data.slide_number,
+        interaction_type=interaction_data.interaction_type,
+        config=interaction_data.config,
+        order_index=interaction_data.order_index
+    )
+    db.add(interaction)
+    db.commit()
+    db.refresh(interaction)
+    return interaction
+
+
+@router.put("/submissions/interactions/{interaction_id}", response_model=SubmissionInteractionResponse)
+def update_interaction(
+    interaction_id: int,
+    update_data: SubmissionInteractionUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update an existing interaction"""
+    interaction = db.query(SubmissionInteraction).filter(
+        SubmissionInteraction.id == interaction_id
+    ).first()
+    if not interaction:
+        raise HTTPException(status_code=404, detail="Interaction not found")
+
+    # Check submission is still in draft
+    submission = db.query(PresentationSubmission).filter(
+        PresentationSubmission.id == interaction.submission_id
+    ).first()
+    if submission.status != "draft":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot modify interactions on a finalized submission"
+        )
+
+    update_dict = update_data.dict(exclude_unset=True)
+    for key, value in update_dict.items():
+        setattr(interaction, key, value)
+
+    interaction.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(interaction)
+    return interaction
+
+
+@router.delete("/submissions/interactions/{interaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_interaction(interaction_id: int, db: Session = Depends(get_db)):
+    """Remove an interaction from a submission"""
+    interaction = db.query(SubmissionInteraction).filter(
+        SubmissionInteraction.id == interaction_id
+    ).first()
+    if not interaction:
+        raise HTTPException(status_code=404, detail="Interaction not found")
+
+    # Check submission is still in draft
+    submission = db.query(PresentationSubmission).filter(
+        PresentationSubmission.id == interaction.submission_id
+    ).first()
+    if submission.status != "draft":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete interactions from a finalized submission"
+        )
+
+    db.delete(interaction)
+    db.commit()
+    return None
+
+
+@router.put("/submissions/{submission_id}/submit", response_model=PresentationSubmissionResponse)
+def finalize_submission(submission_id: int, db: Session = Depends(get_db)):
+    """Finalize a draft submission (changes status from 'draft' to 'submitted')"""
+    submission = db.query(PresentationSubmission).filter(
+        PresentationSubmission.id == submission_id
+    ).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if submission.status != "draft":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Submission is already in '{submission.status}' state"
+        )
+
+    submission.status = "submitted"
+    submission.submitted_at = datetime.utcnow()
+    submission.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(submission)
+    return submission
+

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, Enum, JSON
 from sqlalchemy.orm import relationship
 from app.database import Base
 from datetime import datetime
@@ -38,6 +38,7 @@ class PresentationSubmission(Base):
         "users.id", ondelete="CASCADE"), index=True)
     file_url = Column(String)  # S3/MinIO pre-signed URL
     file_name = Column(String)
+    status = Column(String, default="draft")  # draft, submitted, graded
     submitted_at = Column(DateTime, default=datetime.utcnow)
     is_late = Column(Boolean, default=False)
     grade = Column(Float, nullable=True)
@@ -49,6 +50,8 @@ class PresentationSubmission(Base):
 
     assignment = relationship("PresentationAssignment",
                               back_populates="submissions")
+    interactions = relationship(
+        "SubmissionInteraction", back_populates="submission", cascade="all, delete-orphan")
 
 
 class SlidoSession(Base):
@@ -158,3 +161,23 @@ class QnAUpvote(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     question = relationship("SlidoQnA", back_populates="upvote_records")
+
+
+class SubmissionInteraction(Base):
+    """Stores an interaction block authored by a student for a specific slide.
+    Created during the authoring phase (before final submission).
+    Used during the live session to hydrate polls/Q&A prompts."""
+    __tablename__ = "submission_interactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey(
+        "presentation_submissions.id", ondelete="CASCADE"), index=True)
+    slide_number = Column(Integer)  # After which slide this interaction fires
+    interaction_type = Column(String)  # poll_multiple_choice, poll_open_text, poll_word_cloud, qna_prompt, poll_rating
+    config = Column(JSON)  # {"question": "...", "options": [...], "settings": {...}}
+    order_index = Column(Integer, default=0)  # Ordering when multiple interactions on same slide
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow,
+                        onupdate=datetime.utcnow)
+
+    submission = relationship("PresentationSubmission", back_populates="interactions")
