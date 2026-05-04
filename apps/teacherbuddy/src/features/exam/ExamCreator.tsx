@@ -276,7 +276,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
 
             <section className="p-4 rounded-2xl bg-blue-50 border border-blue-100 space-y-4">
               <h4 className="text-xs font-bold text-blue-700 flex items-center gap-2">
-                <Upload size={14} /> AI Smart Import
+                <Upload size={14} /> Smart Import
               </h4>
               
               <div className="space-y-3">
