@@ -52,13 +52,13 @@ class OMRService:
                                 "w": w, "h": h, "c": c
                             })
 
-            # Target bottom 45% where the MCQ table lives.
-            # Use an absolute left-edge cutoff (70px) to remove binding noise.
-            # No right-side filter — MCQ bubbles can be near the right edge.
+            # Target bottom 55% where the MCQ table lives, avoiding top/middle grids.
+            # Use a smaller left-edge cutoff (20px) to ensure we don't cut off Q1-10!
             mcq = [
                 p for p in all_bubbles
-                if p["y"] > height * 0.45
-                and p["x"] > 70
+                if p["y"] > height * 0.55
+                and p["x"] > 20
+                and p["x"] < width - 20
             ]
             print(f"DEBUG: MCQ candidates = {len(mcq)}")
             if len(mcq) < 20:
@@ -93,14 +93,17 @@ class OMRService:
                     continue
 
                 try:
-                    # ── Step 2: Find 5 vertical tracks per column ──────────────
-                    # Kashmir sheet: [Q_no | A | B | C | D]
+                    # ── Step 2: Find exactly 4 vertical tracks per column (A, B, C, D) ──────────────
                     col_x = np.array([p["x"] for p in col], dtype=np.float32)
-                    k_x = min(5, len(set(int(v) for v in col_x)))
-                    _, _, tx = cv2.kmeans(col_x, k_x, None, criteria, 20, cv2.KMEANS_PP_CENTERS)
-                    sorted_tracks = sorted(tx.flatten())
-                    # If 5 tracks found → skip first (Q number). Else use all as options.
-                    option_tracks = sorted_tracks[1:] if k_x == 5 else sorted_tracks
+                    
+                    # Force exactly 4 tracks since Q.No are just text, not bubbles.
+                    k_x = min(4, len(set(int(v) for v in col_x)))
+                    if k_x < 4:
+                        print(f"  Col {c_idx+1}: Not enough tracks found. Skipping.")
+                        continue
+                        
+                    _, _, tx = cv2.kmeans(col_x, 4, None, criteria, 20, cv2.KMEANS_PP_CENTERS)
+                    option_tracks = sorted(tx.flatten())
 
                     # ── Step 3: K-Means into 10 question rows ─────────────────
                     col_y = np.array([p["y"] for p in col], dtype=np.float32)
@@ -160,8 +163,8 @@ class OMRService:
 
                         # Since we are using inner-ROI on a subtracted background, 
                         # an empty bubble has ~0 pixels. A filled one has many.
-                        # 10 pixels is a safe noise floor for a 800px wide image.
-                        if max_score > 10:
+                        # 20 pixels is a safe noise floor for a 800px wide image.
+                        if max_score > 20:
                             results[str(q_num)] = options[min(best_idx, 3)]
                         else:
                             results[str(q_num)] = "-"
