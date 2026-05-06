@@ -207,5 +207,9 @@ def send_bulk_mail(req: SendMailRequest, background_tasks: BackgroundTasks, db: 
             background_tasks.add_task(send_email, student.email, mail_item["subject"], personalized_body)
             sent_count += 1
             
+    # Delete the drafts that were just sent
+    if req.draft_ids and len(req.draft_ids) > 0:
+        db.query(MailDraft).filter(MailDraft.id.in_(req.draft_ids)).delete(synchronize_session=False)
+
     db.commit()
     return {"message": f"Queued {sent_count} emails for sending"}

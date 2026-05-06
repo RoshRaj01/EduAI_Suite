@@ -315,6 +315,14 @@ export const MailStudentsPage: React.FC = () => {
       if (res.ok) {
           setStatus({ type: 'success', message: data.message });
           fetchHistory();
+          fetchDrafts();
+          
+          // If the currently selected draft was sent, or we sent the current composition, reset the form
+          if (draftsToSend.includes(selectedDraftId as number) || draftsToSend.length === 0) {
+              setSelectedDraftId(null);
+              setMailSubject("");
+              setMailBody("");
+          }
       } else {
           setStatus({ type: 'error', message: data.detail || "Failed to send emails" });
       }
