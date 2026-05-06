@@ -38,49 +38,63 @@ class CoursePlanParser:
         if not text:
             return {"topic": "", "syllabus_context": ""}
 
+        # Normalize text: fix common PDF extraction issues
+        # 1. Normalize line endings
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
+        # 2. Remove trailing whitespace from lines
+        lines = [line.strip() for line in text.split('\n')]
+        # 3. Join back to detect section boundaries better
+        clean_text = '\n'.join(lines)
+
         # Topic Patterns
-        # 1. Look for explicit labels
-        # 2. Look for Markdown H1
-        # 3. Look for "Lesson plan for..."
         topic_patterns = [
-            r"(?i)(?:topic|subject|course(?:\s+name)?|module(?:\s+title)?|lesson\s+title)\s*[:=-]\s*(.*)",
+            r"(?i)(?:topic|subject|course(?:\s+name)?|module(?:\s+title)?|lesson\s+title)\s*[:=-]?\s*(.*)",
             r"(?i)^#\s*(.*)",
             r"(?i)(?:lesson\s+plan\s+for)\s+(.*)"
         ]
         
         # Syllabus Patterns
-        # 1. Look for explicit labels and capture until next section or double newline
-        # 2. Look for Markdown H2
+        # Refined for academic documents and general use
         syllabus_patterns = [
-            r"(?i)(?:syllabus|context|outline|objectives|content|learning\s+outcomes|topics\s+covered)\s*[:=-]\s*([\s\S]*?)(?=\n\s*\n|\n\s*[A-Z\s]{3,}:|$)",
-            r"(?i)##\s*(?:syllabus|context|objectives)\s*([\s\S]*?)(?=\n#|$)"
+            # 1. Academic content markers (capture until reference/exam sections)
+            r"(?i)(?:course\s+content|units?|modules?|topics\s+covered|learning\s+outcomes|outline)\s*[:=-]?\s*([\s\S]*?)(?=\n\s*(?:Text\s*&\s*Reference|Essential\s*Reading|Examination|CIA|ESE|APPENDIX|PATTERN|References)|\Z)",
+            # 2. General keywords with flexible lookahead
+            r"(?i)(?:syllabus|context|objectives|content)\s*[:=-]?\s*([\s\S]*?)(?=\n\s*\n|\n\s*[A-Z\s]{5,}:?|\Z)",
+            # 3. Markdown H2
+            r"(?i)##\s*(?:syllabus|context|objectives|content)\s*([\s\S]*?)(?=\n#|\Z)"
         ]
         
         topic = ""
         for pattern in topic_patterns:
-            match = re.search(pattern, text, re.MULTILINE)
+            match = re.search(pattern, clean_text, re.MULTILINE)
             if match:
                 topic = match.group(1).strip()
-                # Clean up if matched a line with other stuff
                 topic = topic.split('\n')[0].strip()
                 if topic:
                     break
         
         syllabus = ""
         for pattern in syllabus_patterns:
-            match = re.search(pattern, text, re.MULTILINE)
+            match = re.search(pattern, clean_text, re.MULTILINE)
             if match:
-                syllabus = match.group(1).strip()
+                content = match.group(1).strip()
+                # Skip trivial matches (like a page header "SYLLABUS")
+                if len(content) < 15 and len(clean_text) > 200:
+                    continue
+                syllabus = content
                 if syllabus:
                     break
                 
-        # Fallback for Topic if nothing found: First non-empty line
+        # Fallback for Topic: First reasonable line
         if not topic:
-            lines = [l.strip() for l in text.split('\n') if l.strip()]
-            if lines:
-                first_line = lines[0]
-                if len(first_line) < 100:
-                    topic = first_line
+            for line in lines:
+                if not line: continue
+                # Skip generic headers
+                if line.upper() in ["SYLLABUS", "COURSE PLAN", "LESSON PLAN"]:
+                    continue
+                if 3 < len(line) < 100:
+                    topic = line
+                    break
 
         return {
             "topic": topic,
