@@ -10,7 +10,7 @@ class MailDraft(Base):
     body = Column(String)
     student_ids = Column(JSON) # To save selected student IDs
     conditions = Column(JSON) # To save query conditions used
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
 
 class MailHistory(Base):
     __tablename__ = "mail_history"
@@ -18,6 +18,6 @@ class MailHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     subject = Column(String)
     body = Column(String)
-    sent_at = Column(DateTime, default=datetime.utcnow)
+    sent_at = Column(DateTime, default=datetime.now)
     recipients = Column(JSON) # List of student dicts or IDs
     recipient_count = Column(Integer, default=0)
