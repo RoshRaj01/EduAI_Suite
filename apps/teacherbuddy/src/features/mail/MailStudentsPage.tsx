@@ -48,6 +48,8 @@ interface MailDraft {
   id: number;
   subject: string;
   body: string;
+  student_ids?: number[];
+  conditions?: any[];
 }
 
 interface MailHistory {
@@ -90,6 +92,7 @@ export const MailStudentsPage: React.FC = () => {
   const [mailSubject, setMailSubject] = useState("");
   const [mailBody, setMailBody] = useState("");
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   // Drafts & History state
   const [drafts, setDrafts] = useState<MailDraft[]>([]);
@@ -151,6 +154,7 @@ export const MailStudentsPage: React.FC = () => {
             setStudents([]); 
             setSelectedStudents([]);
             fetchCourses();
+            setUploadedFileName(file.name);
         } else {
             setStatus({ type: 'error', message: data.detail || "Failed to upload students" });
         }
@@ -200,9 +204,33 @@ export const MailStudentsPage: React.FC = () => {
       });
       const data = await res.json();
       setStudents(data);
+      // Only set selectedStudents if we aren't loading a draft that already specifies them
+      // This is a basic approach. The best is just to let the user select.
       setSelectedStudents(data.map((s: Student) => s.id));
     } catch (err) {
-      setStatus({ type: 'error', message: "Failed to filter students" });
+        setStatus({ type: 'error', message: "Failed to filter students" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterStudentsWithConditions = async (apiConditions: any[], selectIds: number[] = []) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/mail/filter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conditions: apiConditions })
+      });
+      const data = await res.json();
+      setStudents(data);
+      if (selectIds && selectIds.length > 0) {
+          setSelectedStudents(selectIds);
+      } else {
+          setSelectedStudents(data.map((s: Student) => s.id));
+      }
+    } catch (err) {
+      setStatus({ type: 'error', message: "Failed to load draft students" });
     } finally {
       setLoading(false);
     }
@@ -214,18 +242,23 @@ export const MailStudentsPage: React.FC = () => {
         return;
     }
     try {
-        let res;
+        const payload = { 
+            subject: mailSubject, 
+            body: mailBody,
+            student_ids: selectedStudents,
+            conditions: conditions
+        };
         if (selectedDraftId) {
              res = await fetch(`${API_BASE_URL}/mail/drafts/${selectedDraftId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ subject: mailSubject, body: mailBody })
+                body: JSON.stringify(payload)
             });
         } else {
              res = await fetch(`${API_BASE_URL}/mail/drafts`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ subject: mailSubject, body: mailBody })
+                body: JSON.stringify(payload)
             });
         }
         
@@ -320,11 +353,25 @@ export const MailStudentsPage: React.FC = () => {
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>Communicate with students based on SQL-like performance queries.</p>
         </div>
         <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl border bg-white/50 backdrop-blur-sm relative overflow-hidden group hover:bg-green-50 transition-colors" style={{ borderColor: "var(--color-border)" }}>
-                <input type="file" accept=".csv,.xlsx" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                <FileSpreadsheet size={18} className="text-green-600" />
-                <span className="text-xs font-bold text-green-700 group-hover:text-green-800 transition-colors">Upload Data (CSV/XLSX)</span>
-            </div>
+            {uploadedFileName ? (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl border bg-green-50 text-green-700 relative overflow-hidden transition-colors" style={{ borderColor: "var(--color-border)" }}>
+                    <FileSpreadsheet size={18} className="text-green-600" />
+                    <span className="text-xs font-bold truncate max-w-[150px]">{uploadedFileName}</span>
+                    <button 
+                        onClick={() => setUploadedFileName(null)}
+                        className="p-1 hover:bg-green-200 rounded-full transition-colors ml-1 text-green-800"
+                        title="Remove file and show upload button"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+            ) : (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl border bg-white/50 backdrop-blur-sm relative overflow-hidden group hover:bg-green-50 transition-colors" style={{ borderColor: "var(--color-border)" }}>
+                    <input type="file" accept=".csv,.xlsx" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                    <FileSpreadsheet size={18} className="text-green-600" />
+                    <span className="text-xs font-bold text-green-700 group-hover:text-green-800 transition-colors">Upload Data (CSV/XLSX)</span>
+                </div>
+            )}
         </div>
       </div>
 
@@ -575,7 +622,14 @@ export const MailStudentsPage: React.FC = () => {
               {/* Drafts Tabs */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 <button 
-                    onClick={() => { setSelectedDraftId(null); setMailSubject(""); setMailBody(""); }}
+                    onClick={() => { 
+                        setSelectedDraftId(null); 
+                        setMailSubject(""); 
+                        setMailBody(""); 
+                        setConditions([{ id: Math.random().toString(36).substr(2, 9), field: "attendance", operator: "<", value: 75 }]);
+                        setStudents([]);
+                        setSelectedStudents([]);
+                    }}
                     className={`px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap shadow-sm border ${!selectedDraftId ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-200'}`}
                 >
                     <div className="flex items-center gap-1"><Plus size={14}/> New Mail</div>
@@ -583,7 +637,20 @@ export const MailStudentsPage: React.FC = () => {
                 {drafts.map(d => (
                   <button 
                       key={d.id}
-                      onClick={() => { setSelectedDraftId(d.id); setMailSubject(d.subject); setMailBody(d.body); }}
+                      onClick={() => { 
+                          setSelectedDraftId(d.id); 
+                          setMailSubject(d.subject); 
+                          setMailBody(d.body); 
+                          if (d.conditions && d.conditions.length > 0) {
+                              setConditions(d.conditions);
+                              const apiConds = d.conditions.map((c: any) => ({ field: c.field, operator: c.operator, value: c.value }));
+                              filterStudentsWithConditions(apiConds, d.student_ids || []);
+                          } else {
+                              if (d.student_ids) {
+                                  setSelectedStudents(d.student_ids);
+                              }
+                          }
+                      }}
                       className={`px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap shadow-sm border max-w-[200px] truncate ${selectedDraftId === d.id ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-200'}`}
                   >
                       {d.subject || "Untitled Draft"}

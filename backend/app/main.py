@@ -95,6 +95,15 @@ with engine.begin() as connection:
     except Exception as e:
         print(f"Note: presentation_submissions migration skipped: {e}")
 
+    try:
+        draft_columns = {column["name"] for column in inspector.get_columns("mail_drafts")}
+        if "student_ids" not in draft_columns:
+            connection.execute(text("ALTER TABLE mail_drafts ADD COLUMN student_ids JSON"))
+        if "conditions" not in draft_columns:
+            connection.execute(text("ALTER TABLE mail_drafts ADD COLUMN conditions JSON"))
+    except Exception as e:
+        print(f"Note: mail_drafts migration skipped: {e}")
+
 app = FastAPI()
 
 app.add_middleware(

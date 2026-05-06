@@ -31,6 +31,8 @@ class FilterRequest(BaseModel):
 class DraftCreate(BaseModel):
     subject: str
     body: str
+    student_ids: Optional[List[int]] = None
+    conditions: Optional[List[dict]] = None
 
 class SendMailRequest(BaseModel):
     student_ids: List[int]
@@ -135,7 +137,7 @@ def get_drafts(db: Session = Depends(get_db)):
 
 @router.post("/drafts")
 def create_draft(req: DraftCreate, db: Session = Depends(get_db)):
-    draft = MailDraft(subject=req.subject, body=req.body)
+    draft = MailDraft(subject=req.subject, body=req.body, student_ids=req.student_ids, conditions=req.conditions)
     db.add(draft)
     db.commit()
     db.refresh(draft)
@@ -148,6 +150,8 @@ def update_draft(draft_id: int, req: DraftCreate, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Draft not found")
     draft.subject = req.subject
     draft.body = req.body
+    draft.student_ids = req.student_ids
+    draft.conditions = req.conditions
     db.commit()
     db.refresh(draft)
     return draft

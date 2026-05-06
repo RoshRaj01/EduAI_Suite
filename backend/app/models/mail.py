@@ -8,6 +8,8 @@ class MailDraft(Base):
     id = Column(Integer, primary_key=True, index=True)
     subject = Column(String)
     body = Column(String)
+    student_ids = Column(JSON) # To save selected student IDs
+    conditions = Column(JSON) # To save query conditions used
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class MailHistory(Base):
