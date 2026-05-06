@@ -10,6 +10,7 @@ from app.models.lesson import Lesson
 from app.models.omr import OMRJob, OMRSubmission
 from app.models.report import Report
 from app.models.slido import PresentationAssignment, PresentationSubmission, SlidoSession, SlidoPoll, PollResponse, SlidoQnA, QnAUpvote, SubmissionInteraction
+from app.models.mail import MailDraft, MailHistory
 from app.routes.calendar_routes import CalendarEvent
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles

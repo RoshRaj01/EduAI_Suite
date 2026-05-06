@@ -13,7 +13,10 @@ import {
   Eraser,
   Plus,
   Trash2,
-  Database
+  Database,
+  FileSpreadsheet,
+  Save,
+  X
 } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -39,6 +42,21 @@ interface Condition {
   field: string;
   operator: string;
   value: any;
+}
+
+interface MailDraft {
+  id: number;
+  subject: string;
+  body: string;
+}
+
+interface MailHistory {
+  id: number;
+  subject: string;
+  body: string;
+  sent_at: string;
+  recipient_count: number;
+  recipients: any[];
 }
 
 const FIELDS = [
@@ -73,8 +91,18 @@ export const MailStudentsPage: React.FC = () => {
   const [mailBody, setMailBody] = useState("");
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
+  // Drafts & History state
+  const [drafts, setDrafts] = useState<MailDraft[]>([]);
+  const [history, setHistory] = useState<MailHistory[]>([]);
+  const [selectedDraftId, setSelectedDraftId] = useState<number | null>(null);
+  const [selectedHistory, setSelectedHistory] = useState<MailHistory | null>(null);
+  const [showDraftSelectionPopup, setShowDraftSelectionPopup] = useState(false);
+  const [draftsToSend, setDraftsToSend] = useState<number[]>([]);
+
   useEffect(() => {
     fetchCourses();
+    fetchDrafts();
+    fetchHistory();
   }, []);
 
   const fetchCourses = async () => {
@@ -84,6 +112,53 @@ export const MailStudentsPage: React.FC = () => {
       setCourses(data);
     } catch (err) {
       console.error("Failed to fetch courses", err);
+    }
+  };
+
+  const fetchDrafts = async () => {
+    try {
+        const res = await fetch(`${API_BASE_URL}/mail/drafts`);
+        const data = await res.json();
+        setDrafts(data);
+    } catch (err) {}
+  };
+
+  const fetchHistory = async () => {
+    try {
+        const res = await fetch(`${API_BASE_URL}/mail/history`);
+        const data = await res.json();
+        setHistory(data);
+    } catch (err) {}
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    setLoading(true);
+    setStatus(null);
+    try {
+        const res = await fetch(`${API_BASE_URL}/mail/upload_students`, {
+            method: "POST",
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+            setStatus({ type: 'success', message: "Students uploaded successfully. You can now query the new data." });
+            setStudents([]); 
+            setSelectedStudents([]);
+            fetchCourses();
+        } else {
+            setStatus({ type: 'error', message: data.detail || "Failed to upload students" });
+        }
+    } catch (err) {
+        setStatus({ type: 'error', message: "Error uploading file" });
+    } finally {
+        setLoading(false);
+        if (e.target) e.target.value = '';
     }
   };
 
@@ -110,7 +185,6 @@ export const MailStudentsPage: React.FC = () => {
     setLoading(true);
     setStatus(null);
     try {
-      // Map conditions for API
       const apiConditions = conditions.map(c => ({
         field: c.field,
         operator: c.operator,
@@ -134,33 +208,87 @@ export const MailStudentsPage: React.FC = () => {
     }
   };
 
-  const handleSendMail = async () => {
+  const handleSaveDraft = async () => {
+    if (!mailSubject || !mailBody) {
+        setStatus({ type: 'error', message: "Subject and body are required to save draft" });
+        return;
+    }
+    try {
+        let res;
+        if (selectedDraftId) {
+             res = await fetch(`${API_BASE_URL}/mail/drafts/${selectedDraftId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ subject: mailSubject, body: mailBody })
+            });
+        } else {
+             res = await fetch(`${API_BASE_URL}/mail/drafts`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ subject: mailSubject, body: mailBody })
+            });
+        }
+        
+        if (res.ok) {
+            const data = await res.json();
+            setStatus({ type: 'success', message: "Draft saved successfully" });
+            setSelectedDraftId(data.id);
+            fetchDrafts();
+        }
+    } catch (err) {
+        setStatus({ type: 'error', message: "Failed to save draft" });
+    }
+  };
+
+  const handleSendMailClick = () => {
     if (selectedStudents.length === 0) {
       setStatus({ type: 'error', message: "Please select at least one student" });
       return;
     }
-    if (!mailSubject || !mailBody) {
-      setStatus({ type: 'error', message: "Subject and body are required" });
-      return;
+    setShowDraftSelectionPopup(true);
+    // Pre-select the current draft if we are viewing one
+    if (selectedDraftId && !draftsToSend.includes(selectedDraftId)) {
+        setDraftsToSend([selectedDraftId]);
     }
+  };
 
+  const executeSendMails = async () => {
+    setShowDraftSelectionPopup(false);
     setSending(true);
     try {
+      const payload: any = {
+          student_ids: selectedStudents
+      };
+      
+      if (draftsToSend.length > 0) {
+          payload.draft_ids = draftsToSend;
+      } else {
+          if (!mailSubject || !mailBody) {
+             setStatus({ type: 'error', message: "Please compose a mail or select drafts to send." });
+             setSending(false);
+             return;
+          }
+          payload.subject = mailSubject;
+          payload.body = mailBody;
+      }
+      
       const res = await fetch(`${API_BASE_URL}/mail/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          student_ids: selectedStudents,
-          subject: mailSubject,
-          body: mailBody
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
-      setStatus({ type: 'success', message: data.message });
+      if (res.ok) {
+          setStatus({ type: 'success', message: data.message });
+          fetchHistory();
+      } else {
+          setStatus({ type: 'error', message: data.detail || "Failed to send emails" });
+      }
     } catch (err) {
       setStatus({ type: 'error', message: "Failed to send emails" });
     } finally {
       setSending(false);
+      setDraftsToSend([]);
     }
   };
 
@@ -184,20 +312,23 @@ export const MailStudentsPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-20">
+    <div className="mx-auto space-y-6 animate-fade-in pb-20 px-2 lg:px-0 max-w-7xl">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Mailing System</h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>Communicate with students based on SQL-like performance queries.</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-xl border bg-white/50 backdrop-blur-sm" style={{ borderColor: "var(--color-border)" }}>
-          <Info size={18} className="text-blue-500" />
-          <span className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Tip: Use {"{{name}}"} to personalize messages</span>
+        <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl border bg-white/50 backdrop-blur-sm relative overflow-hidden group hover:bg-green-50 transition-colors" style={{ borderColor: "var(--color-border)" }}>
+                <input type="file" accept=".csv,.xlsx" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                <FileSpreadsheet size={18} className="text-green-600" />
+                <span className="text-xs font-bold text-green-700 group-hover:text-green-800 transition-colors">Upload Data (CSV/XLSX)</span>
+            </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Left Column: SQL Filters */}
         <div className="lg:col-span-1 space-y-6">
           <div className="p-6 rounded-2xl border shadow-sm space-y-5" style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)" }}>
@@ -327,7 +458,7 @@ export const MailStudentsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: List & Compose */}
+        {/* Center Column: List & Compose */}
         <div className="lg:col-span-2 space-y-6">
           {/* Status Message */}
           {status && (
@@ -429,9 +560,36 @@ export const MailStudentsPage: React.FC = () => {
 
           {/* Compose Section */}
           <div className="p-6 rounded-2xl border shadow-sm space-y-6" style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)" }}>
-            <div className="flex items-center gap-2 border-b pb-4" style={{ borderColor: "var(--color-border)" }}>
-              <Mail size={20} className="text-brand-blue" />
-              <h2 className="font-bold">Compose Message</h2>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: "var(--color-border)" }}>
+                <div className="flex items-center gap-2">
+                  <Mail size={20} className="text-brand-blue" />
+                  <h2 className="font-bold">Compose Message</h2>
+                </div>
+                <div className="flex items-center gap-2 px-2 py-1 rounded-lg border bg-white/50 backdrop-blur-sm" style={{ borderColor: "var(--color-border)" }}>
+                    <Info size={14} className="text-blue-500" />
+                    <span className="text-[10px] font-medium" style={{ color: "var(--color-text-secondary)" }}>Use {"{{name}}"} to personalize</span>
+                </div>
+              </div>
+              
+              {/* Drafts Tabs */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                <button 
+                    onClick={() => { setSelectedDraftId(null); setMailSubject(""); setMailBody(""); }}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap shadow-sm border ${!selectedDraftId ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-200'}`}
+                >
+                    <div className="flex items-center gap-1"><Plus size={14}/> New Mail</div>
+                </button>
+                {drafts.map(d => (
+                  <button 
+                      key={d.id}
+                      onClick={() => { setSelectedDraftId(d.id); setMailSubject(d.subject); setMailBody(d.body); }}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap shadow-sm border max-w-[200px] truncate ${selectedDraftId === d.id ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-200'}`}
+                  >
+                      {d.subject || "Untitled Draft"}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -489,21 +647,153 @@ export const MailStudentsPage: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-between pt-2">
-              <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                <History size={14} />
-                <span>Last sent: Never</span>
-              </div>
               <button 
-                onClick={handleSendMail}
+                onClick={handleSaveDraft}
+                className="flex items-center gap-2 px-5 py-2.5 text-blue-600 bg-blue-50 rounded-xl font-bold hover:bg-blue-100 transition-colors border border-blue-100"
+              >
+                 <Save size={16} /> Save as Draft
+              </button>
+              
+              <button 
+                onClick={handleSendMailClick}
                 disabled={sending || selectedStudents.length === 0}
                 className="flex items-center gap-2 px-8 py-3 bg-brand-blue text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
               >
-                {sending ? "Sending..." : <><Send size={18} /> Send Bulk Emails</>}
+                {sending ? "Sending..." : <><Send size={18} /> Send Mails</>}
               </button>
             </div>
           </div>
         </div>
+
+        {/* Right Column: History */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="p-6 rounded-2xl border shadow-sm flex flex-col h-full min-h-[500px]" style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)" }}>
+            <div className="flex items-center gap-2 border-b pb-4 mb-4" style={{ borderColor: "var(--color-border)" }}>
+               <History size={20} className="text-brand-blue" />
+               <h2 className="font-bold uppercase text-xs tracking-widest" style={{ color: "var(--color-text-muted)" }}>Sent History</h2>
+            </div>
+            
+            <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
+               {history.map(h => (
+                  <div key={h.id} onClick={() => setSelectedHistory(h)} className="p-4 border rounded-xl hover:bg-gray-50 cursor-pointer transition-colors" style={{ borderColor: "var(--color-border)", background: "white" }}>
+                     <p className="text-sm font-bold truncate text-gray-800">{h.subject}</p>
+                     <div className="flex items-center justify-between mt-2">
+                        <p className="text-[10px] font-semibold text-gray-400">{new Date(h.sent_at).toLocaleDateString()} {new Date(h.sent_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-[9px] font-bold">{h.recipient_count} recipients</span>
+                     </div>
+                  </div>
+               ))}
+               {history.length === 0 && (
+                  <div className="text-center py-10 opacity-50">
+                    <History size={32} className="mx-auto mb-3 text-gray-400" />
+                    <p className="text-xs font-bold text-gray-500">No emails sent yet.</p>
+                  </div>
+               )}
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Popups */}
+      {showDraftSelectionPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-md shadow-2xl animate-fade-in border border-gray-100">
+             <div className="flex justify-between items-center mb-5">
+               <h3 className="text-xl font-bold text-gray-800">Select Mails to Send</h3>
+               <button onClick={() => setShowDraftSelectionPopup(false)} className="p-1.5 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"><X size={18}/></button>
+             </div>
+             
+             {drafts.length === 0 ? (
+                <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 mb-6">
+                    <p className="text-sm font-semibold text-blue-800">No saved drafts found.</p>
+                    <p className="text-xs text-blue-600 mt-1">The currently composed mail will be sent to {selectedStudents.length} selected students.</p>
+                </div>
+             ) : (
+               <div className="space-y-2 mb-6 max-h-[300px] overflow-y-auto pr-1">
+                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Available Drafts</p>
+                 {drafts.map(d => (
+                    <label key={d.id} className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-all ${draftsToSend.includes(d.id) ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50 hover:border-gray-300'}`}>
+                       <input 
+                          type="checkbox" 
+                          className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={draftsToSend.includes(d.id)} 
+                          onChange={(e) => {
+                             if (e.target.checked) setDraftsToSend([...draftsToSend, d.id]);
+                             else setDraftsToSend(draftsToSend.filter(id => id !== d.id));
+                          }} 
+                       />
+                       <div className="flex-1 min-w-0">
+                         <p className={`font-bold text-sm truncate ${draftsToSend.includes(d.id) ? 'text-blue-900' : 'text-gray-800'}`}>{d.subject || "Untitled Draft"}</p>
+                         <p className="text-xs text-gray-500 line-clamp-1 mt-1">{d.body}</p>
+                       </div>
+                    </label>
+                 ))}
+                 {!draftsToSend.length && (
+                    <p className="text-xs text-orange-500 font-semibold mt-3 p-2 bg-orange-50 rounded-lg">If no drafts are selected, the currently composed mail will be sent.</p>
+                 )}
+               </div>
+             )}
+             
+             <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
+                <button className="px-5 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors" onClick={() => setShowDraftSelectionPopup(false)}>Cancel</button>
+                <button className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold bg-brand-blue text-white rounded-xl shadow-lg shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all" onClick={executeSendMails}>
+                    <Send size={16} /> Confirm Send
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {selectedHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col animate-fade-in border border-gray-100">
+             <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+                <h3 className="text-xl font-bold flex items-center gap-2"><Mail size={22} className="text-brand-blue"/> Sent Mail Details</h3>
+                <button onClick={() => setSelectedHistory(null)} className="p-1.5 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"><X size={18}/></button>
+             </div>
+             
+             <div className="space-y-6 overflow-y-auto flex-1 pr-2 custom-scrollbar">
+               <div className="grid grid-cols-2 gap-4">
+                   <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Subject</p>
+                      <p className="text-sm font-bold text-gray-800">{selectedHistory.subject}</p>
+                   </div>
+                   <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Sent Timestamp</p>
+                      <p className="text-sm font-bold text-gray-800">{new Date(selectedHistory.sent_at).toLocaleString()}</p>
+                   </div>
+               </div>
+               
+               <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Message Body</p>
+                  <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-100 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                     {selectedHistory.body}
+                  </div>
+               </div>
+               
+               <div>
+                  <div className="flex items-center justify-between mb-2 ml-1">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Recipients List</p>
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-lg text-[10px] font-bold">{selectedHistory.recipient_count} Total</span>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto border border-gray-200 rounded-xl divide-y bg-white custom-scrollbar">
+                     {selectedHistory.recipients.map((r: any, idx: number) => (
+                        <div key={idx} className="p-3 flex justify-between items-center hover:bg-gray-50 transition-colors">
+                           <div className="flex items-center gap-3">
+                               <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold">
+                                   {r.name.charAt(0)}
+                               </div>
+                               <span className="font-semibold text-sm text-gray-800">{r.name}</span>
+                           </div>
+                           <span className="text-xs text-gray-500 font-mono">{r.email}</span>
+                        </div>
+                     ))}
+                  </div>
+               </div>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
