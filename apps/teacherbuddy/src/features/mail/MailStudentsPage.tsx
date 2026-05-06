@@ -242,6 +242,7 @@ export const MailStudentsPage: React.FC = () => {
         return;
     }
     try {
+        let res;
         const payload = { 
             subject: mailSubject, 
             body: mailBody,
@@ -323,6 +324,22 @@ export const MailStudentsPage: React.FC = () => {
       setSending(false);
       setDraftsToSend([]);
     }
+  };
+
+  const handleDiscard = async () => {
+      if (selectedDraftId) {
+          try {
+              await fetch(`${API_BASE_URL}/mail/drafts/${selectedDraftId}`, { method: "DELETE" });
+              fetchDrafts();
+          } catch (e) {}
+      }
+      setSelectedDraftId(null);
+      setMailSubject("");
+      setMailBody("");
+      setConditions([{ id: Math.random().toString(36).substr(2, 9), field: "attendance", operator: "<", value: 75 }]);
+      setStudents([]);
+      setSelectedStudents([]);
+      setStatus({ type: 'success', message: "Mail discarded" });
   };
 
   const toggleStudentSelection = (id: number) => {
@@ -714,12 +731,20 @@ export const MailStudentsPage: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-between pt-2">
-              <button 
-                onClick={handleSaveDraft}
-                className="flex items-center gap-2 px-5 py-2.5 text-blue-600 bg-blue-50 rounded-xl font-bold hover:bg-blue-100 transition-colors border border-blue-100"
-              >
-                 <Save size={16} /> Save as Draft
-              </button>
+              <div className="flex items-center gap-3">
+                  <button 
+                    onClick={handleDiscard}
+                    className="flex items-center gap-2 px-5 py-2.5 text-red-600 bg-red-50 rounded-xl font-bold hover:bg-red-100 transition-colors border border-red-100"
+                  >
+                     <Trash2 size={16} /> Discard
+                  </button>
+                  <button 
+                    onClick={handleSaveDraft}
+                    className="flex items-center gap-2 px-5 py-2.5 text-blue-600 bg-blue-50 rounded-xl font-bold hover:bg-blue-100 transition-colors border border-blue-100"
+                  >
+                     <Save size={16} /> Save as Draft
+                  </button>
+              </div>
               
               <button 
                 onClick={handleSendMailClick}
