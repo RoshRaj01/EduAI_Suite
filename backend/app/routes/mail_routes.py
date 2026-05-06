@@ -51,11 +51,21 @@ async def upload_students(file: UploadFile = File(...), db: Session = Depends(ge
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
         
+    # Normalize headers
+    df.columns = df.columns.str.strip().str.lower()
+    
+    def get_val(row, possible_names, default=""):
+        for name in possible_names:
+            if name in row.index:
+                val = row[name]
+                return default if pd.isna(val) else val
+        return default
+
     db.query(Student).delete()
     
     for _, row in df.iterrows():
-        course_name = str(row.get('course', 'Default Course'))
-        if pd.isna(course_name) or course_name == 'nan':
+        course_name = str(get_val(row, ['course', 'program', 'degree', 'course_id'], 'Default Course'))
+        if not course_name or course_name.lower() == 'nan':
             course_name = 'Default Course'
             
         course = db.query(Course).filter(Course.name == course_name).first()
@@ -65,14 +75,24 @@ async def upload_students(file: UploadFile = File(...), db: Session = Depends(ge
             db.commit()
             db.refresh(course)
             
+        try:
+            att_val = int(float(get_val(row, ['att', 'attendance', 'attendance (%)', 'attendance%'], 0)))
+        except ValueError:
+            att_val = 0
+            
+        try:
+            marks_val = int(float(get_val(row, ['marks', 'score', 'average marks', 'avg_score', 'total marks'], 0)))
+        except ValueError:
+            marks_val = 0
+
         student = Student(
-            registration_number=str(row.get('reg', '')),
-            name=str(row.get('name', '')),
-            email=str(row.get('email', '')),
+            registration_number=str(get_val(row, ['reg', 'registration number', 'reg no', 'register number', 'roll no', 'reg_no', 'registration_number'])),
+            name=str(get_val(row, ['name', 'student name', 'full name', 'student_name'])),
+            email=str(get_val(row, ['email', 'email address', 'email id', 'email_address'])),
             course_id=course.id,
-            department=str(row.get('dept', '')),
-            attendance=int(row.get('att', 0)) if not pd.isna(row.get('att')) else 0,
-            avg_score=int(row.get('marks', 0)) if not pd.isna(row.get('marks')) else 0,
+            department=str(get_val(row, ['dept', 'department'])),
+            attendance=att_val,
+            avg_score=marks_val,
             student_class="2026"
         )
         db.add(student)
