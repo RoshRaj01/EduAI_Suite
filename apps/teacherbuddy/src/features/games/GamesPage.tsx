@@ -43,14 +43,14 @@ const gameCategories = [
     color: "from-blue-400 to-indigo-500",
     hasImplementation: true,
   },
-  {
-    id: "team-puzzle",
-    title: "Team Puzzle Challenge",
-    description:
-      "Split the class into teams. Each member gets partial info. Collaborate to solve the complete puzzle.",
-    icon: Users,
-    color: "from-pink-400 to-rose-500",
-  },
+  // {
+  //   id: "team-puzzle",
+  //   title: "Team Puzzle Challenge",
+  //   description:
+  //     "Split the class into teams. Each member gets partial info. Collaborate to solve the complete puzzle.",
+  //   icon: Users,
+  //   color: "from-pink-400 to-rose-500",
+  // },
   {
     id: "slido-polling",
     title: "Slido — Live Polling & Q&A",
@@ -59,14 +59,14 @@ const gameCategories = [
     icon: BarChart,
     color: "from-purple-400 to-violet-500",
   },
-  {
-    id: "padlet-board",
-    title: "Padlet — Shared Visual Board",
-    description:
-      "Students post ideas, media, and responses on a shared visual board for collaborative ideation.",
-    icon: Users,
-    color: "from-cyan-400 to-blue-500",
-  },
+  // {
+  //   id: "padlet-board",
+  //   title: "Padlet — Shared Visual Board",
+  //   description:
+  //     "Students post ideas, media, and responses on a shared visual board for collaborative ideation.",
+  //   icon: Users,
+  //   color: "from-cyan-400 to-blue-500",
+  // },
   {
     id: "trello-projects",
     title: "Trello — Project Management",
@@ -204,21 +204,19 @@ export const GamesPage: React.FC = () => {
       >
         <button
           onClick={() => setActiveTab("modules")}
-          className={`px-4 py-2 font-semibold text-sm transition-colors border-b-2 ${
-            activeTab === "modules"
-              ? "border-blue-500 text-blue-600"
-              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          }`}
+          className={`px-4 py-2 font-semibold text-sm transition-colors border-b-2 ${activeTab === "modules"
+            ? "border-blue-500 text-blue-600"
+            : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
         >
           Game Modules
         </button>
         <button
           onClick={() => setActiveTab("history")}
-          className={`px-4 py-2 font-semibold text-sm transition-colors border-b-2 ${
-            activeTab === "history"
-              ? "border-blue-500 text-blue-600"
-              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          }`}
+          className={`px-4 py-2 font-semibold text-sm transition-colors border-b-2 ${activeTab === "history"
+            ? "border-blue-500 text-blue-600"
+            : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
         >
           My Games (History)
         </button>
@@ -274,7 +272,7 @@ export const GamesPage: React.FC = () => {
           {/* Under Construction Modal */}
           <AnimatePresence>
             {selectedGame && !showCreation && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+              <div className="fixed inset-0 z-50 flex items-center justify-center px-4 under-construction-hidden">
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

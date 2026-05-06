@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.course import Course
@@ -14,6 +14,7 @@ from app.schemas.lesson import (
 )
 from app.services.groq_service import GroqService
 from app.utils.auth import get_password_hash
+from app.utils.plan_parser import CoursePlanParser
 from datetime import datetime
 import logging
 
@@ -86,6 +87,45 @@ def generate_lesson(request: LessonGenerateRequest, db: Session = Depends(get_db
     except Exception as e:
         logger.error(f"Error generating lesson: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/parse-plan")
+async def parse_course_plan(file: UploadFile = File(...)):
+    """Extract topic and syllabus from an uploaded course plan file using Regex."""
+    try:
+        content = await file.read()
+        filename = file.filename.lower() if file.filename else "unknown.txt"
+        
+        text = ""
+        if filename.endswith(".pdf"):
+            text = CoursePlanParser.extract_text_from_pdf(content)
+        elif filename.endswith(".docx"):
+            text = CoursePlanParser.extract_text_from_docx(content)
+        elif filename.endswith(".txt") or filename.endswith(".md"):
+            try:
+                text = content.decode("utf-8")
+            except UnicodeDecodeError:
+                text = content.decode("latin-1")
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail="Unsupported file format. Please upload PDF, DOCX, TXT, or MD."
+            )
+            
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="The file appears to be empty or unreadable.")
+            
+        result = CoursePlanParser.parse_content(text)
+        
+        # Log parsing results for debugging
+        logger.info(f"Parsed plan: Topic='{result['topic']}', SyllabusLength={len(result['syllabus_context'])}")
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error parsing course plan: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal error during parsing: {str(e)}")
 
 
 @router.post("", response_model=LessonResponse)

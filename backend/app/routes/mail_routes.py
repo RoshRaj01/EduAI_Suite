@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from app.database import SessionLocal
 from app.models.student import Student
 from app.models.course import Course
 from app.models.mail import MailDraft, MailHistory
+from app.models.history import ActionHistory
 from app.utils.email_utils import send_email
 from pydantic import BaseModel
 from typing import List, Optional, Any
@@ -208,8 +210,20 @@ def send_bulk_mail(req: SendMailRequest, background_tasks: BackgroundTasks, db: 
             sent_count += 1
             
     # Delete the drafts that were just sent
-    if req.draft_ids and len(req.draft_ids) > 0:
-        db.query(MailDraft).filter(MailDraft.id.in_(req.draft_ids)).delete(synchronize_session=False)
+    # Log to ActionHistory
+    action_history = ActionHistory(
+        feature="mail",
+        action="send_bulk_mail",
+        reaction="user_triggered",
+        result=f"success_{sent_count}_recipients",
+        timestamp=datetime.now(),
+        metadata_json={
+            "subject": mails_to_send[0]["subject"] if mails_to_send else "",
+            "recipient_count": len(students),
+            "draft_ids_used": req.draft_ids
+        }
+    )
+    db.add(action_history)
 
     db.commit()
     return {"message": f"Queued {sent_count} emails for sending"}

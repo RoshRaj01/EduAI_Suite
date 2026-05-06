@@ -3,7 +3,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { Upload, Plus, CheckSquare, AlertTriangle, FileImage, ArrowLeft, ChevronRight, CheckCircle2, Save, X, Trash2, Edit } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
-const API_URL = "http://localhost:8000/api/omr";
+import { API_ENDPOINTS, API_BASE_URL } from "../../shared/utils/apiConfig";
+
+const API_URL = API_ENDPOINTS.OMR;
 
 export const OMRPage: React.FC = () => {
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list');
@@ -379,7 +381,7 @@ export const OMRPage: React.FC = () => {
                 <div className="w-full md:w-1/2 p-4 border-r" style={{ borderColor: "var(--color-border)" }}>
                   <div className="w-full h-full bg-black/5 rounded-xl border flex items-center justify-center overflow-hidden relative group" style={{ borderColor: "var(--color-border)" }}>
                     {selectedSub.image_url ? (
-                      <img src={`http://localhost:8000${selectedSub.image_url}`} alt="Answer Sheet" className="max-w-full max-h-full object-contain" />
+                      <img src={`${API_BASE_URL}${selectedSub.image_url}`} alt="Answer Sheet" className="max-w-full max-h-full object-contain" />
                     ) : (
                       <div className="text-center text-gray-400">
                         <FileImage size={48} className="mx-auto mb-2 opacity-50" />

@@ -5,6 +5,7 @@ from app.models.exam import ExamAttempt, Exam
 from app.models.submission import Submission
 from app.models.course import Course
 from app.models.assignment import Assignment
+from app.models.student import Student
 from app.models.user import User
 from typing import List, Optional
 import pandas as pd
@@ -88,26 +89,56 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     pass_rate = (df["score"] >= 40).mean() * 100 
     
     student_avgs = df.groupby('student_name')['score'].mean()
-    at_risk_count = int((student_avgs < 40).sum())
     
+    # Calculate actual attendance average for the course
+    all_students = db.query(Student).filter(Student.course_id == course_id).all()
+    if all_students:
+        avg_attendance = sum(s.attendance or 0 for s in all_students) / len(all_students)
+    else:
+        avg_attendance = 0
+    
+    at_risk_count = 0
+    risk_list = []
+    
+    # Identify at-risk students based on BOTH score and attendance
+    for s in all_students:
+        s_avg = student_avgs.get(s.name, 0)
+        s_att = s.attendance or 0
+        
+        is_risk = False
+        reason = ""
+        if s_avg < 40:
+            is_risk = True
+            reason = "Critically low academic performance"
+        elif s_att < 50:
+            is_risk = True
+            reason = "Critically low attendance"
+        elif s_avg < 55 or s_att < 75:
+            is_risk = True # Moderate risk
+            reason = "Performance or attendance needs attention"
+            
+        if is_risk:
+            at_risk_count += 1
+            risk_list.append({
+                "id": s.registration_number or f"ST-{s.id}",
+                "name": s.name,
+                "attendance": s_att,
+                "avgScore": float(s_avg),
+                "assignments": 90, # Placeholder if not tracked specifically
+                "risk": int(100 - (s_avg + s_att)/2), 
+                "level": "high" if (s_avg < 40 or s_att < 50) else "moderate"
+            })
+    
+    # If no activity data, fallback to just student list risk
+    if not all_data:
+        # (This block was already handled above, but let's ensure consistency)
+        pass
+
     df['date'] = pd.to_datetime(df['date'])
     df['month'] = df['date'].dt.strftime('%b')
     month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     trend_df = df.groupby('month')['score'].mean().reindex(month_order).dropna().reset_index()
     trend = trend_df.replace([np.inf, -np.inf], 0).fillna(0).to_dict(orient='records')
-    
-    risk_list = []
-    for sname, savg in student_avgs.items():
-        if savg < 55:
-            risk_list.append({
-                "id": f"ST-{hash(sname) % 10000}",
-                "name": sname,
-                "attendance": 85,
-                "avgScore": float(savg) if not np.isnan(savg) else 0,
-                "assignments": 90,
-                "risk": int(100 - savg), 
-                "level": "high" if savg < 40 else "moderate"
-            })
 
     subject_stats = []
     for e in exams:
@@ -121,9 +152,9 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     return {
         "overview": {
             "avg_score": f"{avg_score:.1f}%",
-            "total_students": total_students,
+            "total_students": total_students or len(all_students),
             "at_risk_count": at_risk_count,
-            "attendance_rate": "85%",
+            "attendance_rate": f"{avg_attendance:.1f}%",
             "pass_rate": f"{pass_rate:.0f}%",
             "high_score": f"{df['score'].max():.1f}%",
             "low_score": f"{df['score'].min():.1f}%"

@@ -7,7 +7,7 @@ export const ConstructionPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 animate-fade-in">
+    <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 animate-fade-in under-construction-hidden">
       <GlassCard className="max-w-md w-full p-10 text-center flex flex-col items-center">
         <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
           style={{ background: "linear-gradient(135deg, rgba(208,174,97,0.2) 0%, rgba(208,174,97,0.05) 100%)", border: "1px solid rgba(208,174,97,0.3)" }}>

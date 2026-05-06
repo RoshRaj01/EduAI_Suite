@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import logo from "../assets/logo (5).png";
 
+
+// uncomment to view the modesl
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/", end: true, keywords: "home overview summary stats" },
   { icon: Wrench, label: "Teacher Tools", href: "/tools", keywords: "question paper generator quiz" },
@@ -33,12 +35,12 @@ const navItems = [
   { icon: ClipboardList, label: "Exams", href: "/exams", keywords: "mcq test assessment quiz" },
   { icon: CheckSquare, label: "OMR Grading", href: "/omr", keywords: "grade paper omr image scan answers ai score" },
   { icon: FileSpreadsheet, label: "Reports", href: "/reports", keywords: "export download pdf analytics" },
-  { icon: FileSignature, label: "Form Automation", href: "/forms", keywords: "template auto-fill document" },
+  // { icon: FileSignature, label: "Form Automation", href: "/forms", keywords: "template auto-fill document" },
   { icon: Activity, label: "Analytics & Risk", href: "/analytics", keywords: "risk alert attendance prediction" },
   { icon: Mail, label: "Mail Students", href: "/mail", keywords: "email send students parents bulk communication" },
   { icon: Calendar, label: "Calendar", href: "/calendar", keywords: "calendar events schedule deadlines" },
-  { icon: MessageSquare, label: "AI Assistant", href: "/chat", keywords: "chat ask help bot" },
-  { icon: Settings, label: "Settings", href: "/settings", keywords: "preferences config account" },
+  // { icon: MessageSquare, label: "AI Assistant", href: "/chat", keywords: "chat ask help bot" },
+  // { icon: Settings, label: "Settings", href: "/settings", keywords: "preferences config account" },
 ];
 
 const notifications = [

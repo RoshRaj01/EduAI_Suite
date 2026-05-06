@@ -4,9 +4,9 @@ import { GlassCard } from "../../shared/components/GlassCard";
 import { motion } from "framer-motion";
 
 const mockEvaluations = [
-  { id: 1, student: "Aarav Sharma", regNo: "24CUS101", subj: "Data Structures", score: 85, aiConfidence: 92, status: "pending", snippet: "The time complexity is O(N log N) because we divide the array in half..." },
-  { id: 2, student: "Priya Patel", regNo: "24CUS102", subj: "Data Structures", score: 45, aiConfidence: 65, status: "flagged", plagiarism: 85, snippet: "Merge sort is a divide and conquer algorithm that was invented by John von Neumann in 1945..." },
-  { id: 3, student: "Rohan Gupta", regNo: "24CUS105", subj: "Data Structures", score: 95, aiConfidence: 98, status: "pending", snippet: "Space complexity of merge sort is O(N) due to the auxiliary array used during the merge step." },
+  { id: 1, student: "#", regNo: "#", subj: "#", score: 0, aiConfidence: 0, status: "pending", snippet: "#" },
+  { id: 2, student: "#", regNo: "#", subj: "#", score: 0, aiConfidence: 0, status: "flagged", plagiarism: 0, snippet: "#" },
+  { id: 3, student: "#", regNo: "#", subj: "#", score: 0, aiConfidence: 0, status: "pending", snippet: "#" },
 ];
 
 export const EvaluationPage: React.FC = () => {

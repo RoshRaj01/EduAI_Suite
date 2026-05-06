@@ -12,14 +12,14 @@ import { GlassCard } from "../../shared/components/GlassCard";
 import { AutoLessonPlannerComponent } from "./AutoLessonPlannerComponent";
 
 const tools = [
-  {
-    id: "generator",
-    title: "Smart Question Generator",
-    desc: "AI generates MCQs, Case studies, and Coding questions instantly.",
-    icon: BrainCircuit,
-    color: "text-blue-500",
-    bg: "bg-blue-100/50",
-  },
+  // {
+  //   id: "generator",
+  //   title: "Smart Question Generator",
+  //   desc: "AI generates MCQs, Case studies, and Coding questions instantly.",
+  //   icon: BrainCircuit,
+  //   color: "text-blue-500",
+  //   bg: "bg-blue-100/50",
+  // },
   {
     id: "planner",
     title: "Auto Lesson Planner",
@@ -28,14 +28,14 @@ const tools = [
     color: "text-yellow-500",
     bg: "bg-yellow-100/50",
   },
-  {
-    id: "intervention",
-    title: "Intervention Planner",
-    desc: "Get AI-suggested actions and extra tasks for at-risk students.",
-    icon: Sparkles,
-    color: "text-purple-500",
-    bg: "bg-purple-100/50",
-  },
+  // {
+  //   id: "intervention",
+  //   title: "Intervention Planner",
+  //   desc: "Get AI-suggested actions and extra tasks for at-risk students.",
+  //   icon: Sparkles,
+  //   color: "text-purple-500",
+  //   bg: "bg-purple-100/50",
+  // },
 ];
 
 export const TeacherToolsPage: React.FC = () => {

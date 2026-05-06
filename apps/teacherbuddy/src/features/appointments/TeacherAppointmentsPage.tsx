@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
-const API_URL = "http://localhost:8000";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
+
+const API_URL = API_ENDPOINTS.BASE;
 
 type AppointmentStatus = "pending" | "approved" | "rejected";
 
@@ -39,8 +41,10 @@ type Appointment = {
   teacher_department?: string | null;
   meeting_mode: string;
   time_slot: string;
-  topic: string;
+  agenda: string;
+  details?: string | null;
   status: AppointmentStatus;
+  rejection_reason?: string | null;
   requested_at: string;
   reviewed_at?: string | null;
   reviewed_by?: string | null;
@@ -85,6 +89,8 @@ export const TeacherAppointmentsPage: React.FC = () => {
   const [actioningId, setActioningId] = useState<number | null>(null);
   const [decisionNotes, setDecisionNotes] = useState<Record<number, string>>({});
   const [search, setSearch] = useState("");
+  const [rejectingAppointment, setRejectingAppointment] = useState<Appointment | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState("");
 
   const teacherOptions = useMemo(() => {
     const names = new Set<string>();
@@ -151,7 +157,8 @@ export const TeacherAppointmentsPage: React.FC = () => {
         return [
           appointment.student_name,
           appointment.teacher_name,
-          appointment.topic,
+          appointment.agenda,
+          appointment.details || "",
           appointment.meeting_mode,
           appointment.time_slot,
         ].some((value) => value.toLowerCase().includes(query));
@@ -173,7 +180,7 @@ export const TeacherAppointmentsPage: React.FC = () => {
     rejected: appointments.filter((appointment) => appointment.status === "rejected").length,
   }), [appointments]);
 
-  const respondToAppointment = async (appointment: Appointment, status: AppointmentStatus) => {
+  const respondToAppointment = async (appointment: Appointment, status: AppointmentStatus, rejectionReason?: string) => {
     setActioningId(appointment.id);
     try {
       const response = await fetch(`${API_URL}/appointments/${appointment.id}/status`, {
@@ -182,6 +189,7 @@ export const TeacherAppointmentsPage: React.FC = () => {
         body: JSON.stringify({
           status,
           reviewed_by: appointment.teacher_name,
+          rejection_reason: rejectionReason,
           notes: decisionNotes[appointment.id] ?? (status === "approved" ? "Approved for the requested slot." : "Declined with a reschedule recommendation."),
         }),
       });
@@ -190,9 +198,25 @@ export const TeacherAppointmentsPage: React.FC = () => {
         throw new Error(`Failed to update appointment (${response.status})`);
       }
 
+      // Log history
+      await fetch(`${API_URL}/history/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feature: "appointment",
+          action: status === "approved" ? "approve_appointment" : "reject_appointment",
+          reaction: rejectionReason ? "rejection_reason_provided" : "processed",
+          result: "success",
+          user_id: appointment.teacher_name,
+          metadata_json: { appointment_id: appointment.id, student_name: appointment.student_name }
+        }),
+      });
+
       await fetchData();
     } finally {
       setActioningId(null);
+      setRejectingAppointment(null);
+      setRejectionReasonInput("");
     }
   };
 
@@ -233,7 +257,7 @@ export const TeacherAppointmentsPage: React.FC = () => {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Student, teacher, topic..."
+                placeholder="Student, teacher, agenda..."
                 className="rounded-xl pl-9 pr-4 py-3 text-sm outline-none"
                 style={{ background: "var(--color-surface-base)", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
               />
@@ -241,6 +265,45 @@ export const TeacherAppointmentsPage: React.FC = () => {
           </label>
         </div>
       </div>
+
+      {/* Rejection Reason Modal */}
+      {rejectingAppointment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <GlassCard className="w-full max-w-md p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3 text-red-600">
+              <XCircle size={24} />
+              <h2 className="text-xl font-bold font-display">Reject Appointment</h2>
+            </div>
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              Please provide a reason for rejecting the appointment from <strong>{rejectingAppointment.student_name}</strong>.
+            </p>
+            <textarea
+              value={rejectionReasonInput}
+              onChange={(e) => setRejectionReasonInput(e.target.value)}
+              className="w-full rounded-xl px-4 py-3 text-sm outline-none resize-none"
+              style={{ background: "var(--color-surface-base)", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
+              placeholder="e.g., I have a conflicting lecture. Please reschedule for tomorrow."
+              rows={4}
+              autoFocus
+            />
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setRejectingAppointment(null)}
+                className="btn btn-outline flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => respondToAppointment(rejectingAppointment, "rejected", rejectionReasonInput)}
+                className="btn btn-primary bg-red-600 hover:bg-red-700 flex-1"
+                disabled={!rejectionReasonInput.trim() || actioningId === rejectingAppointment.id}
+              >
+                {actioningId === rejectingAppointment.id ? <Loader2 size={16} className="animate-spin" /> : "Confirm Rejection"}
+              </button>
+            </div>
+          </GlassCard>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -319,7 +382,8 @@ export const TeacherAppointmentsPage: React.FC = () => {
                         </span>
                       </div>
                       <p className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>{appointment.student_name}</p>
-                      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{appointment.topic}</p>
+                      <p className="text-sm font-semibold" style={{ color: "var(--color-brand-blue)" }}>{appointment.agenda}</p>
+                      {appointment.details && <p className="text-xs line-clamp-1" style={{ color: "var(--color-text-secondary)" }}>{appointment.details}</p>}
                       <div className="flex flex-wrap gap-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
                         <span className="flex items-center gap-1"><Calendar size={12} /> {appointment.time_slot}</span>
                         <span className="flex items-center gap-1"><Clock size={12} /> {formatTimestamp(appointment.requested_at)}</span>
@@ -337,14 +401,14 @@ export const TeacherAppointmentsPage: React.FC = () => {
                           {actioningId === appointment.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                           Approve
                         </button>
-                        <button
-                          onClick={(event) => { event.stopPropagation(); respondToAppointment(appointment, "rejected"); }}
-                          className="btn btn-outline text-xs"
-                          disabled={actioningId === appointment.id || appointment.status !== "pending"}
-                        >
-                          <XCircle size={14} />
-                          Reject
-                        </button>
+                          <button
+                           onClick={(event) => { event.stopPropagation(); setRejectingAppointment(appointment); }}
+                           className="btn btn-outline text-xs text-red-600 border-red-200 hover:bg-red-50"
+                           disabled={actioningId === appointment.id || appointment.status !== "pending"}
+                         >
+                           <XCircle size={14} />
+                           Reject
+                         </button>
                       </div>
                       {appointment.status !== "pending" && (
                         <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
@@ -377,9 +441,23 @@ export const TeacherAppointmentsPage: React.FC = () => {
                   <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>{selectedAppointment.student_name}</p>
                   <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>{selectedAppointment.student_email}</p>
                 </div>
-                <div className="rounded-xl p-3 border" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-base)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Meeting Topic</p>
-                  <p className="text-sm mt-1" style={{ color: "var(--color-text-primary)" }}>{selectedAppointment.topic}</p>
+                <div className="rounded-xl p-3 border space-y-2" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-base)" }}>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Agenda (Subject)</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{selectedAppointment.agenda}</p>
+                  </div>
+                  {selectedAppointment.details && (
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Details (Body)</p>
+                      <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{selectedAppointment.details}</p>
+                    </div>
+                  )}
+                  {selectedAppointment.status === "rejected" && selectedAppointment.rejection_reason && (
+                    <div className="pt-2 border-t mt-2" style={{ borderColor: "rgba(220,38,38,0.2)" }}>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">Rejection Reason</p>
+                      <p className="text-xs italic text-red-700">{selectedAppointment.rejection_reason}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="rounded-xl p-3 border" style={{ borderColor: "var(--color-border)" }}>
@@ -417,8 +495,8 @@ export const TeacherAppointmentsPage: React.FC = () => {
                       <CheckCircle2 size={15} /> Approve
                     </button>
                     <button
-                      className="btn btn-outline flex-1 text-sm"
-                      onClick={() => respondToAppointment(selectedAppointment, "rejected")}
+                      className="btn btn-outline flex-1 text-sm text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => setRejectingAppointment(selectedAppointment)}
                     >
                       <XCircle size={15} /> Reject
                     </button>

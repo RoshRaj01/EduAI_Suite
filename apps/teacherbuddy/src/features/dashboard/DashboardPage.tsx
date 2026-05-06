@@ -1,41 +1,76 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Users, BrainCircuit, AlertTriangle, TrendingUp, BookOpen,
   Clock, ArrowRight, Activity, Star, Calendar, CheckCircle2,
-  Zap, BarChart2, User,
+  Zap, BarChart2, User, Loader2
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { Link } from "react-router-dom";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
-const stats = [
-  { label: "Active Students",       value: "1,284", delta: "+12%",  icon: Users,        color: "#264796", bg: "rgba(38,71,150,0.1)",  accent: "border-l-[#264796]"  },
-  { label: "AI Evaluations Done",   value: "452",   delta: "+28%",  icon: BrainCircuit, color: "#d0ae61", bg: "rgba(208,174,97,0.12)", accent: "border-l-[#d0ae61]"  },
-  { label: "Risk Alerts",           value: "12",    delta: "−3",    icon: AlertTriangle, color: "#dc2626",bg: "rgba(220,38,38,0.1)",  accent: "border-l-red-500"     },
-  { label: "Avg. Score Improvement",value: "+14%",  delta: "vs last month", icon: TrendingUp, color: "#16a34a", bg: "rgba(22,163,74,0.1)",accent: "border-l-green-500" },
-];
-
-const classrooms = [
-  { code: "CSC401", name: "Advanced Neural Networks", batch: "Batch 2026-A", students: 42, time: "2:00 PM", progress: 68, teacher: "Prof. Alan Turing" },
-  { code: "CSC312", name: "Data Structures & Algorithms", batch: "Batch 2025-B", students: 38, time: "10:00 AM", progress: 82, teacher: "Dr. Grace Hopper" },
-  { code: "CSC501", name: "Cloud Computing & DevOps", batch: "Batch 2026-A", students: 35, time: "3:30 PM", progress: 45, teacher: "Prof. Ken Thompson" },
-  { code: "CSC220", name: "Database Management Systems", batch: "Batch 2025-C", students: 50, time: "8:00 AM", progress: 91, teacher: "Dr. E.F. Codd" },
-];
-
-const riskAlerts = [
-  { id: "S4121", name: "Arjun Mehta",   level: "high",     reason: "Attendance dropped to 42%",         score: 78 },
-  { id: "S4122", name: "Priya Sharma",  level: "high",     reason: "3 consecutive exams below 40%",     score: 82 },
-  { id: "S4109", name: "Rohan Verma",   level: "moderate", reason: "2 missing assignment submissions",  score: 61 },
-  { id: "S4135", name: "Sneha Patil",   level: "moderate", reason: "Irregular attendance pattern",      score: 55 },
-];
-
-const recentActivity = [
-  { text: "AI evaluated 55 subjective answers in CSC401",          time: "1h ago",  icon: BrainCircuit, color: "#264796" },
-  { text: "Priya Sharma submitted Neural Networks Mid-Term",        time: "2h ago",  icon: CheckCircle2, color: "#16a34a" },
-  { text: "Risk score updated for Batch 2026-A",                    time: "4h ago",  icon: Activity,     color: "#d0ae61" },
-  { text: "New course material uploaded to CSC501",                 time: "Yesterday",icon: BookOpen,    color: "#264796" },
-];
+const iconMap: Record<string, any> = {
+  Users,
+  BrainCircuit,
+  AlertTriangle,
+  TrendingUp,
+  BookOpen,
+  Clock,
+  Activity,
+  CheckCircle2,
+  Calendar,
+  Zap,
+  BarChart2,
+  User
+};
 
 export const DashboardPage: React.FC = () => {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_ENDPOINTS.DASHBOARD}/summary`);
+        if (!response.ok) throw new Error("Failed to fetch dashboard data");
+        const json = await response.json();
+        setData(json);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        <p className="text-muted-foreground animate-pulse">Loading academic overview...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <AlertTriangle className="w-12 h-12 text-destructive" />
+        <h2 className="text-xl font-bold">Something went wrong</h2>
+        <p className="text-muted-foreground">{error || "Failed to load dashboard data"}</p>
+        <button onClick={() => window.location.reload()} className="btn btn-primary mt-2">
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  const { stats, classrooms, riskAlerts, recentActivity, schedule } = data;
+
   return (
     <div className="space-y-7 animate-fade-in">
       {/* Page Header */}
@@ -45,7 +80,7 @@ export const DashboardPage: React.FC = () => {
             Good afternoon, Professor 👋
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
-            Monday, 13 April 2026 — Here's your academic overview for today.
+            {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} — Here's your academic overview for today.
           </p>
         </div>
         <div className="flex gap-2">
@@ -60,27 +95,30 @@ export const DashboardPage: React.FC = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
-          <div
-            key={stat.label}
-            className={`glass-card p-5 border-l-4 ${stat.accent} animate-fade-in-up delay-${i}00`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: stat.bg }}>
-                <stat.icon size={20} style={{ color: stat.color }} />
+        {stats.map((stat: any, i: number) => {
+          const Icon = iconMap[stat.icon] || Activity;
+          return (
+            <div
+              key={stat.label}
+              className={`glass-card p-5 border-l-4 ${stat.accent} animate-fade-in-up delay-${i}00`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: stat.bg }}>
+                  <Icon size={20} style={{ color: stat.color }} />
+                </div>
+                <span className="badge text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{
+                    background: stat.color === "#dc2626" ? "rgba(220,38,38,0.1)" : "rgba(22,163,74,0.12)",
+                    color: stat.color === "#dc2626" ? "#dc2626" : "#16a34a"
+                  }}>
+                  {stat.delta}
+                </span>
               </div>
-              <span className="badge text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{
-                  background: stat.color === "#dc2626" ? "rgba(220,38,38,0.1)" : "rgba(22,163,74,0.12)",
-                  color: stat.color === "#dc2626" ? "#dc2626" : "#16a34a"
-                }}>
-                {stat.delta}
-              </span>
+              <p className="stat-number">{stat.value}</p>
+              <p className="text-xs mt-1 font-medium" style={{ color: "var(--color-text-muted)" }}>{stat.label}</p>
             </div>
-            <p className="stat-number">{stat.value}</p>
-            <p className="text-xs mt-1 font-medium" style={{ color: "var(--color-text-muted)" }}>{stat.label}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Main Grid */}
@@ -94,8 +132,8 @@ export const DashboardPage: React.FC = () => {
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
-            {classrooms.map((cls, i) => (
-              <Link to="/classrooms" key={cls.code}>
+            {classrooms.map((cls: any, i: number) => (
+              <Link to={`/classrooms/${cls.code}`} key={cls.code}>
                 <GlassCard interactive className={`animate-fade-in-up delay-${i % 3}00`}>
                   <div className="gradient-blue rounded-xl mb-4 p-4 h-28 flex flex-col justify-between relative overflow-hidden">
                     <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-10 bg-white" />
@@ -144,11 +182,7 @@ export const DashboardPage: React.FC = () => {
               <h3 className="section-title text-sm">Today's Schedule</h3>
             </div>
             <div className="space-y-2.5">
-              {[
-                { name: "Neural Networks", code: "CSC401", time: "10:00 AM", room: "CS-Lab 3",   status: "upcoming" },
-                { name: "DSA Lecture",     code: "CSC312", time: "12:00 PM", room: "Seminar Hall",status: "live"     },
-                { name: "Cloud DevOps",    code: "CSC501", time: "3:30 PM",  room: "Online",      status: "upcoming" },
-              ].map(s => (
+              {schedule.map((s: any) => (
                 <div key={s.name} className="flex items-center gap-3 p-2.5 rounded-lg border"
                   style={{ borderColor: "var(--color-border)", background: "var(--color-bg-grad1)" }}>
                   <div className="flex flex-col items-center w-12 shrink-0">
@@ -164,6 +198,9 @@ export const DashboardPage: React.FC = () => {
                   </span>
                 </div>
               ))}
+              {schedule.length === 0 && (
+                <p className="text-xs text-center py-4 text-muted-foreground italic">No classes scheduled for today.</p>
+              )}
             </div>
           </GlassCard>
 
@@ -179,7 +216,7 @@ export const DashboardPage: React.FC = () => {
               </Link>
             </div>
             <div className="space-y-2">
-              {riskAlerts.map(alert => (
+              {riskAlerts.map((alert: any) => (
                 <div key={alert.id} className="flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition-colors"
                   style={{}}
                   onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-border)'}
@@ -214,18 +251,21 @@ export const DashboardPage: React.FC = () => {
               <h3 className="section-title text-sm">Recent Activity</h3>
             </div>
             <div className="space-y-3">
-              {recentActivity.map((act, i) => (
-                <div key={i} className="flex gap-2.5">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: `${act.color}15` }}>
-                    <act.icon size={13} style={{ color: act.color }} />
+              {recentActivity.map((act: any, i: number) => {
+                const Icon = iconMap[act.icon] || Activity;
+                return (
+                  <div key={i} className="flex gap-2.5">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                      style={{ background: `${act.color}15` }}>
+                      <Icon size={13} style={{ color: act.color }} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{act.text}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>{act.time}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[11px] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{act.text}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>{act.time}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </GlassCard>
         </div>

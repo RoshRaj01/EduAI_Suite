@@ -410,3 +410,8 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
+
+/* ─── Under Construction Hiding ────────────────────────────── */
+@utility under-construction-hidden {
+  display: none !important;
+}

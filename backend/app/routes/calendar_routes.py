@@ -204,7 +204,7 @@ def get_calendar_events(
         events.append({
             "id": f"appointment-{appt.id}",
             "raw_id": appt.id,
-            "title": f"👤 {appt.student_name}: {appt.topic}",
+            "title": f"👤 {appt.student_name}: {appt.agenda}",
             "description": f"Mode: {appt.meeting_mode} | Slot: {appt.time_slot}",
             "start": dt.isoformat(),
             "end": (dt + timedelta(minutes=30)).isoformat(),
@@ -426,12 +426,12 @@ def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session =
                 continue
             notifications.append({
                 "id": f"appointment-{appt.id}",
-                "title": f"👤 {appt.student_name}: {appt.topic}",
+                "title": f"👤 {appt.student_name}: {appt.agenda}",
                 "start": dt.isoformat(),
                 "type": "appointment",
                 "color": "#16a34a",
                 "source": "appointment",
-                "message": f"👤 Meeting with {appt.student_name} about \"{appt.topic}\" tomorrow",
+                "message": f"👤 Meeting with {appt.student_name} about \"{appt.agenda}\" tomorrow",
             })
 
     # Lessons tomorrow

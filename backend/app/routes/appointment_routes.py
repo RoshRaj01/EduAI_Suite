@@ -57,7 +57,8 @@ def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)
         teacher_department=payload.teacher_department,
         meeting_mode=payload.meeting_mode,
         time_slot=payload.time_slot,
-        topic=payload.topic,
+        agenda=payload.agenda,
+        details=payload.details,
         status="pending",
         requested_at=datetime.utcnow().isoformat(timespec="minutes"),
     )
@@ -80,6 +81,7 @@ def update_appointment_status(
     appointment.status = payload.status
     appointment.reviewed_by = payload.reviewed_by
     appointment.reviewed_at = datetime.utcnow().isoformat(timespec="minutes")
+    appointment.rejection_reason = payload.rejection_reason
     appointment.notes = payload.notes
     db.commit()
     db.refresh(appointment)

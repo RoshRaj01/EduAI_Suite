@@ -33,8 +33,9 @@ import {
   Sparkles,
   ShieldAlert,
 } from "lucide-react";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = API_ENDPOINTS.BASE;
 
 const DEPARTMENTS = [
   "Computer Science",

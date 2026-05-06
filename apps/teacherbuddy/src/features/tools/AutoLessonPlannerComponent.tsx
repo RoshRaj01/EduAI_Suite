@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sparkles, Clock, Send, Download, Share2, Check } from "lucide-react";
+import { Sparkles, Clock, Send, Download, Share2, Check, Upload, FileText } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
 interface GeneratedLesson {
@@ -31,6 +31,7 @@ export const AutoLessonPlannerComponent: React.FC<{ courseId?: number }> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [posted, setPosted] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -114,6 +115,49 @@ export const AutoLessonPlannerComponent: React.FC<{ courseId?: number }> = ({
       ]);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setError(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/lessons/parse-plan`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to parse course plan");
+      }
+
+      const result = await response.json();
+      
+      if (result.topic) setTopic(result.topic);
+      if (result.syllabus_context) setSyllabus(result.syllabus_context);
+      
+      setChatMessages(prev => [
+        ...prev,
+        { 
+          type: "ai", 
+          content: `📄 Course plan processed! ${result.topic ? `Detected topic: "${result.topic}"` : "Please confirm the topic below."}` 
+        }
+      ]);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Upload failed";
+      setError(`Upload error: ${errorMessage}`);
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      e.target.value = "";
     }
   };
 
@@ -226,6 +270,50 @@ ${generatedLesson.quiz_questions}`;
           </h3>
 
           <div className="space-y-3">
+            {/* Course Plan Upload */}
+            <div className="pb-3 border-b border-dashed border-slate-300/30 mb-2">
+              <label 
+                className="text-xs font-semibold mb-2 block"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                AI Auto-Fill from Course Plan
+              </label>
+              <div 
+                className="relative group border border-dashed rounded-lg p-3 hover:border-blue-400/50 transition-all cursor-pointer"
+                style={{ 
+                  background: "rgba(255, 255, 255, 0.05)",
+                  borderColor: "var(--color-border)"
+                }}
+                onClick={() => document.getElementById('course-plan-upload')?.click()}
+              >
+                <input 
+                  id="course-plan-upload"
+                  type="file" 
+                  className="hidden" 
+                  accept=".pdf,.docx,.txt,.md"
+                  onChange={handleFileUpload}
+                  disabled={isUploading || isGenerating}
+                />
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${isUploading ? 'bg-blue-100/20' : 'bg-slate-100/10'}`}>
+                    {isUploading ? (
+                      <Clock size={16} className="text-blue-500 animate-spin" />
+                    ) : (
+                      <Upload size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[11px] font-bold" style={{ color: "var(--color-text-primary)" }}>
+                      {isUploading ? "Reading document..." : "Upload Lesson Plan"}
+                    </p>
+                    <p className="text-[10px]" style={{ color: "var(--color-text-secondary)" }}>
+                      PDF, Word, or Text
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label
                 className="text-xs font-semibold mb-1.5 block"

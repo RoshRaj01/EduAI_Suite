@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from app.services.groq_service import GroqService
-from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes, analytics_routes, calendar_routes, mail_routes, quiz_routes, omr_routes, wordcloud_routes, report_routes, slido_routes
+from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes, analytics_routes, calendar_routes, mail_routes, quiz_routes, omr_routes, wordcloud_routes, report_routes, slido_routes, history_routes, dashboard_routes
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.models.user import User
@@ -104,6 +104,20 @@ with engine.begin() as connection:
     except Exception as e:
         print(f"Note: mail_drafts migration skipped: {e}")
 
+    try:
+        appointment_columns = {column["name"] for column in inspector.get_columns("appointments")}
+        if "agenda" not in appointment_columns:
+            connection.execute(text("ALTER TABLE appointments ADD COLUMN agenda VARCHAR"))
+            # Transfer existing data from topic to agenda
+            connection.execute(text("UPDATE appointments SET agenda = topic WHERE agenda IS NULL"))
+        if "details" not in appointment_columns:
+            connection.execute(text("ALTER TABLE appointments ADD COLUMN details VARCHAR"))
+            connection.execute(text("UPDATE appointments SET details = '' WHERE details IS NULL"))
+        if "rejection_reason" not in appointment_columns:
+            connection.execute(text("ALTER TABLE appointments ADD COLUMN rejection_reason VARCHAR"))
+    except Exception as e:
+        print(f"Note: appointments migration skipped: {e}")
+
 app = FastAPI()
 
 app.add_middleware(
@@ -146,6 +160,8 @@ app.include_router(omr_routes.router)
 app.include_router(wordcloud_routes.router)
 app.include_router(report_routes.router)
 app.include_router(slido_routes.router)
+app.include_router(history_routes.router)
+app.include_router(dashboard_routes.router)
 app.include_router(websocket_routes.ws_router)
 
 

@@ -13,7 +13,9 @@ import {
   ScatterChart, Scatter, ZAxis, ComposedChart
 } from 'recharts';
 
-const API_BASE = "http://localhost:8000";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
+
+const API_BASE = API_ENDPOINTS.BASE;
 
 /* ─── Types ──────────────────────────────────────────── */
 interface Course {

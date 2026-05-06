@@ -7,6 +7,7 @@ import {
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ExamCreator } from "./ExamCreator";
 import { AnswerSheet } from "./AnswerSheet";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 type ExamView = "list" | "take" | "review";
 
@@ -39,7 +40,7 @@ export const ExamsPage: React.FC = () => {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8000/exams/stats", {
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/stats`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (response.ok) {
@@ -56,7 +57,7 @@ export const ExamsPage: React.FC = () => {
       setLoading(true);
       setError("");
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8000/exams/", {
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/`, {
         headers: { "Authorization": `Bearer ${token}` },
         signal: AbortSignal.timeout(10000) // 10 second timeout
       });
@@ -77,8 +78,8 @@ export const ExamsPage: React.FC = () => {
   const handleSaveExam = async (examData: any) => {
     try {
       const url = editingExam 
-        ? `http://localhost:8000/exams/${editingExam.id}`
-        : "http://localhost:8000/exams/";
+        ? `${API_ENDPOINTS.EXAMS}/${editingExam.id}`
+        : `${API_ENDPOINTS.EXAMS}/`;
       
       const token = localStorage.getItem("token");
       const response = await fetch(url, {
@@ -105,7 +106,7 @@ export const ExamsPage: React.FC = () => {
     if (!window.confirm("Are you sure you want to delete this exam? This action cannot be undone.")) return;
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:8000/exams/${id}`, {
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/${id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -127,7 +128,7 @@ export const ExamsPage: React.FC = () => {
     try {
       setLoadingAttempts(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:8000/exams/${examId}/attempts`, {
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/${examId}/attempts`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!response.ok) throw new Error("Failed to fetch attempts");
@@ -144,7 +145,7 @@ export const ExamsPage: React.FC = () => {
     try {
       setLoadingDetail(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:8000/exams/attempts/${attemptId}`, {
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/attempts/${attemptId}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!response.ok) throw new Error("Failed to fetch attempt details");

@@ -27,4 +27,5 @@ export const API_ENDPOINTS = {
   REPORTS: `${API_BASE_URL}/reports`,
   SLIDO: `${API_BASE_URL}/api/slido`,
   LESSONS: `${API_BASE_URL}/lessons`,
+  DASHBOARD: `${API_BASE_URL}/api/dashboard`,
 };

@@ -19,7 +19,9 @@ import {
   X
 } from "lucide-react";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
+
+const API_BASE_URL = API_ENDPOINTS.BASE;
 
 interface Student {
   id: number;
@@ -110,7 +112,7 @@ export const MailStudentsPage: React.FC = () => {
 
   const fetchCourses = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/courses/`);
+      const res = await fetch(`${API_ENDPOINTS.COURSES}/`);
       const data = await res.json();
       setCourses(data);
     } catch (err) {
@@ -120,7 +122,7 @@ export const MailStudentsPage: React.FC = () => {
 
   const fetchDrafts = async () => {
     try {
-        const res = await fetch(`${API_BASE_URL}/mail/drafts`);
+        const res = await fetch(`${API_ENDPOINTS.MAIL}/drafts`);
         const data = await res.json();
         setDrafts(data);
     } catch (err) {}
@@ -128,7 +130,7 @@ export const MailStudentsPage: React.FC = () => {
 
   const fetchHistory = async () => {
     try {
-        const res = await fetch(`${API_BASE_URL}/mail/history`);
+        const res = await fetch(`${API_ENDPOINTS.MAIL}/history`);
         const data = await res.json();
         setHistory(data);
     } catch (err) {}
@@ -144,7 +146,7 @@ export const MailStudentsPage: React.FC = () => {
     setLoading(true);
     setStatus(null);
     try {
-        const res = await fetch(`${API_BASE_URL}/mail/upload_students`, {
+        const res = await fetch(`${API_ENDPOINTS.MAIL}/upload_students`, {
             method: "POST",
             body: formData
         });
@@ -197,7 +199,7 @@ export const MailStudentsPage: React.FC = () => {
           : c.value
       }));
 
-      const res = await fetch(`${API_BASE_URL}/mail/filter`, {
+      const res = await fetch(`${API_ENDPOINTS.MAIL}/filter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conditions: apiConditions })
@@ -217,7 +219,7 @@ export const MailStudentsPage: React.FC = () => {
   const filterStudentsWithConditions = async (apiConditions: any[], selectIds: number[] = []) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/mail/filter`, {
+      const res = await fetch(`${API_ENDPOINTS.MAIL}/filter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conditions: apiConditions })
@@ -250,13 +252,13 @@ export const MailStudentsPage: React.FC = () => {
             conditions: conditions
         };
         if (selectedDraftId) {
-             res = await fetch(`${API_BASE_URL}/mail/drafts/${selectedDraftId}`, {
+             res = await fetch(`${API_ENDPOINTS.MAIL}/drafts/${selectedDraftId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
         } else {
-             res = await fetch(`${API_BASE_URL}/mail/drafts`, {
+             res = await fetch(`${API_ENDPOINTS.MAIL}/drafts`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
@@ -306,7 +308,7 @@ export const MailStudentsPage: React.FC = () => {
           payload.body = mailBody;
       }
       
-      const res = await fetch(`${API_BASE_URL}/mail/send`, {
+      const res = await fetch(`${API_ENDPOINTS.MAIL}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -337,7 +339,7 @@ export const MailStudentsPage: React.FC = () => {
   const handleDiscard = async () => {
       if (selectedDraftId) {
           try {
-              await fetch(`${API_BASE_URL}/mail/drafts/${selectedDraftId}`, { method: "DELETE" });
+              await fetch(`${API_ENDPOINTS.MAIL}/drafts/${selectedDraftId}`, { method: "DELETE" });
               fetchDrafts();
           } catch (e) {}
       }

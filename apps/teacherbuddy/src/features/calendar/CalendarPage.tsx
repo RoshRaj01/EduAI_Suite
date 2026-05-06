@@ -18,7 +18,9 @@ import {
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
-const API_URL = "http://localhost:8000";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
+
+const API_URL = API_ENDPOINTS.BASE;
 
 type CalendarEvent = {
   id: string;
@@ -108,8 +110,8 @@ export const CalendarPage: React.FC = () => {
       }
 
       const [eventsRes, notificationsRes] = await Promise.all([
-        fetch(`${API_URL}/calendar/events${query}`),
-        fetch(`${API_URL}/calendar/notifications${query}`)
+        fetch(`${API_ENDPOINTS.CALENDAR}/events${query}`),
+        fetch(`${API_ENDPOINTS.CALENDAR}/notifications${query}`)
       ]);
       
       if (eventsRes.ok) {
@@ -216,7 +218,7 @@ export const CalendarPage: React.FC = () => {
     if (!confirm("Are you sure you want to delete this event?")) return;
     
     try {
-      const res = await fetch(`${API_URL}/calendar/events/${id}`, {
+      const res = await fetch(`${API_ENDPOINTS.CALENDAR}/events/${id}`, {
         method: "DELETE"
       });
       
@@ -253,8 +255,8 @@ export const CalendarPage: React.FC = () => {
       };
 
       const url = editEventId 
-        ? `${API_URL}/calendar/events/${editEventId}`
-        : `${API_URL}/calendar/events`;
+        ? `${API_ENDPOINTS.CALENDAR}/events/${editEventId}`
+        : `${API_ENDPOINTS.CALENDAR}/events`;
         
       const method = editEventId ? "PUT" : "POST";
       

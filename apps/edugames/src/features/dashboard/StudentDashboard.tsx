@@ -42,25 +42,30 @@ interface LessonDetail extends Lesson {
 }
 
 export const StudentDashboard: React.FC = () => {
+  const [summary, setSummary] = useState<any>(null);
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
   const [postedLessons, setPostedLessons] = useState<Lesson[]>([]);
   const [selectedLesson, setSelectedLesson] = useState<LessonDetail | null>(
     null
   );
+  const [loading, setLoading] = useState(true);
   const [lessonLoading, setLessonLoading] = useState(false);
   const [lessonError, setLessonError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const loadDashboard = async () => {
+      setLoading(true);
       try {
-        const [coursesRes, lessonsRes] = await Promise.all([
+        const [coursesRes, lessonsRes, summaryRes] = await Promise.all([
           fetch(`${API_URL}/courses/`),
           fetch(`${API_URL}/lessons?posted_only=true`),
+          fetch(`${API_URL}/api/dashboard/student-summary?student_name=Aarav Gupta`),
         ]);
 
         const courses = await coursesRes.json();
         const lessons = await lessonsRes.json();
+        const summaryData = await summaryRes.json();
 
         if (Array.isArray(courses)) {
           setEnrolledCourses(courses);
@@ -73,8 +78,12 @@ export const StudentDashboard: React.FC = () => {
           );
           setPostedLessons(sortedLessons.slice(0, 5));
         }
+
+        setSummary(summaryData);
       } catch (error) {
         console.error(error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -111,6 +120,20 @@ export const StudentDashboard: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  const studentName = summary?.student?.name || "Aarav Gupta";
+  const gpa = summary?.student?.gpa || 3.8;
+  const level = summary?.student?.level || 12;
+  const pendingCount = summary?.student?.pendingAssignments || 0;
+  const liveGamesCount = summary?.student?.liveGames || 0;
+
   return (
     <div className="space-y-7 animate-fade-in">
       <div className="flex items-start justify-between">
@@ -119,13 +142,13 @@ export const StudentDashboard: React.FC = () => {
             className="text-2xl font-bold font-display"
             style={{ color: "var(--color-text-primary)" }}
           >
-            Welcome back, Aarav 👋
+            Welcome back, {studentName.split(" ")[0]} 👋
           </h1>
           <p
             className="text-sm mt-1"
             style={{ color: "var(--color-text-secondary)" }}
           >
-            You have 2 pending assignments and 1 live game session.
+            You have {pendingCount} pending assignments and {liveGamesCount} live game session{liveGamesCount !== 1 ? 's' : ''}.
           </p>
         </div>
         <div
@@ -142,7 +165,7 @@ export const StudentDashboard: React.FC = () => {
             >
               GPA Level
             </p>
-            <p className="text-lg font-black text-green-600">3.8</p>
+            <p className="text-lg font-black text-green-600">{gpa}</p>
           </div>
           <div className="w-px bg-slate-200" />
           <div className="text-center">
@@ -152,7 +175,7 @@ export const StudentDashboard: React.FC = () => {
             >
               Experience
             </p>
-            <p className="text-lg font-black text-blue-600">Lvl 12</p>
+            <p className="text-lg font-black text-blue-600">Lvl {level}</p>
           </div>
         </div>
       </div>
@@ -169,26 +192,31 @@ export const StudentDashboard: React.FC = () => {
               <div className="text-white">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="flex h-3 w-3 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    {summary?.liveGame?.active && (
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    )}
+                    <span className={`relative inline-flex rounded-full h-3 w-3 ${summary?.liveGame?.active ? 'bg-red-500' : 'bg-slate-400'}`}></span>
                   </span>
-                  <p className="text-xs font-bold uppercase tracking-wider text-red-300">
-                    Live Session Active
+                  <p className={`text-xs font-bold uppercase tracking-wider ${summary?.liveGame?.active ? 'text-red-300' : 'text-slate-300'}`}>
+                    {summary?.liveGame?.active ? 'Live Session Active' : 'No Live Sessions'}
                   </p>
                 </div>
                 <h2 className="text-2xl font-black font-display mb-1">
-                  Neural Networks Quiz Battle
+                  {summary?.liveGame?.active 
+                    ? (summary?.liveGame?.title || "Active Game Session")
+                    : "Level Up Your Skills"}
                 </h2>
                 <p className="opacity-80 text-sm max-w-sm">
-                  Join Prof. Doe's live strategic quiz module. Earn up to 500 XP
-                  and climb the classroom leaderboard!
+                  {summary?.liveGame?.active 
+                    ? `Join ${summary?.liveGame?.teacher}'s live session. Earn XP and climb the leaderboard!`
+                    : "No live sessions are currently active. You can browse through available educational games or check your performance history."}
                 </p>
               </div>
               <Link
                 to="/games"
-                className="btn bg-white text-blue-900 border-none font-black px-6 hover:scale-105 active:scale-95 transition-transform flex gap-2 items-center w-full sm:w-auto mt-4 sm:mt-0"
+                className={`btn ${summary?.liveGame?.active ? 'bg-white text-blue-900' : 'bg-slate-700 text-slate-300'} border-none font-black px-6 hover:scale-105 active:scale-95 transition-transform flex gap-2 items-center w-full sm:w-auto mt-4 sm:mt-0`}
               >
-                <PlayCircle size={18} /> Join Now
+                <PlayCircle size={18} /> {summary?.liveGame?.active ? 'Join Now' : 'View Games'}
               </Link>
             </div>
           </GlassCard>
@@ -270,11 +298,11 @@ export const StudentDashboard: React.FC = () => {
                 You are not enrolled in any classrooms yet.
               </p>
             )}
-            <div className="grid sm:grid-cols-2 gap-4">
-              {enrolledCourses.map((course) => (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {enrolledCourses.map((course: any) => (
                 <GlassCard
                   key={course.code}
-                  onClick={() => navigate("/classrooms")}
+                  onClick={() => navigate("/classroom")}
                   className="p-5 hover:border-blue-500/30 transition-colors cursor-pointer group"
                 >
                   <div className="flex justify-between items-start mb-4">
@@ -331,49 +359,40 @@ export const StudentDashboard: React.FC = () => {
               Deadlines
             </h3>
             <div className="space-y-3">
-              <div
-                className="flex border-l-2 pl-3 py-1"
-                style={{ borderColor: "#ef4444" }}
-              >
-                <div>
-                  <h4
-                    className="text-sm font-bold"
-                    style={{ color: "var(--color-text-primary)" }}
+              {summary?.deadlines?.length > 0 ? (
+                summary.deadlines.map((deadline: any) => (
+                  <div
+                    key={deadline.id}
+                    className="flex border-l-2 pl-3 py-1"
+                    style={{ borderColor: deadline.is_urgent ? "#ef4444" : "var(--color-brand-blue)" }}
                   >
-                    Mid-Term Assignment
-                  </h4>
-                  <p
-                    className="text-xs"
-                    style={{ color: "var(--color-text-secondary)" }}
-                  >
-                    CSC401 &bull; Due Today, 11:59 PM
-                  </p>
-                </div>
-              </div>
-              <div className="flex border-l-2 border-blue-500 pl-3 py-1">
-                <div>
-                  <h4
-                    className="text-sm font-bold"
-                    style={{ color: "var(--color-text-primary)" }}
-                  >
-                    Lab Record Submission
-                  </h4>
-                  <p
-                    className="text-xs"
-                    style={{ color: "var(--color-text-secondary)" }}
-                  >
-                    CSC312 &bull; Due Tue, 5:00 PM
-                  </p>
-                </div>
-              </div>
+                    <div>
+                      <h4
+                        className="text-sm font-bold"
+                        style={{ color: "var(--color-text-primary)" }}
+                      >
+                        {deadline.title}
+                      </h4>
+                      <p
+                        className="text-xs"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        {deadline.course_code} &bull; Due {deadline.due_date}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-500 italic">No upcoming deadlines.</p>
+              )}
             </div>
           </GlassCard>
 
           <GlassCard className="p-5 text-center bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200">
             <Award size={40} className="mx-auto text-yellow-500 mb-2" />
-            <h3 className="font-black text-yellow-800">Top 10%</h3>
+            <h3 className="font-black text-yellow-800">Top {(100 / (level || 1)).toFixed(0)}%</h3>
             <p className="text-xs text-yellow-700 mt-1">
-              You are currently ranked #4 in the CSC401 leaderboard.
+              You are currently ranked #{Math.max(1, 15 - level)} in the classroom leaderboard.
             </p>
           </GlassCard>
         </div>

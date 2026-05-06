@@ -4,9 +4,9 @@ import { GlassCard } from "../../shared/components/GlassCard";
 import { useTheme } from "../../shared/hooks/useTheme";
 
 const mockForms = [
-  { id: 1, name: "Semester Grade Submission Form", desc: "Auto-fills student names, register numbers, and final AI-confirmed scores." },
-  { id: 2, name: "Risk Intervention Approval", desc: "Generates an intervention request pre-filled with the risk analytics data." },
-  { id: 3, name: "Syllabus Compliance Report", desc: "Cross-references your lesson planner against the standard syllabus." },
+  { id: 1, name: "#", desc: "#" },
+  { id: 2, name: "#", desc: "#" },
+  { id: 3, name: "#", desc: "#" },
 ];
 
 export const FormsPage: React.FC = () => {

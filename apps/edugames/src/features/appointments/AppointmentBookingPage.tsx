@@ -47,8 +47,10 @@ type Appointment = {
   teacher_department?: string | null;
   meeting_mode: string;
   time_slot: string;
-  topic: string;
+  agenda: string;
+  details?: string | null;
   status: AppointmentStatus;
+  rejection_reason?: string | null;
   requested_at: string;
   reviewed_at?: string | null;
   reviewed_by?: string | null;
@@ -93,7 +95,8 @@ export const AppointmentBookingPage: React.FC = () => {
   const [mode, setMode] = useState<AppointmentMode>("In-person");
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
-  const [reason, setReason] = useState("I need help with my project proposal and next steps.");
+  const [agenda, setAgenda] = useState("");
+  const [details, setDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -184,7 +187,8 @@ export const AppointmentBookingPage: React.FC = () => {
           teacher_name: selectedTeacher.teacher_name,
           meeting_mode: mode,
           time_slot: `${preferredDate} ${preferredTime}`.trim(),
-          topic: reason,
+          agenda: agenda || "Meeting Request",
+          details: details,
         }),
       });
 
@@ -196,7 +200,8 @@ export const AppointmentBookingPage: React.FC = () => {
       setNotice(`Appointment request sent to ${selectedTeacher.teacher_name}.`);
       setPreferredDate("");
       setPreferredTime("");
-      setReason("I need help with my project proposal and next steps.");
+      setAgenda("");
+      setDetails("");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to book appointment.");
     } finally {
@@ -388,11 +393,27 @@ export const AppointmentBookingPage: React.FC = () => {
               </div>
 
               <label className="space-y-2 block">
-                <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Reason for Meeting</span>
+                <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Agenda (Subject)</span>
+                <input
+                  value={agenda}
+                  onChange={(event) => setAgenda(event.target.value)}
+                  placeholder="e.g., Project Proposal Discussion"
+                  className="w-full rounded-xl px-4 py-3 text-sm outline-none"
+                  style={{
+                    color: "var(--color-text-primary)",
+                    background: "var(--color-surface-base)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                />
+              </label>
+
+              <label className="space-y-2 block">
+                <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Details (Body)</span>
                 <textarea
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  rows={5}
+                  value={details}
+                  onChange={(event) => setDetails(event.target.value)}
+                  placeholder="Add more context about what you want to discuss..."
+                  rows={4}
                   className="w-full rounded-xl px-4 py-3 text-sm outline-none resize-none"
                   style={{
                     color: "var(--color-text-primary)",
@@ -436,12 +457,18 @@ export const AppointmentBookingPage: React.FC = () => {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>{appointment.teacher_name}</p>
-                          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>{appointment.topic}</p>
+                          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>{appointment.agenda}</p>
                         </div>
                         <span className="badge text-[10px]" style={{ background: meta.bg, color: meta.color }}>
                           {meta.label}
                         </span>
                       </div>
+                      {appointment.status === "rejected" && appointment.rejection_reason && (
+                        <div className="mt-2 p-2 rounded-lg bg-red-50 border border-red-100">
+                          <p className="text-[10px] font-bold text-red-600 uppercase">Reason for Rejection</p>
+                          <p className="text-[11px] text-red-700 italic">{appointment.rejection_reason}</p>
+                        </div>
+                      )}
                       <div className="mt-3 flex items-center justify-between text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                         <span className="flex items-center gap-1"><Calendar size={12} /> {appointment.time_slot || "No time selected"}</span>
                         <span className="flex items-center gap-1"><Clock size={12} /> {formatTimestamp(appointment.requested_at)}</span>

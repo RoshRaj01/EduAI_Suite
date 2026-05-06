@@ -36,14 +36,14 @@ const gameCategories = [
     icon: Gamepad2,
     color: "from-blue-400 to-indigo-500",
   },
-  {
-    id: "team-puzzle",
-    title: "Team Puzzle Challenge",
-    description:
-      "Split the class into teams. Each member gets partial info. Collaborate to solve the complete puzzle.",
-    icon: Users,
-    color: "from-pink-400 to-rose-500",
-  },
+  // {
+  //   id: "team-puzzle",
+  //   title: "Team Puzzle Challenge",
+  //   description:
+  //     "Split the class into teams. Each member gets partial info. Collaborate to solve the complete puzzle.",
+  //   icon: Users,
+  //   color: "from-pink-400 to-rose-500",
+  // },
   {
     id: "slido-polling",
     title: "Slido — Live Polling & Q&A",
@@ -52,14 +52,14 @@ const gameCategories = [
     icon: BarChart,
     color: "from-purple-400 to-violet-500",
   },
-  {
-    id: "padlet-board",
-    title: "Padlet — Shared Visual Board",
-    description:
-      "Students post ideas, media, and responses on a shared visual board for collaborative ideation.",
-    icon: Users,
-    color: "from-cyan-400 to-blue-500",
-  },
+  // {
+  //   id: "padlet-board",
+  //   title: "Padlet — Shared Visual Board",
+  //   description:
+  //     "Students post ideas, media, and responses on a shared visual board for collaborative ideation.",
+  //   icon: Users,
+  //   color: "from-cyan-400 to-blue-500",
+  // },
   {
     id: "trello-projects",
     title: "Trello — Project Management",

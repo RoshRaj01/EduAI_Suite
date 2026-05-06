@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { FileSpreadsheet, Download, RefreshCw, Send, Users, X } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { useTheme } from "../../shared/hooks/useTheme";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 export const ReportsPage: React.FC = () => {
   const { isDark } = useTheme();
@@ -16,7 +17,7 @@ export const ReportsPage: React.FC = () => {
 
   const fetchReports = async () => {
     try {
-      const res = await fetch("http://localhost:8000/reports");
+      const res = await fetch(`${API_ENDPOINTS.REPORTS}`);
       if (res.ok) {
         const data = await res.json();
         setReports(data);
@@ -35,7 +36,7 @@ export const ReportsPage: React.FC = () => {
   const handleGenerate = async (type: string, target_id: number) => {
     try {
       setLoading(true);
-      await fetch("http://localhost:8000/reports/generate", {
+      await fetch(`${API_ENDPOINTS.REPORTS}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, target_id })
@@ -74,7 +75,7 @@ export const ReportsPage: React.FC = () => {
     }
     try {
       setLoading(true);
-      const res = await fetch(`http://localhost:8000/reports/${selectedReportId}/send`, { 
+      const res = await fetch(`${API_ENDPOINTS.REPORTS}/${selectedReportId}/send`, { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: sendEmailAddress })
