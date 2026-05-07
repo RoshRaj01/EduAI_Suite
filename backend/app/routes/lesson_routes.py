@@ -20,7 +20,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/lessons", tags=["Lessons"])
+lesson_router = APIRouter(prefix="/lessons", tags=["Lessons"])
 
 
 def get_db():
@@ -75,7 +75,7 @@ def resolve_creator_id(db: Session) -> int:
     return placeholder.id
 
 
-@router.post("/generate", response_model=dict)
+@lesson_router.post("/generate", response_model=dict)
 def generate_lesson(request: LessonGenerateRequest, db: Session = Depends(get_db)):
     """Generate a lesson plan using Groq AI based on topic and optional syllabus context."""
     try:
@@ -89,7 +89,7 @@ def generate_lesson(request: LessonGenerateRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/parse-plan")
+@lesson_router.post("/parse-plan")
 async def parse_course_plan(file: UploadFile = File(...)):
     """Extract topic and syllabus from an uploaded course plan file using Regex."""
     try:
@@ -128,7 +128,7 @@ async def parse_course_plan(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Internal error during parsing: {str(e)}")
 
 
-@router.post("", response_model=LessonResponse)
+@lesson_router.post("", response_model=LessonResponse)
 def create_lesson(request: LessonCreateRequest, db: Session = Depends(get_db)):
     """Create a new lesson (draft)."""
     try:
@@ -157,7 +157,7 @@ def create_lesson(request: LessonCreateRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("", response_model=list[LessonListResponse])
+@lesson_router.get("", response_model=list[LessonListResponse])
 def get_lessons(
     course_id: int = Query(None),
     posted_only: bool = Query(False),
@@ -180,7 +180,7 @@ def get_lessons(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{lesson_id}", response_model=LessonResponse)
+@lesson_router.get("/{lesson_id}", response_model=LessonResponse)
 def get_lesson(lesson_id: int, db: Session = Depends(get_db)):
     """Get a specific lesson by ID."""
     try:
@@ -195,7 +195,7 @@ def get_lesson(lesson_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/{lesson_id}", response_model=LessonResponse)
+@lesson_router.put("/{lesson_id}", response_model=LessonResponse)
 def update_lesson(
     lesson_id: int,
     request: LessonUpdateRequest,
@@ -240,7 +240,7 @@ def update_lesson(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{lesson_id}/post", response_model=LessonResponse)
+@lesson_router.post("/{lesson_id}/post", response_model=LessonResponse)
 def post_lesson(
     lesson_id: int,
     request: LessonPostRequest,
@@ -269,7 +269,7 @@ def post_lesson(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{lesson_id}")
+@lesson_router.delete("/{lesson_id}")
 def delete_lesson(lesson_id: int, db: Session = Depends(get_db)):
     """Delete a lesson."""
     try:

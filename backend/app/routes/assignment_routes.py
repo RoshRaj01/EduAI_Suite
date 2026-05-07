@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional
 from app.utils.file_uploads import save_optional_upload
 
-router = APIRouter(prefix="/assignments", tags=["Assignments"])
+assignment_router = APIRouter(prefix="/assignments", tags=["Assignments"])
 
 
 def get_db():
@@ -20,12 +20,12 @@ def get_db():
         db.close()
 
 
-@router.get("/{course_id}", response_model=list[AssignmentResponse])
+@assignment_router.get("/{course_id}", response_model=list[AssignmentResponse])
 def get_assignments(course_id: int, db: Session = Depends(get_db)):
     return db.query(Assignment).filter(Assignment.course_id == course_id).all()
 
 
-@router.post("/{course_id}", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
+@assignment_router.post("/{course_id}", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
 def create_assignment(
     course_id: int,
     title: str = Form(...),
@@ -64,7 +64,7 @@ def create_assignment(
     return new_assignment
 
 
-@router.put("/{assignment_id}", response_model=AssignmentResponse)
+@assignment_router.put("/{assignment_id}", response_model=AssignmentResponse)
 def update_assignment(
     assignment_id: int,
     title: Optional[str] = Form(None),
@@ -100,7 +100,7 @@ def update_assignment(
     return assignment
 
 
-@router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@assignment_router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_assignment(assignment_id: int, db: Session = Depends(get_db)):
     assignment = db.query(Assignment).filter(
         Assignment.id == assignment_id).first()

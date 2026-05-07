@@ -14,7 +14,7 @@ from typing import Optional, List
 import uuid
 import datetime
 
-router = APIRouter(prefix="/reports", tags=["Reports"])
+report_router = APIRouter(prefix="/reports", tags=["Reports"])
 
 def get_db():
     db = SessionLocal()
@@ -38,7 +38,7 @@ class ReportResponse(BaseModel):
     status: str
     content: Optional[str]
 
-@router.get("", response_model=List[ReportResponse])
+@report_router.get("", response_model=List[ReportResponse])
 def get_reports(db: Session = Depends(get_db)):
     reports = db.query(Report).order_by(Report.generated_at.desc()).all()
     result = []
@@ -119,7 +119,7 @@ def generate_report_background(report_db_id: int, type: str, target_id: int, db:
         report.content = str(e)
         db.commit()
 
-@router.post("/generate")
+@report_router.post("/generate")
 def generate_report(req: GenerateReportRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     prefix = "RC" if req.type == 'Class Report' else "RS" if req.type == 'Student Report' else "RX"
     report_id = f"{prefix}-{str(uuid.uuid4())[:6].upper()}"
@@ -149,7 +149,7 @@ def generate_report(req: GenerateReportRequest, background_tasks: BackgroundTask
     
     return {"message": "Report generation started", "report_id": report_id}
 
-@router.post("/{report_id}/send")
+@report_router.post("/{report_id}/send")
 def send_report(report_id: str, req: SendReportRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     report = db.query(Report).filter(Report.report_id == report_id).first()
     if not report:

@@ -14,7 +14,7 @@ import random
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/engagement", tags=["Engagement"])
+engagement_router = APIRouter(prefix="/engagement", tags=["Engagement"])
 
 
 def get_db():
@@ -337,7 +337,7 @@ def _get_student_engagement(student, db: Session, assignments: list):
     return result
 
 
-@router.get("/{course_id}/summary")
+@engagement_router.get("/{course_id}/summary")
 def get_course_engagement_summary(course_id: int, db: Session = Depends(get_db)):
     """Get engagement summary for all students in a course."""
 
@@ -389,7 +389,7 @@ def get_course_engagement_summary(course_id: int, db: Session = Depends(get_db))
     }
 
 
-@router.get("/student/{student_id}")
+@engagement_router.get("/student/{student_id}")
 def get_student_engagement(student_id: int, db: Session = Depends(get_db)):
     """Get detailed engagement profile for a single student."""
 

@@ -23,7 +23,7 @@ import os
 import secrets
 import mimetypes
 
-router = APIRouter(prefix="/slido", tags=["Slido"])
+slido_router = APIRouter(prefix="/slido", tags=["Slido"])
 def get_db():
     db = SessionLocal()
     try:
@@ -88,7 +88,7 @@ def save_pptx_file(file_content: bytes, file_name: str) -> Optional[str]:
 
 # ==================== PresentationAssignment Endpoints ====================
 
-@router.post("/assignments", response_model=PresentationAssignmentResponse, status_code=status.HTTP_201_CREATED)
+@slido_router.post("/assignments", response_model=PresentationAssignmentResponse, status_code=status.HTTP_201_CREATED)
 def create_assignment(
     assignment: PresentationAssignmentCreate,
     teacher_id: int = Query(...),
@@ -116,7 +116,7 @@ def create_assignment(
             status_code=500, detail=f"Failed to create assignment: {str(e)}")
 
 
-@router.get("/assignments/{assignment_id}", response_model=PresentationAssignmentResponse)
+@slido_router.get("/assignments/{assignment_id}", response_model=PresentationAssignmentResponse)
 def get_assignment(assignment_id: int, db: Session = Depends(get_db)):
     """Get a specific assignment"""
     assignment = db.query(PresentationAssignment).filter(
@@ -127,7 +127,7 @@ def get_assignment(assignment_id: int, db: Session = Depends(get_db)):
     return assignment
 
 
-@router.get("/assignments", response_model=List[PresentationAssignmentResponse])
+@slido_router.get("/assignments", response_model=List[PresentationAssignmentResponse])
 def list_assignments(
     teacher_id: Optional[int] = Query(None),
     course_id: Optional[int] = Query(None),
@@ -142,7 +142,7 @@ def list_assignments(
     return query.all()
 
 
-@router.put("/assignments/{assignment_id}", response_model=PresentationAssignmentResponse)
+@slido_router.put("/assignments/{assignment_id}", response_model=PresentationAssignmentResponse)
 def update_assignment(
     assignment_id: int,
     update_data: PresentationAssignmentUpdate,
@@ -167,7 +167,7 @@ def update_assignment(
 
 # ==================== PresentationSubmission Endpoints ====================
 
-@router.post("/submissions/upload", response_model=PresentationSubmissionResponse, status_code=status.HTTP_201_CREATED)
+@slido_router.post("/submissions/upload", response_model=PresentationSubmissionResponse, status_code=status.HTTP_201_CREATED)
 async def upload_presentation(
     assignment_id: int = Form(...),
     student_id: int = Form(...),
@@ -242,7 +242,7 @@ async def upload_presentation(
     return submission
 
 
-@router.get("/submissions/{submission_id}", response_model=PresentationSubmissionResponse)
+@slido_router.get("/submissions/{submission_id}", response_model=PresentationSubmissionResponse)
 def get_submission(submission_id: int, db: Session = Depends(get_db)):
     """Get a submission"""
     submission = db.query(PresentationSubmission).filter(
@@ -253,7 +253,7 @@ def get_submission(submission_id: int, db: Session = Depends(get_db)):
     return submission
 
 
-@router.get("/submissions", response_model=List[PresentationSubmissionResponse])
+@slido_router.get("/submissions", response_model=List[PresentationSubmissionResponse])
 def list_submissions(
     assignment_id: Optional[int] = Query(None),
     student_id: Optional[int] = Query(None),
@@ -269,7 +269,7 @@ def list_submissions(
     return query.all()
 
 
-@router.post("/submissions/{submission_id}/grade", response_model=PresentationSubmissionResponse)
+@slido_router.post("/submissions/{submission_id}/grade", response_model=PresentationSubmissionResponse)
 def grade_submission(
     submission_id: int,
     grade_data: PresentationSubmissionGrade,
@@ -306,7 +306,7 @@ def generate_session_pin() -> str:
     return ''.join([str(i) for i in secrets.token_bytes(3)]).zfill(6)[:6]
 
 
-@router.post("/sessions", response_model=SlidoSessionResponse, status_code=status.HTTP_201_CREATED)
+@slido_router.post("/sessions", response_model=SlidoSessionResponse, status_code=status.HTTP_201_CREATED)
 def create_session(
     session_data: SlidoSessionCreate,
     teacher_id: int = Query(...),
@@ -352,7 +352,7 @@ def create_session(
     return new_session
 
 
-@router.get("/sessions/{session_id}", response_model=SlidoSessionResponse)
+@slido_router.get("/sessions/{session_id}", response_model=SlidoSessionResponse)
 def get_session(session_id: int, db: Session = Depends(get_db)):
     """Get a session"""
     session = db.query(SlidoSession).filter(
@@ -362,7 +362,7 @@ def get_session(session_id: int, db: Session = Depends(get_db)):
     return session
 
 
-@router.get("/sessions/pin/{pin}", response_model=SlidoSessionResponse)
+@slido_router.get("/sessions/pin/{pin}", response_model=SlidoSessionResponse)
 def get_session_by_pin(pin: str, db: Session = Depends(get_db)):
     """Get a session by PIN (for students joining)"""
     session = db.query(SlidoSession).filter(SlidoSession.pin == pin).first()
@@ -371,7 +371,7 @@ def get_session_by_pin(pin: str, db: Session = Depends(get_db)):
     return session
 
 
-@router.put("/sessions/{session_id}", response_model=SlidoSessionResponse)
+@slido_router.put("/sessions/{session_id}", response_model=SlidoSessionResponse)
 def update_session(
     session_id: int,
     update_data: SlidoSessionUpdate,
@@ -393,7 +393,7 @@ def update_session(
     return session
 
 
-@router.post("/sessions/{session_id}/end", response_model=SlidoSessionResponse)
+@slido_router.post("/sessions/{session_id}/end", response_model=SlidoSessionResponse)
 def end_session(session_id: int, db: Session = Depends(get_db)):
     """End a session"""
     session = db.query(SlidoSession).filter(
@@ -410,7 +410,7 @@ def end_session(session_id: int, db: Session = Depends(get_db)):
 
 # ==================== SlidoPoll Endpoints ====================
 
-@router.post("/sessions/{session_id}/polls", response_model=SlidoPollResponse, status_code=status.HTTP_201_CREATED)
+@slido_router.post("/sessions/{session_id}/polls", response_model=SlidoPollResponse, status_code=status.HTTP_201_CREATED)
 def create_poll(
     session_id: int,
     poll_data: SlidoPollCreate,
@@ -439,7 +439,7 @@ def create_poll(
     return poll
 
 
-@router.get("/polls/{poll_id}", response_model=SlidoPollResponse)
+@slido_router.get("/polls/{poll_id}", response_model=SlidoPollResponse)
 def get_poll(poll_id: int, db: Session = Depends(get_db)):
     """Get a poll"""
     poll = db.query(SlidoPoll).filter(SlidoPoll.id == poll_id).first()
@@ -448,7 +448,7 @@ def get_poll(poll_id: int, db: Session = Depends(get_db)):
     return poll
 
 
-@router.put("/polls/{poll_id}", response_model=SlidoPollResponse)
+@slido_router.put("/polls/{poll_id}", response_model=SlidoPollResponse)
 def update_poll(
     poll_id: int,
     is_active: bool = Form(...),
@@ -466,7 +466,7 @@ def update_poll(
     return poll
 
 
-@router.post("/polls/{poll_id}/response", response_model=PollResponseResponse, status_code=status.HTTP_201_CREATED)
+@slido_router.post("/polls/{poll_id}/response", response_model=PollResponseResponse, status_code=status.HTTP_201_CREATED)
 def submit_poll_response(
     poll_id: int,
     response: PollResponseCreate,
@@ -494,7 +494,7 @@ def submit_poll_response(
 
 # ==================== SlidoQnA Endpoints ====================
 
-@router.post("/sessions/{session_id}/qna", response_model=SlidoQnAResponse, status_code=status.HTTP_201_CREATED)
+@slido_router.post("/sessions/{session_id}/qna", response_model=SlidoQnAResponse, status_code=status.HTTP_201_CREATED)
 def ask_question(
     session_id: int,
     question_data: SlidoQnACreate,
@@ -519,7 +519,7 @@ def ask_question(
     return question
 
 
-@router.get("/qna/{question_id}", response_model=SlidoQnAResponse)
+@slido_router.get("/qna/{question_id}", response_model=SlidoQnAResponse)
 def get_question(question_id: int, db: Session = Depends(get_db)):
     """Get a Q&A question"""
     question = db.query(SlidoQnA).filter(SlidoQnA.id == question_id).first()
@@ -528,7 +528,7 @@ def get_question(question_id: int, db: Session = Depends(get_db)):
     return question
 
 
-@router.get("/sessions/{session_id}/qna", response_model=List[SlidoQnAResponse])
+@slido_router.get("/sessions/{session_id}/qna", response_model=List[SlidoQnAResponse])
 def get_session_questions(session_id: int, db: Session = Depends(get_db)):
     """Get all Q&A questions in a session"""
     return db.query(SlidoQnA).filter(SlidoQnA.session_id == session_id).order_by(
@@ -536,7 +536,7 @@ def get_session_questions(session_id: int, db: Session = Depends(get_db)):
     ).all()
 
 
-@router.post("/qna/{question_id}/upvote", response_model=SlidoQnAResponse)
+@slido_router.post("/qna/{question_id}/upvote", response_model=SlidoQnAResponse)
 def upvote_question(
     question_id: int,
     student_id: int = Query(...),
@@ -567,7 +567,7 @@ def upvote_question(
     return question
 
 
-@router.post("/qna/{question_id}/answer", response_model=SlidoQnAResponse)
+@slido_router.post("/qna/{question_id}/answer", response_model=SlidoQnAResponse)
 def answer_question(
     question_id: int,
     update_data: SlidoQnAUpdate,
@@ -598,7 +598,7 @@ def answer_question(
 
 # ==================== SubmissionInteraction Endpoints ====================
 
-@router.get("/submissions/{submission_id}/interactions", response_model=List[SubmissionInteractionResponse])
+@slido_router.get("/submissions/{submission_id}/interactions", response_model=List[SubmissionInteractionResponse])
 def list_interactions(submission_id: int, db: Session = Depends(get_db)):
     """Get all interactions for a submission, ordered by slide_number then order_index"""
     submission = db.query(PresentationSubmission).filter(
@@ -615,7 +615,7 @@ def list_interactions(submission_id: int, db: Session = Depends(get_db)):
     ).all()
 
 
-@router.post("/submissions/{submission_id}/interactions", response_model=SubmissionInteractionResponse, status_code=status.HTTP_201_CREATED)
+@slido_router.post("/submissions/{submission_id}/interactions", response_model=SubmissionInteractionResponse, status_code=status.HTTP_201_CREATED)
 def create_interaction(
     submission_id: int,
     interaction_data: SubmissionInteractionCreate,
@@ -654,7 +654,7 @@ def create_interaction(
     return interaction
 
 
-@router.put("/submissions/interactions/{interaction_id}", response_model=SubmissionInteractionResponse)
+@slido_router.put("/submissions/interactions/{interaction_id}", response_model=SubmissionInteractionResponse)
 def update_interaction(
     interaction_id: int,
     update_data: SubmissionInteractionUpdate,
@@ -687,7 +687,7 @@ def update_interaction(
     return interaction
 
 
-@router.delete("/submissions/interactions/{interaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+@slido_router.delete("/submissions/interactions/{interaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_interaction(interaction_id: int, db: Session = Depends(get_db)):
     """Remove an interaction from a submission"""
     interaction = db.query(SubmissionInteraction).filter(
@@ -711,7 +711,7 @@ def delete_interaction(interaction_id: int, db: Session = Depends(get_db)):
     return None
 
 
-@router.put("/submissions/{submission_id}/submit", response_model=PresentationSubmissionResponse)
+@slido_router.put("/submissions/{submission_id}/submit", response_model=PresentationSubmissionResponse)
 def finalize_submission(submission_id: int, db: Session = Depends(get_db)):
     """Finalize a draft submission (changes status from 'draft' to 'submitted')"""
     submission = db.query(PresentationSubmission).filter(

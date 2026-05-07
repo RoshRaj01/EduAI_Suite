@@ -5,9 +5,9 @@ from app.models.user import User
 from app.schemas.user_schema import UserLogin, Token
 from app.utils.auth import verify_password, create_access_token
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
-@router.post("/login", response_model=Token)
+@auth_router.post("/login", response_model=Token)
 def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_credentials.email).first()
     

@@ -13,7 +13,7 @@ from typing import List, Optional, Any
 import pandas as pd
 import io
 
-router = APIRouter(prefix="/mail", tags=["Mailing"])
+mail_router = APIRouter(prefix="/mail", tags=["Mailing"])
 
 def get_db():
     db = SessionLocal()
@@ -42,7 +42,7 @@ class SendMailRequest(BaseModel):
     body: Optional[str] = None
     draft_ids: Optional[List[int]] = None
 
-@router.post("/upload_students")
+@mail_router.post("/upload_students")
 async def upload_students(file: UploadFile = File(...), db: Session = Depends(get_db)):
     content = await file.read()
     try:
@@ -104,7 +104,7 @@ async def upload_students(file: UploadFile = File(...), db: Session = Depends(ge
     db.commit()
     return {"message": "Students uploaded successfully"}
 
-@router.post("/filter")
+@mail_router.post("/filter")
 def filter_students(req: FilterRequest, db: Session = Depends(get_db)):
     query = db.query(Student)
     
@@ -133,11 +133,11 @@ def filter_students(req: FilterRequest, db: Session = Depends(get_db)):
             
     return query.all()
 
-@router.get("/drafts")
+@mail_router.get("/drafts")
 def get_drafts(db: Session = Depends(get_db)):
     return db.query(MailDraft).order_by(MailDraft.id.desc()).all()
 
-@router.post("/drafts")
+@mail_router.post("/drafts")
 def create_draft(req: DraftCreate, db: Session = Depends(get_db)):
     draft = MailDraft(subject=req.subject, body=req.body, student_ids=req.student_ids, conditions=req.conditions)
     db.add(draft)
@@ -145,7 +145,7 @@ def create_draft(req: DraftCreate, db: Session = Depends(get_db)):
     db.refresh(draft)
     return draft
 
-@router.put("/drafts/{draft_id}")
+@mail_router.put("/drafts/{draft_id}")
 def update_draft(draft_id: int, req: DraftCreate, db: Session = Depends(get_db)):
     draft = db.query(MailDraft).filter(MailDraft.id == draft_id).first()
     if not draft:
@@ -158,7 +158,7 @@ def update_draft(draft_id: int, req: DraftCreate, db: Session = Depends(get_db))
     db.refresh(draft)
     return draft
 
-@router.delete("/drafts/{draft_id}")
+@mail_router.delete("/drafts/{draft_id}")
 def delete_draft(draft_id: int, db: Session = Depends(get_db)):
     draft = db.query(MailDraft).filter(MailDraft.id == draft_id).first()
     if draft:
@@ -166,11 +166,11 @@ def delete_draft(draft_id: int, db: Session = Depends(get_db)):
         db.commit()
     return {"message": "Deleted"}
 
-@router.get("/history")
+@mail_router.get("/history")
 def get_history(db: Session = Depends(get_db)):
     return db.query(MailHistory).order_by(MailHistory.sent_at.desc()).all()
 
-@router.post("/send")
+@mail_router.post("/send")
 def send_bulk_mail(req: SendMailRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     students = db.query(Student).filter(Student.id.in_(req.student_ids)).all()
     

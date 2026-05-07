@@ -59,7 +59,7 @@ class CalendarEventUpdate(BaseModel):
     course_id: Optional[int] = None
 
 
-router = APIRouter(prefix="/calendar", tags=["Calendar"])
+calendar_router = APIRouter(prefix="/calendar", tags=["Calendar"])
 
 
 def _parse_date_safe(value: str) -> Optional[datetime]:
@@ -84,7 +84,7 @@ def _parse_date_safe(value: str) -> Optional[datetime]:
     return None
 
 
-@router.get("/events")
+@calendar_router.get("/events")
 def get_calendar_events(
     start: Optional[str] = None,
     end: Optional[str] = None,
@@ -249,7 +249,7 @@ def get_calendar_events(
     return events
 
 
-@router.post("/events")
+@calendar_router.post("/events")
 def create_calendar_event(payload: CalendarEventCreate, db: Session = Depends(get_db)):
     """Create a new custom calendar event."""
     start_dt = _parse_date_safe(payload.start_time)
@@ -286,7 +286,7 @@ def create_calendar_event(payload: CalendarEventCreate, db: Session = Depends(ge
     }
 
 
-@router.put("/events/{event_id}")
+@calendar_router.put("/events/{event_id}")
 def update_calendar_event(event_id: int, payload: CalendarEventUpdate, db: Session = Depends(get_db)):
     """Update a custom calendar event."""
     event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
@@ -335,7 +335,7 @@ def update_calendar_event(event_id: int, payload: CalendarEventUpdate, db: Sessi
     }
 
 
-@router.delete("/events/{event_id}")
+@calendar_router.delete("/events/{event_id}")
 def delete_calendar_event(event_id: int, db: Session = Depends(get_db)):
     """Delete a custom calendar event."""
     event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
@@ -346,7 +346,7 @@ def delete_calendar_event(event_id: int, db: Session = Depends(get_db)):
     return {"deleted": True, "id": event_id}
 
 
-@router.get("/notifications")
+@calendar_router.get("/notifications")
 def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session = Depends(get_db)):
     """
     Return events happening tomorrow (24h window) for in-app reminders.

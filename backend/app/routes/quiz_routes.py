@@ -7,7 +7,7 @@ from typing import List, Optional
 import random
 import string
 
-router = APIRouter(prefix="/quizzes", tags=["Quizzes"])
+quiz_router = APIRouter(prefix="/quizzes", tags=["Quizzes"])
 
 def get_db():
     db = SessionLocal()
@@ -35,11 +35,11 @@ class QuizCreate(BaseModel):
     description: Optional[str] = None
     questions: List[QuestionSchema]
 
-@router.get("/")
+@quiz_router.get("/")
 def get_quizzes(db: Session = Depends(get_db)):
     return db.query(Quiz).all()
 
-@router.post("/")
+@quiz_router.post("/")
 def create_quiz(quiz_data: QuizCreate, db: Session = Depends(get_db)):
     new_quiz = Quiz(
         title=quiz_data.title,
@@ -76,7 +76,7 @@ def create_quiz(quiz_data: QuizCreate, db: Session = Depends(get_db)):
     db.refresh(new_quiz)
     return {"id": new_quiz.id, "title": new_quiz.title}
 
-@router.get("/{quiz_id}")
+@quiz_router.get("/{quiz_id}")
 def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
     quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
     if not quiz:
@@ -103,7 +103,7 @@ def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
         
     return result
 
-@router.post("/{quiz_id}/session")
+@quiz_router.post("/{quiz_id}/session")
 def create_session(quiz_id: int, db: Session = Depends(get_db)):
     quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
     if not quiz:
@@ -125,7 +125,7 @@ def create_session(quiz_id: int, db: Session = Depends(get_db)):
     
     return session
 
-@router.get("/sessions")
+@quiz_router.get("/sessions")
 def get_all_sessions(db: Session = Depends(get_db)):
     sessions = db.query(QuizSession).order_by(QuizSession.id.desc()).all()
     return [
@@ -139,7 +139,7 @@ def get_all_sessions(db: Session = Depends(get_db)):
         for session in sessions
     ]
 
-@router.get("/sessions/{pin}")
+@quiz_router.get("/sessions/{pin}")
 def get_session(pin: str, db: Session = Depends(get_db)):
     session = db.query(QuizSession).filter(QuizSession.pin == pin).first()
     if not session:
@@ -154,7 +154,7 @@ def get_session(pin: str, db: Session = Depends(get_db)):
     }
 
 
-@router.delete("/{quiz_id}", status_code=status.HTTP_204_NO_CONTENT)
+@quiz_router.delete("/{quiz_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_quiz(quiz_id: int, db: Session = Depends(get_db)):
     quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
     if not quiz:
@@ -164,7 +164,7 @@ def delete_quiz(quiz_id: int, db: Session = Depends(get_db)):
     db.commit()
     return None
 
-@router.delete("/sessions/{pin}", status_code=status.HTTP_204_NO_CONTENT)
+@quiz_router.delete("/sessions/{pin}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(pin: str, db: Session = Depends(get_db)):
     session = db.query(QuizSession).filter(QuizSession.pin == pin).first()
     if not session:

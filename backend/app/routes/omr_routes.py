@@ -25,9 +25,9 @@ def compress_image_to_base64(image_bytes: bytes, max_size=(1024, 1024), quality=
         print(f"Image compression error: {e}")
         return base64.b64encode(image_bytes).decode('utf-8')
 
-router = APIRouter(prefix="/api/omr", tags=["OMR Evaluation"])
+omr_router = APIRouter(prefix="/api/omr", tags=["OMR Evaluation"])
 
-@router.post("/jobs")
+@omr_router.post("/jobs")
 async def create_omr_job(title: str = Form(...), answer_key: str = Form(None), file: UploadFile = File(None), db: Session = Depends(get_db)):
     if not answer_key and not file:
         raise HTTPException(status_code=400, detail="Must provide either answer_key JSON or an image file")
@@ -68,18 +68,18 @@ async def create_omr_job(title: str = Form(...), answer_key: str = Form(None), f
     db.refresh(job)
     return job
 
-@router.get("/jobs")
+@omr_router.get("/jobs")
 def get_omr_jobs(db: Session = Depends(get_db)):
     return db.query(OMRJob).order_by(OMRJob.id.desc()).all()
 
-@router.get("/jobs/{job_id}")
+@omr_router.get("/jobs/{job_id}")
 def get_omr_job(job_id: int, db: Session = Depends(get_db)):
     job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
 
-@router.delete("/jobs/{job_id}")
+@omr_router.delete("/jobs/{job_id}")
 def delete_omr_job(job_id: int, db: Session = Depends(get_db)):
     job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
     if not job:
@@ -91,7 +91,7 @@ def delete_omr_job(job_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Job deleted successfully"}
 
-@router.put("/jobs/{job_id}")
+@omr_router.put("/jobs/{job_id}")
 async def update_omr_job(
     job_id: int, 
     title: str = Form(...), 
@@ -133,11 +133,11 @@ async def update_omr_job(
     db.refresh(job)
     return job
 
-@router.get("/jobs/{job_id}/submissions")
+@omr_router.get("/jobs/{job_id}/submissions")
 def get_omr_submissions(job_id: int, db: Session = Depends(get_db)):
     return db.query(OMRSubmission).filter(OMRSubmission.job_id == job_id).all()
 
-@router.post("/jobs/{job_id}/upload")
+@omr_router.post("/jobs/{job_id}/upload")
 async def upload_omr_sheet(job_id: int, student_id: str = Form(...), file: UploadFile = File(...), db: Session = Depends(get_db)):
     job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
     if not job:
@@ -190,7 +190,7 @@ async def upload_omr_sheet(job_id: int, student_id: str = Form(...), file: Uploa
     
     return submission
 
-@router.put("/submissions/{sub_id}")
+@omr_router.put("/submissions/{sub_id}")
 def update_submission(sub_id: int, score: float = Form(...), detected_answers: str = Form(...), db: Session = Depends(get_db)):
     sub = db.query(OMRSubmission).filter(OMRSubmission.id == sub_id).first()
     if not sub:

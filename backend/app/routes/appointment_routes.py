@@ -6,7 +6,7 @@ from app.database import SessionLocal
 from app.models.appointment import Appointment
 from app.schemas.appointment import AppointmentCreate, AppointmentResponse, AppointmentStatusUpdate
 
-router = APIRouter(prefix="/appointments", tags=["Appointments"])
+appointment_router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 
 def get_db():
@@ -21,7 +21,7 @@ def _base_query(db: Session):
     return db.query(Appointment)
 
 
-@router.get("/", response_model=list[AppointmentResponse])
+@appointment_router.get("/", response_model=list[AppointmentResponse])
 def get_appointments(
     teacher_name: str | None = None,
     student_name: str | None = None,
@@ -38,17 +38,17 @@ def get_appointments(
     return query.order_by(Appointment.id.desc()).all()
 
 
-@router.get("/teacher/{teacher_name}", response_model=list[AppointmentResponse])
+@appointment_router.get("/teacher/{teacher_name}", response_model=list[AppointmentResponse])
 def get_teacher_appointments(teacher_name: str, db: Session = Depends(get_db)):
     return _base_query(db).filter(Appointment.teacher_name == teacher_name).order_by(Appointment.id.desc()).all()
 
 
-@router.get("/student/{student_name}", response_model=list[AppointmentResponse])
+@appointment_router.get("/student/{student_name}", response_model=list[AppointmentResponse])
 def get_student_appointments(student_name: str, db: Session = Depends(get_db)):
     return _base_query(db).filter(Appointment.student_name == student_name).order_by(Appointment.id.desc()).all()
 
 
-@router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
+@appointment_router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
 def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)):
     appointment = Appointment(
         student_name=payload.student_name,
@@ -68,7 +68,7 @@ def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)
     return appointment
 
 
-@router.patch("/{appointment_id}/status", response_model=AppointmentResponse)
+@appointment_router.patch("/{appointment_id}/status", response_model=AppointmentResponse)
 def update_appointment_status(
     appointment_id: int,
     payload: AppointmentStatusUpdate,

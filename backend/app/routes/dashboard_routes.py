@@ -13,7 +13,7 @@ from app.models.lesson import Lesson
 from datetime import datetime, date, timedelta
 from typing import Optional
 
-router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+dashboard_router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 def _parse_date_safe(value: str) -> Optional[datetime]:
     """Try multiple date formats."""
@@ -35,7 +35,7 @@ def _parse_date_safe(value: str) -> Optional[datetime]:
             continue
     return None
 
-@router.get("/summary")
+@dashboard_router.get("/summary")
 def get_dashboard_summary(db: Session = Depends(get_db)):
     # 1. Stats
     total_students = db.query(Student).count()
@@ -231,7 +231,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         "schedule": schedule
     }
 
-@router.get("/student-summary")
+@dashboard_router.get("/student-summary")
 def get_student_dashboard_summary(student_name: str = "Aarav Gupta", db: Session = Depends(get_db)):
     # 1. Student Info & Stats
     # Find all enrollment records for this student

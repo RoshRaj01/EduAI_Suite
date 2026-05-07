@@ -13,7 +13,7 @@ import re
 import random
 from datetime import datetime
 
-router = APIRouter(prefix="/exams", tags=["Exams"])
+exam_router = APIRouter(prefix="/exams", tags=["Exams"])
 
 def get_db():
     db = SessionLocal()
@@ -22,7 +22,7 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/stats")
+@exam_router.get("/stats")
 def get_exam_stats(db: Session = Depends(get_db)):
     total_exams = db.query(Exam).count()
     
@@ -44,11 +44,11 @@ def get_exam_stats(db: Session = Depends(get_db)):
         "pending_ai_review": 0 # Placeholder for now
     }
 
-@router.get("/", response_model=List[ExamResponse])
+@exam_router.get("/", response_model=List[ExamResponse])
 def get_all_exams(db: Session = Depends(get_db)):
     return db.query(Exam).all()
 
-@router.post("/", response_model=ExamResponse)
+@exam_router.post("/", response_model=ExamResponse)
 def create_exam(exam_data: ExamCreate, db: Session = Depends(get_db)):
     new_exam = Exam(
         course_id=exam_data.course_id,
@@ -86,18 +86,18 @@ def create_exam(exam_data: ExamCreate, db: Session = Depends(get_db)):
     db.refresh(new_exam)
     return new_exam
 
-@router.get("/course/{course_id}", response_model=List[ExamResponse])
+@exam_router.get("/course/{course_id}", response_model=List[ExamResponse])
 def get_course_exams(course_id: int, db: Session = Depends(get_db)):
     return db.query(Exam).filter(Exam.course_id == course_id).all()
 
-@router.get("/{exam_id}", response_model=ExamResponse)
+@exam_router.get("/{exam_id}", response_model=ExamResponse)
 def get_exam(exam_id: int, db: Session = Depends(get_db)):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     return exam
 
-@router.post("/{exam_id}/start", response_model=ExamAttemptResponse)
+@exam_router.post("/{exam_id}/start", response_model=ExamAttemptResponse)
 def start_exam_attempt(exam_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
@@ -133,7 +133,7 @@ def start_exam_attempt(exam_id: int, db: Session = Depends(get_db), current_user
     db.refresh(new_attempt)
     return new_attempt
 
-@router.post("/attempts/{attempt_id}/submit", response_model=ExamAttemptResponse)
+@exam_router.post("/attempts/{attempt_id}/submit", response_model=ExamAttemptResponse)
 def submit_exam_attempt(attempt_id: int, submission: ExamAttemptSubmit, db: Session = Depends(get_db)):
     attempt = db.query(ExamAttempt).filter(ExamAttempt.id == attempt_id).first()
     if not attempt:
@@ -167,7 +167,7 @@ def submit_exam_attempt(attempt_id: int, submission: ExamAttemptSubmit, db: Sess
     db.refresh(attempt)
     return attempt
 
-@router.post("/extract")
+@exam_router.post("/extract")
 async def extract_exam_questions(file: UploadFile = File(...)):
     contents = await file.read()
     text = ""
@@ -245,7 +245,7 @@ async def extract_exam_questions(file: UploadFile = File(...)):
 
     return questions
 
-@router.post("/extract-answers")
+@exam_router.post("/extract-answers")
 async def extract_exam_answers(file: UploadFile = File(...)):
     contents = await file.read()
     text = ""
@@ -275,7 +275,7 @@ async def extract_exam_answers(file: UploadFile = File(...)):
     
     return answers
 
-@router.delete("/{exam_id}")
+@exam_router.delete("/{exam_id}")
 def delete_exam(exam_id: int, db: Session = Depends(get_db)):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
@@ -287,7 +287,7 @@ def delete_exam(exam_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Exam deleted successfully"}
 
-@router.put("/{exam_id}", response_model=ExamResponse)
+@exam_router.put("/{exam_id}", response_model=ExamResponse)
 def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_db)):
     db_exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not db_exam:
@@ -329,7 +329,7 @@ def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_d
     db.refresh(db_exam)
     return db_exam
 
-@router.get("/{exam_id}/attempts", response_model=List[ExamAttemptResponse])
+@exam_router.get("/{exam_id}/attempts", response_model=List[ExamAttemptResponse])
 def get_exam_attempts(exam_id: int, db: Session = Depends(get_db)):
     attempts = db.query(ExamAttempt).filter(ExamAttempt.exam_id == exam_id).all()
     
@@ -349,7 +349,7 @@ def get_exam_attempts(exam_id: int, db: Session = Depends(get_db)):
         })
     return res
 
-@router.get("/attempts/{attempt_id}", response_model=ExamAttemptDetailResponse)
+@exam_router.get("/attempts/{attempt_id}", response_model=ExamAttemptDetailResponse)
 def get_attempt_details(attempt_id: int, db: Session = Depends(get_db)):
     attempt = db.query(ExamAttempt).filter(ExamAttempt.id == attempt_id).first()
     if not attempt:

@@ -14,7 +14,7 @@ import json
 import numpy as np
 from datetime import datetime
 
-router = APIRouter(prefix="/analytics", tags=["Analytics"])
+analytics_router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 def get_db():
     db = SessionLocal()
@@ -23,7 +23,7 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/course/{course_id}")
+@analytics_router.get("/course/{course_id}")
 def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     # Get all exams for the course
     exams = db.query(Exam).filter(Exam.course_id == course_id).all()
@@ -160,7 +160,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
         "subject_breakdown": subject_stats
     }
 
-@router.post("/upload")
+@analytics_router.post("/upload")
 async def upload_analytics_data(
     file: UploadFile = File(...),
     impute_method: str = Form("auto")

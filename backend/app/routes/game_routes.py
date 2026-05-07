@@ -16,7 +16,7 @@ from datetime import datetime
 import uuid
 import json
 
-router = APIRouter(prefix="/games", tags=["Games"])
+game_router = APIRouter(prefix="/games", tags=["Games"])
 
 
 def get_db():
@@ -29,7 +29,7 @@ def get_db():
 # Create a new game
 
 
-@router.post("/chain-answer", response_model=ChainAnswerGameResponse, status_code=status.HTTP_201_CREATED)
+@game_router.post("/chain-answer", response_model=ChainAnswerGameResponse, status_code=status.HTTP_201_CREATED)
 def create_chain_answer_game(
     game_data: ChainAnswerGameCreate,
     db: Session = Depends(get_db)
@@ -110,7 +110,7 @@ def create_chain_answer_game(
 
 
 # Get all games
-@router.get("/chain-answer", response_model=list[ChainAnswerGameListResponse])
+@game_router.get("/chain-answer", response_model=list[ChainAnswerGameListResponse])
 def get_all_chain_answer_games(
     skip: int = 0,
     limit: int = 100,
@@ -127,7 +127,7 @@ def get_all_chain_answer_games(
 
 
 # Get game by ID
-@router.get("/chain-answer/{game_id}", response_model=ChainAnswerGameResponse)
+@game_router.get("/chain-answer/{game_id}", response_model=ChainAnswerGameResponse)
 def get_chain_answer_game(
     game_id: int,
     db: Session = Depends(get_db)
@@ -146,7 +146,7 @@ def get_chain_answer_game(
 
 
 # Get game by session ID
-@router.get("/chain-answer/session/{session_id}", response_model=ChainAnswerGameResponse)
+@game_router.get("/chain-answer/session/{session_id}", response_model=ChainAnswerGameResponse)
 def get_chain_answer_game_by_session(
     session_id: str,
     db: Session = Depends(get_db)
@@ -165,7 +165,7 @@ def get_chain_answer_game_by_session(
 
 
 # Start a game
-@router.post("/chain-answer/{game_id}/start", response_model=ChainAnswerGameResponse)
+@game_router.post("/chain-answer/{game_id}/start", response_model=ChainAnswerGameResponse)
 def start_chain_answer_game(
     game_id: int,
     db: Session = Depends(get_db)
@@ -203,7 +203,7 @@ def start_chain_answer_game(
 
 
 # Submit a word
-@router.post("/chain-answer/{game_id}/word", response_model=GameWordResponse, status_code=status.HTTP_201_CREATED)
+@game_router.post("/chain-answer/{game_id}/word", response_model=GameWordResponse, status_code=status.HTTP_201_CREATED)
 def submit_word(
     game_id: int,
     word_data: GameWordCreate,
@@ -263,7 +263,7 @@ def submit_word(
 
 
 # End a game
-@router.post("/chain-answer/{game_id}/end", response_model=ChainAnswerGameResponse)
+@game_router.post("/chain-answer/{game_id}/end", response_model=ChainAnswerGameResponse)
 def end_chain_answer_game(
     game_id: int,
     db: Session = Depends(get_db)
@@ -294,7 +294,7 @@ def end_chain_answer_game(
 
 
 # Pause a game
-@router.post("/chain-answer/{game_id}/pause", response_model=ChainAnswerGameResponse)
+@game_router.post("/chain-answer/{game_id}/pause", response_model=ChainAnswerGameResponse)
 def pause_chain_answer_game(
     game_id: int,
     db: Session = Depends(get_db)
@@ -324,7 +324,7 @@ def pause_chain_answer_game(
 
 
 # Resume a game
-@router.post("/chain-answer/{game_id}/resume", response_model=ChainAnswerGameResponse)
+@game_router.post("/chain-answer/{game_id}/resume", response_model=ChainAnswerGameResponse)
 def resume_chain_answer_game(
     game_id: int,
     db: Session = Depends(get_db)
@@ -354,7 +354,7 @@ def resume_chain_answer_game(
 
 
 # Word engine status check (replaces old Groq status endpoint)
-@router.get("/chain-answer/status/groq")
+@game_router.get("/chain-answer/status/groq")
 def get_word_engine_status():
     """Check word engine availability — always available (local dictionary)"""
     return {
@@ -365,7 +365,7 @@ def get_word_engine_status():
 
 
 # Delete a game
-@router.delete("/chain-answer/{game_id}", status_code=status.HTTP_204_NO_CONTENT)
+@game_router.delete("/chain-answer/{game_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_chain_answer_game(
     game_id: int,
     db: Session = Depends(get_db)

@@ -7,7 +7,7 @@ from app.database import SessionLocal
 from app.models.history import ActionHistory
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/history", tags=["History"])
+history_router = APIRouter(prefix="/history", tags=["History"])
 
 def get_db():
     db = SessionLocal()
@@ -31,7 +31,7 @@ class ActionHistoryResponse(ActionHistoryCreate):
     class Config:
         from_attributes = True
 
-@router.post("/", response_model=ActionHistoryResponse, status_code=status.HTTP_201_CREATED)
+@history_router.post("/", response_model=ActionHistoryResponse, status_code=status.HTTP_201_CREATED)
 def create_history(payload: ActionHistoryCreate, db: Session = Depends(get_db)):
     history = ActionHistory(**payload.model_dump())
     db.add(history)
@@ -39,7 +39,7 @@ def create_history(payload: ActionHistoryCreate, db: Session = Depends(get_db)):
     db.refresh(history)
     return history
 
-@router.get("/", response_model=list[ActionHistoryResponse])
+@history_router.get("/", response_model=list[ActionHistoryResponse])
 def get_history(
     feature: Optional[str] = None,
     user_id: Optional[str] = None,

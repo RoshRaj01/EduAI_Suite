@@ -7,7 +7,7 @@ from app.schemas.announcement import AnnouncementResponse
 from app.utils.file_uploads import save_optional_upload
 from typing import Optional
 
-router = APIRouter(prefix="/announcements", tags=["Announcements"])
+announcement_router = APIRouter(prefix="/announcements", tags=["Announcements"])
 
 def get_db():
     db = SessionLocal()
@@ -16,11 +16,11 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/{course_id}", response_model=list[AnnouncementResponse])
+@announcement_router.get("/{course_id}", response_model=list[AnnouncementResponse])
 def get_announcements(course_id: int, db: Session = Depends(get_db)):
     return db.query(Announcement).filter(Announcement.course_id == course_id).all()
 
-@router.post("/{course_id}", response_model=AnnouncementResponse, status_code=status.HTTP_201_CREATED)
+@announcement_router.post("/{course_id}", response_model=AnnouncementResponse, status_code=status.HTTP_201_CREATED)
 async def create_announcement(
     course_id: int,
     title: str = Form(...),
@@ -47,7 +47,7 @@ async def create_announcement(
     db.refresh(new_announcement)
     return new_announcement
 
-@router.delete("/{announcement_id}", status_code=status.HTTP_204_NO_CONTENT)
+@announcement_router.delete("/{announcement_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_announcement(announcement_id: int, db: Session = Depends(get_db)):
     announcement = db.query(Announcement).filter(Announcement.id == announcement_id).first()
     if not announcement:

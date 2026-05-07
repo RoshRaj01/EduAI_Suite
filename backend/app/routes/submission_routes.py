@@ -8,7 +8,7 @@ from app.utils.file_uploads import save_optional_upload
 from datetime import datetime
 import os
 
-router = APIRouter(prefix="/submissions", tags=["Submissions"])
+submission_router = APIRouter(prefix="/submissions", tags=["Submissions"])
 
 def get_db():
     db = SessionLocal()
@@ -17,15 +17,15 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/{assignment_id}", response_model=list[SubmissionResponse])
+@submission_router.get("/{assignment_id}", response_model=list[SubmissionResponse])
 def get_submissions(assignment_id: int, db: Session = Depends(get_db)):
     return db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
 
-@router.get("/assignment/{assignment_id}", response_model=list[SubmissionResponse])
+@submission_router.get("/assignment/{assignment_id}", response_model=list[SubmissionResponse])
 def get_submissions_by_assignment(assignment_id: int, db: Session = Depends(get_db)):
     return db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
 
-@router.post("/{assignment_id}", response_model=SubmissionResponse, status_code=status.HTTP_201_CREATED)
+@submission_router.post("/{assignment_id}", response_model=SubmissionResponse, status_code=status.HTTP_201_CREATED)
 async def create_submission(
     assignment_id: int,
     student_name: str = Form(...),
@@ -54,7 +54,7 @@ async def create_submission(
     
     return new_sub
 
-@router.delete("/{submission_id}", status_code=status.HTTP_204_NO_CONTENT)
+@submission_router.delete("/{submission_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_submission(submission_id: int, db: Session = Depends(get_db)):
     sub = db.query(Submission).filter(Submission.id == submission_id).first()
     if not sub:
@@ -71,7 +71,7 @@ def delete_submission(submission_id: int, db: Session = Depends(get_db)):
     db.commit()
     return None
 
-@router.delete("/assignment/{assignment_id}/student/{student_name}", status_code=status.HTTP_204_NO_CONTENT)
+@submission_router.delete("/assignment/{assignment_id}/student/{student_name}", status_code=status.HTTP_204_NO_CONTENT)
 def unsubmit_assignment(assignment_id: int, student_name: str, db: Session = Depends(get_db)):
     subs = db.query(Submission).filter(
         Submission.assignment_id == assignment_id,
@@ -82,7 +82,7 @@ def unsubmit_assignment(assignment_id: int, student_name: str, db: Session = Dep
     db.commit()
     return None
 
-@router.put("/grade/{submission_id}", response_model=SubmissionResponse)
+@submission_router.put("/grade/{submission_id}", response_model=SubmissionResponse)
 def grade_submission(submission_id: int, grade: float = Form(...), db: Session = Depends(get_db)):
     sub = db.query(Submission).filter(Submission.id == submission_id).first()
     if not sub:

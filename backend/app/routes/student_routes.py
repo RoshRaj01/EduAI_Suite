@@ -7,7 +7,7 @@ from app.schemas.student import StudentCreate, StudentResponse
 import csv
 import io
 
-router = APIRouter(prefix="/students", tags=["Students"])
+student_router = APIRouter(prefix="/students", tags=["Students"])
 
 
 def get_db():
@@ -18,12 +18,12 @@ def get_db():
         db.close()
 
 
-@router.get("/{course_id}", response_model=list[StudentResponse])
+@student_router.get("/{course_id}", response_model=list[StudentResponse])
 def get_students(course_id: int, db: Session = Depends(get_db)):
     return db.query(Student).filter(Student.course_id == course_id).all()
 
 
-@router.post("/{course_id}", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
+@student_router.post("/{course_id}", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 def manual_enroll(course_id: int, student: StudentCreate, db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
@@ -37,7 +37,7 @@ def manual_enroll(course_id: int, student: StudentCreate, db: Session = Depends(
     return new_student
 
 
-@router.post("/bulk_upload/{course_id}", status_code=status.HTTP_201_CREATED)
+@student_router.post("/bulk_upload/{course_id}", status_code=status.HTTP_201_CREATED)
 async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
@@ -73,7 +73,7 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session 
     return {"message": f"Successfully enrolled {len(students_to_add)} students"}
 
 
-@router.post("/enroll/code", status_code=status.HTTP_201_CREATED)
+@student_router.post("/enroll/code", status_code=status.HTTP_201_CREATED)
 def enroll_via_code(enrollment_code: str, student: StudentCreate, db: Session = Depends(get_db)):
     course = db.query(Course).filter(
         Course.enrollment_code == enrollment_code).first()
@@ -88,7 +88,7 @@ def enroll_via_code(enrollment_code: str, student: StudentCreate, db: Session = 
     return new_student
 
 
-@router.get("/{course_id}/active", response_model=list[StudentResponse])
+@student_router.get("/{course_id}/active", response_model=list[StudentResponse])
 def get_active_students(course_id: int, db: Session = Depends(get_db)):
     """Get all active students enrolled in a course (for games/activities)"""
     course = db.query(Course).filter(Course.id == course_id).first()
@@ -103,7 +103,7 @@ def get_active_students(course_id: int, db: Session = Depends(get_db)):
     return students
 
 
-@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+@student_router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:

@@ -18,7 +18,7 @@ import docx
 import io
 import re
 
-router = APIRouter(prefix="/courses", tags=["Courses"])
+course_router = APIRouter(prefix="/courses", tags=["Courses"])
 
 def get_db():
     db = SessionLocal()
@@ -55,13 +55,13 @@ def _enrich_course(course: Course, db: Session) -> dict:
     return d
 
 
-@router.get("/", response_model=list[CourseResponse])
+@course_router.get("/", response_model=list[CourseResponse])
 def get_courses(db: Session = Depends(get_db)):
     courses = db.query(Course).all()
     return [_enrich_course(c, db) for c in courses]
 
 
-@router.get("/{course_id}", response_model=CourseResponse)
+@course_router.get("/{course_id}", response_model=CourseResponse)
 def get_course(course_id: int, db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
@@ -71,7 +71,7 @@ def get_course(course_id: int, db: Session = Depends(get_db)):
 def generate_unique_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-@router.post("/extract_details")
+@course_router.post("/extract_details")
 async def extract_course_details(file: UploadFile = File(...)):
     contents = await file.read()
     text = ""
@@ -169,7 +169,7 @@ async def extract_course_details(file: UploadFile = File(...)):
     return details
 
 
-@router.post("/", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
+@course_router.post("/", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
 def create_course(
     code: str = Form(...),
     name: str = Form(...),
@@ -202,7 +202,7 @@ def create_course(
     db.refresh(new_course)
     return new_course
 
-@router.put("/{course_id}", response_model=CourseResponse)
+@course_router.put("/{course_id}", response_model=CourseResponse)
 def update_course(course_id: int, course_update: CourseUpdate, db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
@@ -216,7 +216,7 @@ def update_course(course_id: int, course_update: CourseUpdate, db: Session = Dep
     db.refresh(course)
     return course
 
-@router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
+@course_router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_course(course_id: int, db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:

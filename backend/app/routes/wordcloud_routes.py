@@ -7,12 +7,12 @@ import string
 from pydantic import BaseModel
 from typing import Optional
 
-router = APIRouter(prefix="/wordcloud", tags=["Word Cloud"])
+wordcloud_router = APIRouter(prefix="/wordcloud", tags=["Word Cloud"])
 
 class WordCloudCreateRequest(BaseModel):
     prompt: str
 
-@router.post("/create")
+@wordcloud_router.post("/create")
 def create_wordcloud_session(request: WordCloudCreateRequest, db: Session = Depends(get_db)):
     # Generate 6-digit random pin
     pin = ''.join(random.choices(string.digits, k=6))
@@ -32,7 +32,7 @@ def create_wordcloud_session(request: WordCloudCreateRequest, db: Session = Depe
     
     return {"pin": pin, "prompt": session.prompt, "session_id": session.id}
 
-@router.get("/{pin}")
+@wordcloud_router.get("/{pin}")
 def get_wordcloud_session(pin: str, db: Session = Depends(get_db)):
     session = db.query(WordCloudSession).filter(WordCloudSession.pin == pin).first()
     if not session:
@@ -40,12 +40,12 @@ def get_wordcloud_session(pin: str, db: Session = Depends(get_db)):
         
     return {"prompt": session.prompt, "status": session.status, "session_id": session.id}
 
-@router.get("/")
+@wordcloud_router.get("/")
 def get_all_wordcloud_sessions(db: Session = Depends(get_db)):
     sessions = db.query(WordCloudSession).order_by(WordCloudSession.id.desc()).all()
     return [{"pin": s.pin, "prompt": s.prompt, "status": s.status, "session_id": s.id, "created_at": getattr(s, 'created_at', None)} for s in sessions]
 
-@router.delete("/{pin}")
+@wordcloud_router.delete("/{pin}")
 def delete_wordcloud_session(pin: str, db: Session = Depends(get_db)):
     session = db.query(WordCloudSession).filter(WordCloudSession.pin == pin).first()
     if not session:
