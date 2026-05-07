@@ -6,6 +6,7 @@ from app.models.exam import Exam, ExamQuestion, ExamChoice, ExamAttempt, ExamAns
 from app.schemas.exam import ExamCreate, ExamResponse, ExamAttemptCreate, ExamAttemptResponse, ExamAttemptSubmit, ExamAttemptDetailResponse, ExamReviewResponse
 from app.utils.auth import get_current_user
 from app.models.user import User
+from app.models.student import Student
 import PyPDF2
 import docx
 import io
@@ -47,8 +48,15 @@ def get_exam_stats(db: Session = Depends(get_db)):
 @exam_router.get("/", response_model=List[ExamResponse])
 def get_all_exams(course_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.role == "student":
-        # Students only see exams for their course
-        return db.query(Exam).filter(Exam.course_id == current_user.course_id).all()
+        # Find the student record to get the course_id
+        student = db.query(Student).filter(Student.email == current_user.email).first()
+        if not student:
+            return []
+        # Students only see published exams for their course
+        return db.query(Exam).filter(
+            Exam.course_id == student.course_id,
+            Exam.status == "published"
+        ).all()
     
     # Teachers/Admins can see all or filter by course_id
     query = db.query(Exam)
