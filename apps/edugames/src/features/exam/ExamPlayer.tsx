@@ -267,11 +267,11 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
                <Home size={18} /> Exit
              </button>
           </div>
-
-          {showReview && fullSubmissionDetail && (
-             <AnswerSheet attempt={fullSubmissionDetail} onClose={() => setShowReview(false)} />
-          )}
         </GlassCard>
+
+        {showReview && fullSubmissionDetail && (
+           <AnswerSheet attempt={fullSubmissionDetail} onClose={() => setShowReview(false)} />
+        )}
       </div>
     );
   }
