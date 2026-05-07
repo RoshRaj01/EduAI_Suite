@@ -47,6 +47,24 @@ export const QuizMonitoring: React.FC = () => {
   }, []);
 
   const startSession = async () => {
+    // If quizId is 6 digits, it's likely a PIN (rejoining)
+    if (quizId && quizId.length === 6 && !isNaN(Number(quizId))) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/quizzes/sessions/${quizId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setPin(quizId);
+          setStatus(data.status);
+          setQuestionIndex(data.current_question || 0);
+          connectWebSocket(quizId);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to rejoin session", err);
+      }
+    }
+
+    // Otherwise, create a new session
     try {
       const res = await fetch(`${API_BASE_URL}/quizzes/${quizId}/session`, { method: "POST" });
       const data = await res.json();
