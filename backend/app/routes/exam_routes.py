@@ -45,8 +45,16 @@ def get_exam_stats(db: Session = Depends(get_db)):
     }
 
 @exam_router.get("/", response_model=List[ExamResponse])
-def get_all_exams(db: Session = Depends(get_db)):
-    return db.query(Exam).all()
+def get_all_exams(course_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.role == "student":
+        # Students only see exams for their course
+        return db.query(Exam).filter(Exam.course_id == current_user.course_id).all()
+    
+    # Teachers/Admins can see all or filter by course_id
+    query = db.query(Exam)
+    if course_id:
+        query = query.filter(Exam.course_id == course_id)
+    return query.all()
 
 @exam_router.post("/", response_model=ExamResponse)
 def create_exam(exam_data: ExamCreate, db: Session = Depends(get_db)):

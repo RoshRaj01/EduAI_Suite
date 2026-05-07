@@ -24,10 +24,13 @@ interface ExamCreatorProps {
   initialData?: any;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initialData }) => {
   const [title, setTitle] = useState(initialData?.title || "");
   const [description, setDescription] = useState(initialData?.description || "");
-  const [courseId, setCourseId] = useState(initialData?.course_id || 1);
+  const [courseId, setCourseId] = useState<number | string>(initialData?.course_id || "");
+  const [courses, setCourses] = useState<any[]>([]);
   const [timeLimit, setTimeLimit] = useState(initialData?.time_limit || 60);
   const [attempts, setAttempts] = useState(initialData?.attempts_allowed || 1);
   const [randomize, setRandomize] = useState(initialData?.randomize_questions || false);
@@ -36,6 +39,23 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
   const [isMappingAnswers, setIsMappingAnswers] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+
+  React.useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  const fetchCourses = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/courses/`);
+      const data = await response.json();
+      setCourses(data);
+      if (data.length > 0 && !courseId) {
+        setCourseId(data[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to fetch courses", err);
+    }
+  };
 
   const addQuestion = () => {
     setQuestions([
@@ -94,7 +114,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8000/exams/extract", {
+      const response = await fetch(`${API_BASE_URL}/exams/extract`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
         body: formData,
@@ -127,7 +147,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8000/exams/extract-answers", {
+      const response = await fetch(`${API_BASE_URL}/exams/extract-answers`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
         body: formData,
@@ -236,6 +256,22 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
                   />
                 </div>
                 
+                <div>
+                  <label className="text-xs font-semibold mb-1 block text-slate-600">Assign to Class <span className="text-red-500">*</span></label>
+                  <select 
+                    className="form-input text-sm bg-white"
+                    value={courseId}
+                    onChange={(e) => setCourseId(parseInt(e.target.value))}
+                  >
+                    {courses.length === 0 && <option value="">Loading classes...</option>}
+                    {courses.map(course => (
+                      <option key={course.id} value={course.id}>
+                        {course.code} - {course.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="text-xs font-semibold mb-1 block text-slate-600">Time Limit (Minutes)</label>
                   <div className="flex items-center gap-3">

@@ -17,7 +17,14 @@ export const StudentExams: React.FC = () => {
   const fetchExams = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/exams/`);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setLoading(false);
+        return; // App will show "No Exams Available" or user will be redirected by other logic
+      }
+      const response = await fetch(`${API_BASE_URL}/exams/`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
       if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
       setExams(data.filter((e: any) => e.status === "published"));
