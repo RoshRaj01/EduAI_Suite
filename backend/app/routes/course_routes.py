@@ -7,6 +7,8 @@ from app.models.student import Student
 from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.announcement import Announcement
+from app.models.lesson import Lesson
+from app.models.resource import Resource
 from app.schemas.course import CourseCreate, CourseResponse, CourseUpdate
 from app.utils.file_uploads import save_optional_upload
 import random
@@ -224,6 +226,8 @@ def delete_course(course_id: int, db: Session = Depends(get_db)):
     db.query(Announcement).filter(Announcement.course_id == course_id).delete(synchronize_session="fetch")
     db.query(Assignment).filter(Assignment.course_id == course_id).delete(synchronize_session="fetch")
     db.query(Student).filter(Student.course_id == course_id).delete(synchronize_session="fetch")
+    db.query(Lesson).filter(Lesson.course_id == course_id).delete(synchronize_session="fetch")
+    db.query(Resource).filter(Resource.course_id == course_id).delete(synchronize_session="fetch")
     
     db.delete(course)
     db.commit()
