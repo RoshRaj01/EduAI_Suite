@@ -48,6 +48,8 @@ def _enrich_course(course: Course, db: Session) -> dict:
     }
     d["students"] = student_count
     d["progress"] = progress
+    d["color"] = d.get("color") or "from-blue-400 to-indigo-500"
+    d["description"] = d.get("description") or ""
     return d
 
 
