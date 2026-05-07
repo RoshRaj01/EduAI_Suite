@@ -118,6 +118,13 @@ with engine.begin() as connection:
     except Exception as e:
         print(f"Note: appointments migration skipped: {e}")
 
+    try:
+        quiz_columns = {column["name"] for column in inspector.get_columns("quizzes")}
+        if "is_draft" not in quiz_columns:
+            connection.execute(text("ALTER TABLE quizzes ADD COLUMN is_draft BOOLEAN DEFAULT 0"))
+    except Exception as e:
+        print(f"Note: quizzes migration skipped: {e}")
+
 app = FastAPI()
 
 app.add_middleware(

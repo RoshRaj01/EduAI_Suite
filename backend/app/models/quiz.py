@@ -10,6 +10,7 @@ class Quiz(Base):
     title = Column(String)
     description = Column(Text, nullable=True)
     cover_image = Column(String, nullable=True)
+    is_draft = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")

@@ -7,12 +7,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 interface GameSession {
   id: string | number;
-  type: "chain-answer" | "wordcloud" | "quiz";
+  type: "chain-answer" | "wordcloud" | "quiz" | "quiz-template";
   title: string;
   status: string;
   created_at?: string;
   session_id?: string;
   pin?: string;
+  question_count?: number;
 }
 
 interface GamesHistoryListProps {
@@ -29,6 +30,26 @@ export const GamesHistoryList: React.FC<GamesHistoryListProps> = ({ onRejoinGame
     setError(null);
     try {
       const results: GameSession[] = [];
+
+      // Fetch Quizzes (Drafts and Templates)
+      try {
+        const qzRes = await fetch(`${API_BASE_URL}/quizzes/`);
+        if (qzRes.ok) {
+          const qzData = await qzRes.json();
+          qzData.forEach((quiz: any) => {
+            results.push({
+              id: quiz.id,
+              type: "quiz-template",
+              title: quiz.title,
+              status: quiz.is_draft ? "draft" : "published",
+              created_at: quiz.created_at,
+              question_count: quiz.question_count
+            });
+          });
+        }
+      } catch (err) {
+        console.warn("Could not fetch Quiz templates", err);
+      }
 
       // Fetch Chain Answer games
       try {
@@ -68,7 +89,7 @@ export const GamesHistoryList: React.FC<GamesHistoryListProps> = ({ onRejoinGame
         console.warn("Could not fetch Word Cloud sessions", err);
       }
 
-      // Fetch Quiz sessions
+      // Fetch Quiz sessions (Active games)
       try {
         const qRes = await fetch(`${API_BASE_URL}/quizzes/sessions`);
         if (qRes.ok) {
@@ -100,7 +121,7 @@ export const GamesHistoryList: React.FC<GamesHistoryListProps> = ({ onRejoinGame
   }, []);
 
   const handleDelete = async (type: string, id: string | number) => {
-    if (!window.confirm("Are you sure you want to delete this game session?")) return;
+    if (!window.confirm("Are you sure you want to delete this?")) return;
 
     try {
       let endpoint = "";
@@ -110,17 +131,33 @@ export const GamesHistoryList: React.FC<GamesHistoryListProps> = ({ onRejoinGame
         endpoint = `${API_BASE_URL}/wordcloud/${id}`;
       } else if (type === "quiz") {
         endpoint = `${API_BASE_URL}/quizzes/sessions/${id}`;
+      } else if (type === "quiz-template") {
+        endpoint = `${API_BASE_URL}/quizzes/${id}`;
       }
 
       const res = await fetch(endpoint, { method: "DELETE" });
       if (res.ok) {
         setSessions((prev) => prev.filter((s) => s.id !== id || s.type !== type));
       } else {
-        alert("Failed to delete game session.");
+        alert("Failed to delete.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error deleting game session.");
+      alert("Error deleting.");
+    }
+  };
+
+  const handlePlayTemplate = async (quizId: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/quizzes/${quizId}/session`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        const session = await res.json();
+        onRejoinGame("quiz", quizId, session.pin);
+      }
+    } catch (err) {
+      console.error("Failed to start session", err);
     }
   };
 
@@ -155,43 +192,64 @@ export const GamesHistoryList: React.FC<GamesHistoryListProps> = ({ onRejoinGame
           key={`${session.type}-${session.id}`}
         >
           <GlassCard className="p-4 flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-bold text-lg" style={{ color: "var(--color-text-primary)" }}>
                   {session.title}
                 </h3>
                 <span
-                  className={`text-xs px-2 py-1 rounded-full ${
+                  className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter ${
                     session.status === "active" || session.status === "lobby"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-100 text-gray-700"
+                      ? "bg-green-100 text-green-700 border border-green-200"
+                      : session.status === "draft"
+                      ? "bg-amber-100 text-amber-700 border border-amber-200"
+                      : "bg-gray-100 text-gray-700 border border-gray-200"
                   }`}
                 >
-                  {session.status.toUpperCase()}
+                  {session.status}
                 </span>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                  {session.type.replace("-", " ").toUpperCase()}
+                <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md border border-blue-200 uppercase tracking-tighter">
+                  {session.type === "quiz-template" ? "QUIZ TEMPLATE" : session.type.replace("-", " ").toUpperCase()}
                 </span>
               </div>
-              <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
+              <p className="text-xs mt-1 font-medium" style={{ color: "var(--color-text-secondary)" }}>
                 {session.session_id && `Session ID: ${session.session_id}`}
                 {session.pin && `PIN: ${session.pin}`}
+                {session.question_count !== undefined && `${session.question_count} Questions`}
+                {session.created_at && ` • Created ${new Date(session.created_at).toLocaleDateString()}`}
               </p>
             </div>
             
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => onRejoinGame(session.type, session.id, session.session_id || session.pin || "")}
-                className="p-2 rounded-lg bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors flex items-center gap-1 text-sm font-semibold"
-              >
-                <Play size={16} /> Open
-              </button>
+            <div className="flex items-center gap-2 ml-4">
+              {session.type === "quiz-template" ? (
+                <>
+                  <button
+                    onClick={() => (window.location.href = `/games/quiz/edit/${session.id}`)}
+                    className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors text-xs font-bold"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handlePlayTemplate(session.id as number)}
+                    className="px-4 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all text-xs font-bold shadow-sm flex items-center gap-1.5"
+                  >
+                    <Play size={12} fill="currentColor" /> Play
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => onRejoinGame(session.type, session.id, session.session_id || session.pin || "")}
+                  className="px-4 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-all text-xs font-bold shadow-sm flex items-center gap-1.5"
+                >
+                  <Play size={12} fill="currentColor" /> Open
+                </button>
+              )}
               <button
                 onClick={() => handleDelete(session.type, session.id)}
-                className="p-2 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors"
-                title="Delete Game"
+                className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                title="Delete"
               >
-                <Trash2 size={18} />
+                <Trash2 size={16} />
               </button>
             </div>
           </GlassCard>

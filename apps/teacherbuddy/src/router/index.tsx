@@ -39,6 +39,7 @@ export const router = createBrowserRouter([
       { path: "forms", element: <FormsPage /> },
       { path: "games", element: <GamesPage /> },
       { path: "games/quiz/create", element: <QuizCreator /> },
+      { path: "games/quiz/edit/:id", element: <QuizCreator /> },
       { path: "games/quiz/host/:quizId", element: <QuizMonitoring /> },
       {
         path: "games/slido/assignments",

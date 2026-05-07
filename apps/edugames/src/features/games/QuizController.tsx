@@ -21,6 +21,8 @@ export const QuizController: React.FC = () => {
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [lastResult, setLastResult] = useState<any>(null);
   const [score, setScore] = useState(0);
+  const [rank, setRank] = useState<number | null>(null);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [startTime, setStartTime] = useState(0);
   const [avatar, setAvatar] = useState("");
   const socketRef = useRef<WebSocket | null>(null);
@@ -57,6 +59,12 @@ export const QuizController: React.FC = () => {
         }
         setStatus('feedback');
       } else if (message.type === "game_over") {
+        setLeaderboard(message.leaderboard);
+        const me = message.leaderboard.find((p: any) => p.nickname === nickname);
+        if (me) {
+          setScore(me.score);
+          setRank(me.rank);
+        }
         setStatus('finished');
       } else if (message.type === "error") {
         alert(message.message);
@@ -210,15 +218,42 @@ export const QuizController: React.FC = () => {
 
   if (status === 'finished') {
     return (
-      <div className="min-h-screen bg-[#46178f] flex flex-col items-center justify-center p-8 text-white text-center animate-fade-in relative overflow-hidden">
-         <Trophy size={100} className="text-yellow-400 mb-8 animate-bounce" />
-         <h2 className="text-6xl font-black italic mb-4 tracking-tighter shadow-text">GAME OVER</h2>
-         <p className="text-3xl font-black opacity-80 mb-12">Final Score: {score}</p>
+      <div className="min-h-screen bg-[#46178f] flex flex-col p-6 text-white animate-fade-in relative overflow-hidden">
+         <div className="flex flex-col items-center text-center mt-8 mb-12">
+            <Trophy size={80} className="text-yellow-400 mb-4 animate-bounce" />
+            <h2 className="text-5xl font-black italic tracking-tighter mb-2 shadow-text">GAME OVER</h2>
+            <div className="flex flex-col items-center gap-2">
+               <span className="text-8xl font-black text-yellow-400">#{rank}</span>
+               <span className="text-xl font-bold opacity-60">Final Score: {score} pts</span>
+            </div>
+         </div>
+
+         <div className="flex-1 bg-white/10 backdrop-blur-md rounded-3xl p-6 overflow-y-auto custom-scrollbar border border-white/10">
+            <h3 className="text-xl font-black uppercase tracking-widest mb-6 opacity-60 text-center">Leaderboard</h3>
+            <div className="space-y-3">
+               {leaderboard.map((p, idx) => (
+                 <div 
+                   key={idx}
+                   className={`flex items-center justify-between p-4 rounded-2xl border ${
+                     p.nickname === nickname ? 'bg-yellow-400 text-[#46178f] border-yellow-500 scale-[1.02] shadow-xl' : 'bg-white/5 border-white/10'
+                   }`}
+                 >
+                    <div className="flex items-center gap-4">
+                       <span className={`w-8 font-black ${p.nickname === nickname ? 'text-[#46178f]' : 'text-white/40'}`}>{idx + 1}</span>
+                       <span className="text-2xl">{p.avatar}</span>
+                       <span className="font-bold text-lg">{p.nickname}</span>
+                    </div>
+                    <span className="font-black">{p.score}</span>
+                 </div>
+               ))}
+            </div>
+         </div>
+
          <button 
            onClick={() => window.location.reload()}
-           className="px-16 py-6 bg-white text-[#46178f] rounded-2xl font-black text-3xl shadow-2xl hover:scale-105 active:scale-95 transition-all"
+           className="mt-8 w-full p-6 bg-white text-[#46178f] rounded-2xl font-black text-2xl shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
          >
-           Play Again
+           DONE
          </button>
       </div>
     );

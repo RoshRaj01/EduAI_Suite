@@ -206,10 +206,10 @@ async def quiz_websocket_endpoint(
                         session.status = "completed"
                         db.commit()
                         leaderboard = sorted(
-                            session.players, key=lambda x: x.score, reverse=True)[:5]
+                            session.players, key=lambda x: x.score, reverse=True)
                         await manager.broadcast(pin, {
                             "type": "game_over",
-                            "leaderboard": [{"nickname": p.nickname, "score": p.score, "avatar": p.avatar} for p in leaderboard]
+                            "leaderboard": [{"nickname": p.nickname, "score": p.score, "avatar": p.avatar, "rank": i + 1} for i, p in enumerate(leaderboard)]
                         })
 
     except WebSocketDisconnect:

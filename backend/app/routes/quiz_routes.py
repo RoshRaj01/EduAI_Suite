@@ -33,17 +33,30 @@ class QuestionSchema(BaseModel):
 class QuizCreate(BaseModel):
     title: str
     description: Optional[str] = None
+    is_draft: Optional[bool] = False
     questions: List[QuestionSchema]
 
 @quiz_router.get("/")
 def get_quizzes(db: Session = Depends(get_db)):
-    return db.query(Quiz).all()
+    quizzes = db.query(Quiz).all()
+    return [
+        {
+            "id": q.id,
+            "title": q.title,
+            "description": q.description,
+            "is_draft": q.is_draft,
+            "question_count": len(q.questions),
+            "created_at": q.created_at
+        }
+        for q in quizzes
+    ]
 
 @quiz_router.post("/")
 def create_quiz(quiz_data: QuizCreate, db: Session = Depends(get_db)):
     new_quiz = Quiz(
         title=quiz_data.title,
-        description=quiz_data.description
+        description=quiz_data.description,
+        is_draft=quiz_data.is_draft
     )
     db.add(new_quiz)
     db.commit()
@@ -74,7 +87,49 @@ def create_quiz(quiz_data: QuizCreate, db: Session = Depends(get_db)):
     
     db.commit()
     db.refresh(new_quiz)
-    return {"id": new_quiz.id, "title": new_quiz.title}
+    return {"id": new_quiz.id, "title": new_quiz.title, "is_draft": new_quiz.is_draft}
+
+@quiz_router.put("/{quiz_id}")
+def update_quiz(quiz_id: int, quiz_data: QuizCreate, db: Session = Depends(get_db)):
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    quiz.title = quiz_data.title
+    quiz.description = quiz_data.description
+    quiz.is_draft = quiz_data.is_draft
+    
+    # Delete old questions and options (cascaded)
+    for q in quiz.questions:
+        db.delete(q)
+    
+    # Add new questions
+    for i, q in enumerate(quiz_data.questions):
+        question = QuizQuestion(
+            quiz_id=quiz.id,
+            question_text=q.question_text,
+            question_type=q.question_type,
+            time_limit=q.time_limit,
+            points=q.points,
+            image_url=q.image_url,
+            order=i
+        )
+        db.add(question)
+        db.commit()
+        db.refresh(question)
+        
+        for opt in q.options:
+            option = QuizOption(
+                question_id=question.id,
+                option_text=opt.option_text,
+                is_correct=opt.is_correct,
+                color=opt.color
+            )
+            db.add(option)
+            
+    db.commit()
+    db.refresh(quiz)
+    return {"id": quiz.id, "title": quiz.title, "is_draft": quiz.is_draft}
 
 @quiz_router.get("/{quiz_id}")
 def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
@@ -87,6 +142,7 @@ def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
         "id": quiz.id,
         "title": quiz.title,
         "description": quiz.description,
+        "is_draft": quiz.is_draft,
         "questions": []
     }
     
@@ -97,7 +153,8 @@ def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
             "type": q.question_type,
             "time_limit": q.time_limit,
             "points": q.points,
-            "options": [{"id": o.id, "text": o.option_text, "is_correct": o.is_correct} for o in q.options]
+            "image_url": q.image_url,
+            "options": [{"id": o.id, "text": o.option_text, "is_correct": o.is_correct, "color": o.color} for o in q.options]
         }
         result["questions"].append(question_data)
         

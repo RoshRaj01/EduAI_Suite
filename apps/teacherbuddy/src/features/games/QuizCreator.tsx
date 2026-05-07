@@ -11,7 +11,8 @@ import {
   ChevronRight,
   MonitorPlay
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { useEffect } from "react";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -32,6 +33,7 @@ interface Question {
 
 export const QuizCreator: React.FC = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -51,6 +53,32 @@ export const QuizCreator: React.FC = () => {
   ]);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      fetch(`${API_BASE_URL}/quizzes/${id}`)
+        .then(res => res.json())
+        .then(data => {
+          setTitle(data.title);
+          setDescription(data.description || "");
+          if (data.questions && data.questions.length > 0) {
+            setQuestions(data.questions.map((q: any) => ({
+              question_text: q.text,
+              question_type: q.type,
+              time_limit: q.time_limit,
+              points: q.points,
+              image_url: q.image_url,
+              options: q.options.map((o: any) => ({
+                option_text: o.text,
+                is_correct: o.is_correct,
+                color: o.color
+              }))
+            })));
+          }
+        })
+        .catch(err => console.error("Failed to fetch quiz:", err));
+    }
+  }, [id]);
 
   const addQuestion = () => {
     const newQuestion: Question = {
@@ -101,7 +129,7 @@ export const QuizCreator: React.FC = () => {
     setQuestions(newQuestions);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (asDraft: boolean = false) => {
     if (!title) {
       alert("Please enter a quiz title");
       return;
@@ -109,22 +137,28 @@ export const QuizCreator: React.FC = () => {
     
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/quizzes/`, {
-        method: "POST",
+      const url = id ? `${API_BASE_URL}/quizzes/${id}` : `${API_BASE_URL}/quizzes/`;
+      const method = id ? "PUT" : "POST";
+      
+      const res = await fetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
           description,
+          is_draft: asDraft,
           questions
         })
       });
       if (res.ok) {
         const data = await res.json();
-        if (data && data.id) {
+        if (asDraft) {
+          navigate("/games");
+        } else if (data && data.id) {
           navigate(`/games/quiz/host/${data.id}`);
         } else {
-          console.error("Quiz created but no ID returned", data);
-          alert("Error: Quiz created but no ID returned. Please try again.");
+          console.error("Quiz saved but no ID returned", data);
+          alert("Error: Quiz saved but no ID returned. Please try again.");
         }
       }
     } catch (err) {
@@ -164,11 +198,18 @@ export const QuizCreator: React.FC = () => {
             Settings
           </button>
           <button 
-            onClick={handleSave}
+            onClick={() => handleSave(true)}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
+          >
+            {saving ? "..." : "Save as Draft"}
+          </button>
+          <button 
+            onClick={() => handleSave(false)}
             disabled={saving}
             className="px-6 py-2 bg-brand-blue text-white rounded-lg font-bold shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
           >
-            {saving ? "Saving..." : <><Save size={18} /> Save & Exit</>}
+            {saving ? "Saving..." : <><Save size={18} /> Save & Play</>}
           </button>
         </div>
       </div>
