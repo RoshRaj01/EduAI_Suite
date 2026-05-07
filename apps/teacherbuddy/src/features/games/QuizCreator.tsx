@@ -177,23 +177,23 @@ export const QuizCreator: React.FC = () => {
             <MonitorPlay className="text-purple-600" size={24} />
           </div>
           <div>
+            <input 
+              type="text" 
+              placeholder="Enter quiz title..." 
+              className="text-xl font-bold bg-transparent border-none outline-none focus:ring-0 placeholder:text-gray-300 w-full"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+            />
             <div className="flex items-center gap-2">
-              <input 
-                type="text" 
-                placeholder="Enter quiz title..." 
-                className="text-xl font-bold bg-transparent border-none outline-none focus:ring-0 placeholder:text-gray-300 w-64"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-              />
+              <p className="text-xs text-gray-400 font-medium">Kahoot-style Interactive Quiz</p>
+              <span className="text-gray-300 text-xs">•</span>
               <button 
                 onClick={() => setShowSettings(true)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                title="Quiz Settings"
+                className="text-xs text-blue-600 font-bold hover:text-blue-700 transition-colors"
               >
-                <Plus size={16} className="rotate-45" /> {/* Using Plus rotated as a settings-like icon or just a gear */}
+                {description ? "Edit Description" : "+ Add Description"}
               </button>
             </div>
-            <p className="text-xs text-gray-400 font-medium">Kahoot-style Interactive Quiz</p>
           </div>
         </div>
         
