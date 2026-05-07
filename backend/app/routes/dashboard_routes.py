@@ -40,34 +40,32 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     # 1. Stats
     total_students = db.query(Student).count()
     
-    # AI Evaluations Done: Count OMR submissions + Regular AI evaluations
+    # AI Evaluations Done: Count OMR submissions
     omr_evals = db.query(OMRSubmission).filter(OMRSubmission.status == "verified").count()
-    # Assuming some regular submissions might be AI evaluated, but for now we rely on OMR
-    ai_evaluations = 450 + omr_evals
+    ai_evaluations = omr_evals
     
     real_risk_alerts = []
     students = db.query(Student).all()
     for s in students:
-        # Avoid zero division or None types
         att = s.attendance or 0
         avg = s.avg_score or 0
-        if att > 0 and att < 50:
+        if 0 < att < 50:
             real_risk_alerts.append({"id": f"S{s.id}", "name": s.name or "Unknown", "level": "high", "reason": f"Attendance dropped to {att}%", "score": avg})
-        elif avg > 0 and avg < 40:
+        elif 0 < avg < 40:
             real_risk_alerts.append({"id": f"S{s.id}", "name": s.name or "Unknown", "level": "high", "reason": f"Average score is critically low ({avg}%)", "score": avg})
-        elif att > 0 and att < 75:
+        elif 0 < att < 75:
             real_risk_alerts.append({"id": f"S{s.id}", "name": s.name or "Unknown", "level": "moderate", "reason": f"Low attendance ({att}%)", "score": avg})
-        elif avg > 0 and avg < 60:
+        elif 0 < avg < 60:
             real_risk_alerts.append({"id": f"S{s.id}", "name": s.name or "Unknown", "level": "moderate", "reason": f"Below average score ({avg}%)", "score": avg})
             
-    risk_alerts_count = len(real_risk_alerts) if real_risk_alerts else 12
-    avg_improvement = "+14%"
+    risk_alerts_count = len(real_risk_alerts)
+    avg_improvement = "0%"
 
     stats = [
         {
             "label": "Active Students",
-            "value": f"{total_students:,}" if total_students > 0 else "1,284",
-            "delta": "+12%",
+            "value": f"{total_students:,}",
+            "delta": "0%",
             "icon": "Users",
             "color": "#264796",
             "bg": "rgba(38,71,150,0.1)",
@@ -76,7 +74,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         {
             "label": "AI Evaluations Done",
             "value": str(ai_evaluations),
-            "delta": "+28%",
+            "delta": "0%",
             "icon": "BrainCircuit",
             "color": "#d0ae61",
             "bg": "rgba(208,174,97,0.12)",
@@ -85,7 +83,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         {
             "label": "Risk Alerts",
             "value": str(risk_alerts_count),
-            "delta": "−3",
+            "delta": "0",
             "icon": "AlertTriangle",
             "color": "#dc2626",
             "bg": "rgba(220,38,38,0.1)",
@@ -113,27 +111,13 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
             "students": c.students or 0,
             "time": "10:00 AM",
             "progress": c.progress or 0,
-            "teacher": c.teacher_name or "Prof. Alan Turing"
+            "teacher": c.teacher_name or "Not Assigned"
         })
-
-    if not classrooms:
-        classrooms = [
-            {"code": "CSC401", "name": "Advanced Neural Networks", "batch": "Batch 2026-A", "students": 42, "time": "2:00 PM", "progress": 68, "teacher": "Prof. Alan Turing"},
-            {"code": "CSC312", "name": "Data Structures & Algorithms", "batch": "Batch 2025-B", "students": 38, "time": "10:00 AM", "progress": 82, "teacher": "Dr. Grace Hopper"},
-        ]
 
     # 3. Risk Alerts (From DB logic)
     real_risk_alerts.sort(key=lambda x: (0 if x["level"] == "high" else 1, x["score"]))
     risk_alerts = real_risk_alerts[:4]
     
-    if not risk_alerts:
-        risk_alerts = [
-            {"id": "S4121", "name": "Arjun Mehta", "level": "high", "reason": "Attendance dropped to 42%", "score": 78},
-            {"id": "S4122", "name": "Priya Sharma", "level": "high", "reason": "3 consecutive exams below 40%", "score": 82},
-            {"id": "S4109", "name": "Rohan Verma", "level": "moderate", "reason": "2 missing assignment submissions", "score": 61},
-            {"id": "S4135", "name": "Sneha Patil", "level": "moderate", "reason": "Irregular attendance pattern", "score": 55},
-        ]
-
     # 4. Recent Activity
     history_records = db.query(ActionHistory).order_by(ActionHistory.timestamp.desc()).limit(4).all()
     recent_activity = []
@@ -161,12 +145,6 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
             "icon": icon_map.get(h.feature, icon_map["default"]),
             "color": color_map.get(h.feature, color_map["default"])
         })
-
-    if not recent_activity:
-         recent_activity = [
-            {"text": "AI evaluated 55 subjective answers in CSC401", "time": "1h ago", "icon": "BrainCircuit", "color": "#264796"},
-            {"text": "Priya Sharma submitted Neural Networks Mid-Term", "time": "2h ago", "icon": "CheckCircle2", "color": "#16a34a"},
-        ]
 
     # 5. Today's Schedule
     today_start = datetime.combine(date.today(), datetime.min.time())
