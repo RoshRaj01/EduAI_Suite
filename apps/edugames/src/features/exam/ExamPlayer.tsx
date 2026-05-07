@@ -3,6 +3,7 @@ import {
   Timer, ChevronRight, ChevronLeft, CheckCircle2, 
   AlertTriangle, ArrowRight, Home
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { AnswerSheet } from "./AnswerSheet";
 
@@ -39,6 +40,7 @@ interface ExamPlayerProps {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClose }) => {
+  const navigate = useNavigate();
   const [displayQuestions, setDisplayQuestions] = useState<Question[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
@@ -279,14 +281,24 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
       {/* Error Overlay */}
       {error && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[60] w-full max-w-md px-4">
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl shadow-lg flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <AlertTriangle size={20} className="shrink-0" />
-              <p className="text-sm font-medium">{error}</p>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl shadow-lg flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={20} className="shrink-0" />
+                <p className="text-sm font-medium">{error}</p>
+              </div>
+              <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
+                <ChevronRight size={20} className="rotate-45" />
+              </button>
             </div>
-            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
-              <ChevronRight size={20} className="rotate-45" />
-            </button>
+            {(error.includes("log in") || error.includes("credentials")) && (
+              <button 
+                onClick={() => navigate("/login")}
+                className="w-full py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Go to Login Page
+              </button>
+            )}
           </div>
         </div>
       )}

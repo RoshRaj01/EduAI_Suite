@@ -6,6 +6,8 @@ import { useNavigate } from "react-router-dom";
 
 type Mode = "login" | "forgot";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 export const AuthPage: React.FC = () => {
   const [mode, setMode] = useState<Mode>("login");
   const [showPass, setShowPass] = useState(false);
@@ -28,7 +30,7 @@ export const AuthPage: React.FC = () => {
     }
 
     try {
-      const response = await fetch("http://localhost:8000/auth/login", {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form)
