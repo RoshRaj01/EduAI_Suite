@@ -9,6 +9,8 @@ from app.models.submission import Submission
 from app.models.announcement import Announcement
 from app.models.lesson import Lesson
 from app.models.resource import Resource
+from app.models.exam import Exam
+from app.models.slido import PresentationAssignment
 from app.schemas.course import CourseCreate, CourseResponse, CourseUpdate
 from app.utils.file_uploads import save_optional_upload
 import random
@@ -222,6 +224,15 @@ def delete_course(course_id: int, db: Session = Depends(get_db)):
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     
+    # Fetch and delete complex relationships to allow SQLAlchemy cascades
+    exams = db.query(Exam).filter(Exam.course_id == course_id).all()
+    for exam in exams:
+        db.delete(exam)
+        
+    pas = db.query(PresentationAssignment).filter(PresentationAssignment.course_id == course_id).all()
+    for pa in pas:
+        db.delete(pa)
+
     # Manually delete all child records to avoid FK constraint errors
     db.query(Announcement).filter(Announcement.course_id == course_id).delete(synchronize_session="fetch")
     db.query(Assignment).filter(Assignment.course_id == course_id).delete(synchronize_session="fetch")
