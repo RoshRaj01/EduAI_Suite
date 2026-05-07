@@ -5,6 +5,7 @@ import {
   HelpCircle, ChevronDown, ChevronUp, Save, AlertCircle
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 interface Choice {
   choice_text: string;
@@ -24,7 +25,7 @@ interface ExamCreatorProps {
   initialData?: any;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 
 export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initialData }) => {
   const [title, setTitle] = useState(initialData?.title || "");
@@ -46,7 +47,10 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
 
   const fetchCourses = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/courses/`);
+      const token = localStorage.getItem("token");
+      const response = await fetch(API_ENDPOINTS.COURSES, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
       const data = await response.json();
       setCourses(data);
       if (data.length > 0 && !courseId) {
@@ -114,7 +118,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/exams/extract`, {
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/extract`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
         body: formData,
@@ -147,7 +151,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/exams/extract-answers`, {
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/extract-answers`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
         body: formData,

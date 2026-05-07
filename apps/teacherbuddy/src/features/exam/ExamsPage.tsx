@@ -119,6 +119,35 @@ export const ExamsPage: React.FC = () => {
     }
   };
 
+  const handleExportStats = () => {
+    if (!selectedExam) return;
+    
+    // Prepare CSV content
+    const headers = ["Student Name", "Email", "Score", "Finished Date", "Status"];
+    const rows = attempts.map(a => [
+        a.student_name,
+        a.student_email,
+        a.score,
+        a.end_time ? new Date(a.end_time).toLocaleDateString() : "N/A",
+        a.status
+    ]);
+    
+    const csvContent = [
+        headers.join(","),
+        ...rows.map(r => r.join(","))
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${selectedExam.title}_stats.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const openEditCreator = (exam: any) => {
       setEditingExam(exam);
       setShowCreator(true);
@@ -283,13 +312,6 @@ export const ExamsPage: React.FC = () => {
                       </div>
                       <div className="flex gap-2">
                           <button 
-                              onClick={() => openEditCreator(selectedExam)}
-                              className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white"
-                              title="Edit Exam"
-                          >
-                              <Settings size={14} />
-                          </button>
-                          <button 
                               onClick={() => handleDeleteExam(selectedExam.id)}
                               className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-lg transition-colors text-white"
                               title="Delete Exam"
@@ -338,10 +360,10 @@ export const ExamsPage: React.FC = () => {
                         ))}
                       </div>
                       <div className="flex gap-3">
-                        <button className="btn btn-primary flex-1 text-sm">
-                          <Eye size={14} /> Preview Exam
+                        <button onClick={() => openEditCreator(selectedExam)} className="btn btn-primary flex-1 text-sm">
+                          <Settings size={14} /> Edit Exam
                         </button>
-                        <button className="btn btn-outline text-sm flex-1">
+                        <button onClick={handleExportStats} className="btn btn-outline text-sm flex-1">
                           <FileText size={14} /> Export Stats
                         </button>
                       </div>
