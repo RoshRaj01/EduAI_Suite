@@ -207,7 +207,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
       time_limit: timeLimit,
       attempts_allowed: attempts,
       randomize_questions: randomize,
-      status: "published",
+      status: "draft",
       questions
     };
     

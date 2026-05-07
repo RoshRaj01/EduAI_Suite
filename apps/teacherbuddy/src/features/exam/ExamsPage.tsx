@@ -16,6 +16,7 @@ const statusStyle: Record<string, { color: string; bg: string; label: string }> 
   upcoming:  { color: "#264796", bg: "rgba(38,71,150,0.1)",  label: "Upcoming"  },
   ongoing:   { color: "#d97706", bg: "rgba(217,119,6,0.1)",  label: "Ongoing"   },
   completed: { color: "#16a34a", bg: "rgba(22,163,74,0.1)",  label: "Completed" },
+  published: { color: "#264796", bg: "rgba(38,71,150,0.1)",  label: "Live"      },
   draft:     { color: "#64748b", bg: "rgba(100,116,139,0.1)", label: "Draft"    },
 };
 
@@ -156,6 +157,28 @@ export const ExamsPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handlePublishExam = async () => {
+    if (!selectedExam) return;
+    try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_ENDPOINTS.EXAMS}/${selectedExam.id}`, {
+            method: "PUT",
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}` 
+            },
+            body: JSON.stringify({ ...selectedExam, status: "published" }),
+        });
+        if (response.ok) {
+            const updated = await response.json();
+            setExamsList(prev => prev.map(e => e.id === updated.id ? updated : e));
+            setSelectedExam(updated);
+        }
+    } catch (err) {
+        console.error("Publish failed", err);
+    }
   };
 
   const openEditCreator = (exam: any) => {
@@ -370,9 +393,15 @@ export const ExamsPage: React.FC = () => {
                         ))}
                       </div>
                       <div className="flex gap-3">
-                        <button onClick={() => openEditCreator(selectedExam)} className="btn btn-primary flex-1 text-sm">
-                          <Settings size={14} /> Edit Exam
-                        </button>
+                        {selectedExam.status === "draft" ? (
+                            <button onClick={handlePublishExam} className="btn btn-primary flex-1 text-sm bg-green-600 hover:bg-green-700 border-green-600">
+                                <CheckCircle2 size={14} /> Publish Now
+                            </button>
+                        ) : (
+                            <button onClick={() => openEditCreator(selectedExam)} className="btn btn-primary flex-1 text-sm">
+                                <Settings size={14} /> Edit Exam
+                            </button>
+                        )}
                         <button onClick={handleExportStats} className="btn btn-outline text-sm flex-1">
                           <FileText size={14} /> Export Stats
                         </button>
