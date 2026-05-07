@@ -428,19 +428,22 @@ export const AnalyticsPage: React.FC = () => {
           {!uploadedData ? (
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:bg-slate-50 transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all"
             >
               <Upload size={16} /> Upload Data
             </button>
           ) : (
-            <div className="flex items-center gap-1 bg-gold-50/50 rounded-xl p-0.5">
+            <div className="flex items-center gap-1 bg-blue-50 rounded-xl p-0.5 border border-blue-100">
               <button 
                 onClick={() => setDataSource("upload")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-l-xl text-sm font-bold transition-all ${
-                  dataSource === "upload" ? "bg-gold-500 text-white shadow-lg shadow-gold-500/20" : "text-gold-600 hover:bg-gold-100/50"
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                  dataSource === "upload" 
+                    ? "bg-blue-900 text-white shadow-lg shadow-blue-900/20" 
+                    : "text-blue-900 hover:bg-blue-100/50"
                 }`}
               >
-                <FileSpreadsheet size={16} /> {fileName}
+                <FileSpreadsheet size={16} />
+                <span>{fileName || "External Dataset"}</span>
               </button>
               <button 
                 onClick={() => {
@@ -448,8 +451,8 @@ export const AnalyticsPage: React.FC = () => {
                   setDataSource("platform");
                   setFileName("");
                 }}
-                className="px-2 py-2 text-gold-400 hover:text-red-500 transition-colors"
-                title="Remove file"
+                className="px-2 py-2 text-blue-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                title="Clear Data"
               >
                 <X size={14} />
               </button>
