@@ -11,6 +11,7 @@ import { AIChatPage } from "../features/ai-chat/AIChatPage";
 import { AuthPage } from "../features/auth/AuthPage";
 import { GamesPage } from "../features/games/GamesPage";
 import { QuizCreator } from "../features/games/QuizCreator";
+import { QuizLibraryPage } from "../features/games/QuizLibraryPage";
 import { QuizMonitoring } from "../features/games/QuizMonitoring";
 import SlidoAssignmentDashboard from "../features/games/SlidoAssignmentDashboard";
 import LiveGradingForm from "../features/games/LiveGradingForm";
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { path: "reports", element: <ReportsPage /> },
       { path: "forms", element: <FormsPage /> },
       { path: "games", element: <GamesPage /> },
+      { path: "games/quiz", element: <QuizLibraryPage /> },
       { path: "games/quiz/create", element: <QuizCreator /> },
       { path: "games/quiz/edit/:id", element: <QuizCreator /> },
       { path: "games/quiz/host/:quizId", element: <QuizMonitoring /> },

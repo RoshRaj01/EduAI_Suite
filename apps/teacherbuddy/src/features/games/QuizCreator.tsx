@@ -153,7 +153,7 @@ export const QuizCreator: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         if (asDraft) {
-          navigate("/games");
+          navigate("/games/quiz");
         } else if (data && data.id) {
           navigate(`/games/quiz/host/${data.id}`);
         } else {

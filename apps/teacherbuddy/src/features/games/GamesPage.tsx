@@ -96,7 +96,7 @@ export const GamesPage: React.FC = () => {
       return;
     }
     if (gameId === "quiz-battle-royale") {
-      navigate("/games/quiz/create");
+      navigate("/games/quiz");
       return;
     }
     if (gameId === "slido-polling") {
