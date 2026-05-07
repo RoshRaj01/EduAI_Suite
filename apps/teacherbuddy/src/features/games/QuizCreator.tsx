@@ -129,7 +129,7 @@ export const QuizCreator: React.FC = () => {
     setQuestions(newQuestions);
   };
 
-  const handleSave = async (asDraft: boolean = false) => {
+  const handleSave = async (asDraft: boolean = false, startPlaying: boolean = false) => {
     if (!title) {
       alert("Please enter a quiz title");
       return;
@@ -152,13 +152,11 @@ export const QuizCreator: React.FC = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        if (asDraft) {
-          navigate("/games/quiz");
-        } else if (data && data.id) {
-          navigate(`/games/quiz/host/${data.id}`);
+        const quizId = data.id || id;
+        if (startPlaying && quizId) {
+          navigate(`/games/quiz/host/${quizId}`);
         } else {
-          console.error("Quiz saved but no ID returned", data);
-          alert("Error: Quiz saved but no ID returned. Please try again.");
+          navigate("/games/quiz");
         }
       }
     } catch (err) {
@@ -179,33 +177,43 @@ export const QuizCreator: React.FC = () => {
             <MonitorPlay className="text-purple-600" size={24} />
           </div>
           <div>
-            <input 
-              type="text" 
-              placeholder="Enter quiz title..." 
-              className="text-xl font-bold bg-transparent border-none outline-none focus:ring-0 placeholder:text-gray-300 w-64"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-            />
+            <div className="flex items-center gap-2">
+              <input 
+                type="text" 
+                placeholder="Enter quiz title..." 
+                className="text-xl font-bold bg-transparent border-none outline-none focus:ring-0 placeholder:text-gray-300 w-64"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+              />
+              <button 
+                onClick={() => setShowSettings(true)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                title="Quiz Settings"
+              >
+                <Plus size={16} className="rotate-45" /> {/* Using Plus rotated as a settings-like icon or just a gear */}
+              </button>
+            </div>
             <p className="text-xs text-gray-400 font-medium">Kahoot-style Interactive Quiz</p>
           </div>
         </div>
         
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setShowSettings(true)}
-            className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-all"
+            onClick={() => handleSave(false, false)}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
           >
-            Settings
+            {saving ? "..." : "Save Game"}
           </button>
           <button 
-            onClick={() => handleSave(true)}
+            onClick={() => handleSave(true, false)}
             disabled={saving}
             className="px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
           >
             {saving ? "..." : "Save as Draft"}
           </button>
           <button 
-            onClick={() => handleSave(false)}
+            onClick={() => handleSave(false, true)}
             disabled={saving}
             className="px-6 py-2 bg-brand-blue text-white rounded-lg font-bold shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
           >
