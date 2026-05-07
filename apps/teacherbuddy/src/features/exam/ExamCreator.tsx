@@ -177,7 +177,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (status: "draft" | "published") => {
     setError("");
     
     if (!title.trim()) {
@@ -207,7 +207,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
       time_limit: timeLimit,
       attempts_allowed: attempts,
       randomize_questions: randomize,
-      status: "draft",
+      status: status,
       questions
     };
     
@@ -433,15 +433,24 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
         {/* Footer */}
         <div className="p-6 border-t flex items-center justify-end gap-3 bg-slate-50">
           <button onClick={onClose} className="btn btn-outline px-6 py-2">Cancel</button>
+          
           <button 
-            onClick={handleSubmit}
+            onClick={() => handleSubmit("draft")}
+            className={`btn border-2 border-slate-200 text-slate-600 bg-white hover:bg-slate-50 px-6 py-2 font-bold flex items-center gap-2 transition-all ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}
+            disabled={isSaving}
+          >
+            <Save size={18} /> Save as Draft
+          </button>
+
+          <button 
+            onClick={() => handleSubmit("published")}
             className={`btn btn-primary px-10 py-2 font-bold flex items-center gap-2 shadow-lg hover:shadow-xl active:scale-95 transition-all ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}
             disabled={questions.length === 0 || isSaving}
           >
             {isSaving ? (
                 <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Saving Exam...
+                    Saving...
                 </>
             ) : (
                 <>
