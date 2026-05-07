@@ -33,7 +33,7 @@ const navItems = [
   { icon: Calendar, label: "Appointments", href: "/appointments", keywords: "bookings approvals office hours" },
   { icon: BookOpen, label: "Classrooms", href: "/classrooms", keywords: "courses students assignments" },
   { icon: ClipboardList, label: "Exams", href: "/exams", keywords: "mcq test assessment quiz" },
-  { icon: CheckSquare, label: "OMR Grading", href: "/omr", keywords: "grade paper omr image scan answers ai score" },
+  // { icon: CheckSquare, label: "OMR Grading", href: "/omr", keywords: "grade paper omr image scan answers ai score" },
   { icon: FileSpreadsheet, label: "Reports", href: "/reports", keywords: "export download pdf analytics" },
   // { icon: FileSignature, label: "Form Automation", href: "/forms", keywords: "template auto-fill document" },
   { icon: Activity, label: "Analytics & Risk", href: "/analytics", keywords: "risk alert attendance prediction" },

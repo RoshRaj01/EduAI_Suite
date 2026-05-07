@@ -62,6 +62,8 @@ sdd_extracted.txt
 backend/uploads/announcements/
 backend/uploads/courses/
 backend/uploads/submissions/
+backend/uploads/assignments/
+backend/app/utils/
 calendar_replica/
 trello_replica/
 mentimeter_replica/
@@ -73,4 +75,3 @@ slido_replica/
 *.md
 !README.md
 !ARCHITECTURE.md
-backend/app/utils/MOBILE APPLICATION DEVELOPMENT_MCA518-3_TRIMESTER 3 and 6_2025_2025-11-26T07_58_36.710942480.pdf
