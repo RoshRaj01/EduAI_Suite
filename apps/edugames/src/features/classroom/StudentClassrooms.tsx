@@ -106,8 +106,15 @@ export const StudentClassrooms: React.FC = () => {
     [courses, selectedId],
   );
 
+  const get_user = () => {
+    const storedUser = localStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : { name: "Aarav Gupta", email: "aarav@student.com" };
+  };
+
   const loadCourses = async () => {
-    const response = await fetch(`${API_URL}/api/dashboard/student-summary?student_name=Aarav Gupta`);
+    const user = get_user();
+    const studentName = user.name;
+    const response = await fetch(`${API_URL}/api/dashboard/student-summary?student_name=${encodeURIComponent(studentName)}`);
     if (!response.ok) {
       throw new Error(`Failed to load classrooms (${response.status})`);
     }
@@ -139,8 +146,10 @@ export const StudentClassrooms: React.FC = () => {
       );
       const allSubmissions = await Promise.all(submissionsPromises);
       const submittedIds = [];
+      const user = get_user();
+      const studentName = user.name;
       assignmentData.forEach((a, i) => {
-         if (Array.isArray(allSubmissions[i]) && allSubmissions[i].some((sub: any) => sub.student_name === "Aarav (Student)")) {
+         if (Array.isArray(allSubmissions[i]) && allSubmissions[i].some((sub: any) => sub.student_name === studentName)) {
             submittedIds.push(a.id);
          }
       });
@@ -193,8 +202,10 @@ export const StudentClassrooms: React.FC = () => {
 
   const handleSubmitWork = async (assignmentId: number, files: File[]) => {
     try {
+      const user = get_user();
+      const studentName = user.name;
       const formData = new FormData();
-      formData.append("student_name", "Aarav (Student)"); // Mocked student identity
+      formData.append("student_name", studentName); // Dynamic student identity
       for (const file of files) {
         formData.append("files", file);
       }
@@ -229,15 +240,16 @@ export const StudentClassrooms: React.FC = () => {
 
     setIsJoining(true);
     try {
+      const user = get_user();
       const response = await fetch(`${API_URL}/students/enroll/code?enrollment_code=${joinCode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "Aarav (Student)",
-          email: "aarav.student@university.edu",
-          registration_number: "S12345",
-          student_class: "Batch 2026-A",
-          department: "Computer Science"
+          name: user.name || "Student",
+          email: user.sub || user.email || "student@university.edu",
+          registration_number: user.registration_number || `REG${Math.floor(Math.random() * 10000)}`,
+          student_class: user.student_class || "General",
+          department: user.department || "General"
         })
       });
 

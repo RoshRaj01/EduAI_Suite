@@ -57,9 +57,13 @@ export const StudentDashboard: React.FC = () => {
     const loadDashboard = async () => {
       setLoading(true);
       try {
+        const storedUser = localStorage.getItem("user");
+        const user = storedUser ? JSON.parse(storedUser) : { name: "Aarav Gupta" };
+        const studentName = user.name;
+        
         const [lessonsRes, summaryRes] = await Promise.all([
           fetch(`${API_URL}/lessons?posted_only=true`),
-          fetch(`${API_URL}/api/dashboard/student-summary?student_name=Aarav Gupta`),
+          fetch(`${API_URL}/api/dashboard/student-summary?student_name=${encodeURIComponent(studentName)}`),
         ]);
 
         const lessons = await lessonsRes.json();
