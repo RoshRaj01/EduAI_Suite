@@ -181,6 +181,28 @@ export const ExamsPage: React.FC = () => {
     }
   };
 
+  const handleUnpublishExam = async () => {
+    if (!selectedExam) return;
+    try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_ENDPOINTS.EXAMS}/${selectedExam.id}`, {
+            method: "PUT",
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}` 
+            },
+            body: JSON.stringify({ ...selectedExam, status: "draft" }),
+        });
+        if (response.ok) {
+            const updated = await response.json();
+            setExamsList(prev => prev.map(e => e.id === updated.id ? updated : e));
+            setSelectedExam(updated);
+        }
+    } catch (err) {
+        console.error("Unpublish failed", err);
+    }
+  };
+
   const openEditCreator = (exam: any) => {
       setEditingExam(exam);
       setShowCreator(true);
@@ -394,17 +416,24 @@ export const ExamsPage: React.FC = () => {
                       </div>
                       <div className="flex gap-3">
                         {selectedExam.status === "draft" ? (
+                          <>
                             <button onClick={handlePublishExam} className="btn btn-primary flex-1 text-sm bg-green-600 hover:bg-green-700 border-green-600">
                                 <CheckCircle2 size={14} /> Publish Now
                             </button>
-                        ) : (
-                            <button onClick={() => openEditCreator(selectedExam)} className="btn btn-primary flex-1 text-sm">
+                            <button onClick={() => openEditCreator(selectedExam)} className="btn btn-outline flex-1 text-sm">
                                 <Settings size={14} /> Edit Exam
                             </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={handleUnpublishExam} className="btn btn-primary flex-1 text-sm bg-orange-600 hover:bg-orange-700 border-orange-600">
+                                <X size={14} /> Unpublish
+                            </button>
+                            <button onClick={handleExportStats} className="btn btn-outline text-sm flex-1">
+                              <FileText size={14} /> Export Stats
+                            </button>
+                          </>
                         )}
-                        <button onClick={handleExportStats} className="btn btn-outline text-sm flex-1">
-                          <FileText size={14} /> Export Stats
-                        </button>
                       </div>
                     </div>
                   )}
