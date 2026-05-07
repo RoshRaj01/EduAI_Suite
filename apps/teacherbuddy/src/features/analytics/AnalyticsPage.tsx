@@ -415,7 +415,7 @@ export const AnalyticsPage: React.FC = () => {
           <p className="text-sm text-slate-500 mt-1">Real-time performance monitoring and predictive risk analytics.</p>
         </div>
 
-        <div className="flex items-center gap-3 bg-white p-1 rounded-2xl border border-slate-100 shadow-sm self-start">
+        <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-slate-100 shadow-sm self-start">
           <button 
             onClick={() => setDataSource("platform")}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
@@ -424,17 +424,37 @@ export const AnalyticsPage: React.FC = () => {
           >
             <Database size={16} /> Platform Data
           </button>
-          <button 
-            onClick={() => {
-              if (!uploadedData) fileInputRef.current?.click();
-              else setDataSource("upload");
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-              dataSource === "upload" ? "bg-gold-500 text-white shadow-lg shadow-gold-500/20" : "text-slate-400 hover:bg-slate-50"
-            }`}
-          >
-            <Upload size={16} /> External Data
-          </button>
+
+          {!uploadedData ? (
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:bg-slate-50 transition-all"
+            >
+              <Upload size={16} /> Upload Data
+            </button>
+          ) : (
+            <div className="flex items-center gap-1 bg-gold-50/50 rounded-xl p-0.5">
+              <button 
+                onClick={() => setDataSource("upload")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-l-xl text-sm font-bold transition-all ${
+                  dataSource === "upload" ? "bg-gold-500 text-white shadow-lg shadow-gold-500/20" : "text-gold-600 hover:bg-gold-100/50"
+                }`}
+              >
+                <FileSpreadsheet size={16} /> {fileName}
+              </button>
+              <button 
+                onClick={() => {
+                  setUploadedData(null);
+                  setDataSource("platform");
+                  setFileName("");
+                }}
+                className="px-2 py-2 text-gold-400 hover:text-red-500 transition-colors"
+                title="Remove file"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -457,16 +477,16 @@ export const AnalyticsPage: React.FC = () => {
             </>
           ) : (
             <>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active File:</span>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Data Context:</span>
               <div className="flex flex-col gap-0.5 ml-1">
-                <span className="text-sm font-bold text-gold-600 flex items-center gap-1">
-                  <FileSpreadsheet size={14} /> {fileName || "analysis_export_v1.xlsx"}
+                <span className="text-[11px] text-slate-600 font-bold flex items-center gap-1">
+                   <Activity size={12} className="text-blue-500" /> {uploadedData?.summary?.score_column} Analysis
                 </span>
                 <span className="text-[9px] text-slate-400 font-medium">
-                  Source: <span className="text-blue-600 font-bold">{uploadedData?.summary?.score_column}</span> • Scale: <span className="text-blue-600 font-bold">Out of {uploadedData?.summary?.scale}</span>
+                   Scale: <span className="text-blue-600 font-bold">Out of {uploadedData?.summary?.scale}</span> • Rows: <span className="text-blue-600 font-bold">{uploadedData?.summary?.rows}</span>
                 </span>
               </div>
-              <button onClick={() => fileInputRef.current?.click()} className="text-[10px] text-blue-500 font-bold hover:underline ml-4">Change File</button>
+              <button onClick={() => fileInputRef.current?.click()} className="text-[10px] text-blue-500 font-bold hover:underline ml-4">Replace File</button>
             </>
           )}
         </div>
