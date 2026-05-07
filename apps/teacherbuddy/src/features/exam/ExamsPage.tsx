@@ -4,6 +4,7 @@ import {
   Play, ChevronRight, BrainCircuit, Eye, Check, X, Timer,
   FileText, Layers, Trash2, Settings, RefreshCw
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ExamCreator } from "./ExamCreator";
 import { AnswerSheet } from "./AnswerSheet";
@@ -19,6 +20,7 @@ const statusStyle: Record<string, { color: string; bg: string; label: string }> 
 };
 
 export const ExamsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [examsList, setExamsList] = useState<any[]>([]);
   const [selectedExam, setSelectedExam] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "take" | "review">("overview");
@@ -43,6 +45,10 @@ export const ExamsPage: React.FC = () => {
       const response = await fetch(`${API_ENDPOINTS.EXAMS}/stats`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
+      if (response.status === 401) {
+        navigate("/login");
+        return;
+      }
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -61,6 +67,10 @@ export const ExamsPage: React.FC = () => {
         headers: { "Authorization": `Bearer ${token}` },
         signal: AbortSignal.timeout(10000) // 10 second timeout
       });
+      if (response.status === 401) {
+        navigate("/login");
+        return;
+      }
       if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
       const data = await response.json();
       setExamsList(data);
