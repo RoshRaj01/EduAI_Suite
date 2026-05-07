@@ -34,11 +34,16 @@ async def create_announcement(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
+    from datetime import datetime
+    final_time = time
+    if time == "Just now":
+        final_time = datetime.now().strftime("%I:%M %p, %d %b")
+
     new_announcement = Announcement(
         course_id=course_id,
         title=title,
         body=body,
-        time=time,
+        time=final_time,
         pinned=pinned,
         attachment_path=save_optional_upload(file, "announcements"),
     )

@@ -14,7 +14,7 @@ import { QuizCreator } from "../features/games/QuizCreator";
 import { QuizLibraryPage } from "../features/games/QuizLibraryPage";
 import { QuizMonitoring } from "../features/games/QuizMonitoring";
 import SlidoAssignmentDashboard from "../features/games/SlidoAssignmentDashboard";
-import LiveGradingForm from "../features/games/LiveGradingForm";
+import { LiveGradingPage } from "../features/games/LiveGradingForm";
 import { TeacherAppointmentsPage } from "../features/appointments/TeacherAppointmentsPage";
 import { TeacherToolsPage } from "../features/tools/TeacherToolsPage";
 import { ClassroomsPage } from "../features/classroom/ClassroomsPage";
@@ -47,10 +47,11 @@ export const router = createBrowserRouter([
         path: "games/slido/assignments",
         element: <SlidoAssignmentDashboard />,
       },
-      { path: "games/slido/grade/:submissionId", element: <LiveGradingForm /> },
+      { path: "games/slido/grade/:submissionId", element: <LiveGradingPage /> },
       { path: "appointments", element: <TeacherAppointmentsPage /> },
       { path: "tools", element: <TeacherToolsPage /> },
       { path: "classrooms", element: <ClassroomsPage /> },
+      { path: "classrooms/:courseId", element: <ClassroomsPage /> },
       { path: "analytics", element: <AnalyticsPage /> },
       { path: "mail", element: <MailStudentsPage /> },
       { path: "calendar", element: <CalendarPage /> },

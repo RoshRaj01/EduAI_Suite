@@ -7,6 +7,7 @@ import {
 import { GlassCard } from "../../shared/components/GlassCard";
 import { Link } from "react-router-dom";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
+import { useAuthStore } from "../../store/useAuthStore";
 
 const iconMap: Record<string, any> = {
   Users,
@@ -24,7 +25,9 @@ const iconMap: Record<string, any> = {
 };
 
 export const DashboardPage: React.FC = () => {
+  const { user: authUser } = useAuthStore();
   const [data, setData] = useState<any>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,7 +80,12 @@ export const DashboardPage: React.FC = () => {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>
-            Good afternoon, Professor 👋
+            {(() => {
+              const hour = new Date().getHours();
+              if (hour < 12) return "Good morning";
+              if (hour < 17) return "Good afternoon";
+              return "Good evening";
+            })()}, {authUser?.name || "Professor"} 👋
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
             {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} — Here's your academic overview for today.
@@ -133,7 +141,7 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             {classrooms.map((cls: any, i: number) => (
-              <Link to={`/classrooms/${cls.code}`} key={cls.code}>
+              <Link to={`/classrooms/${cls.id}`} key={cls.id}>
                 <GlassCard interactive className={`animate-fade-in-up delay-${i % 3}00`}>
                   <div className="gradient-blue rounded-xl mb-4 p-4 h-28 flex flex-col justify-between relative overflow-hidden">
                     <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-10 bg-white" />

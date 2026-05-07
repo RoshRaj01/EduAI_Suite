@@ -1,6 +1,6 @@
 // TeacherBuddy - Live Grading Form Component
 // Used in the split-view layout while watching presentations
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Save, X, MessageSquare, Award, AlertCircle } from "lucide-react";
 
 interface GradingFormProps {
@@ -236,23 +236,41 @@ const LiveGradingForm: React.FC<GradingFormProps> = ({
   );
 };
 
-// Live Grading Container Component
-interface LiveGradingContainerProps {
-  submissionId: number;
-  studentId: number;
-  teacherId: number;
-}
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../store/useAuthStore";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
-export const LiveGradingContainer: React.FC<LiveGradingContainerProps> = ({
-  submissionId,
-  studentId,
-  teacherId,
-}) => {
-  const [isOpen, setIsOpen] = useState(true);
+// Live Grading Page Component (for use in Router)
+export const LiveGradingPage: React.FC = () => {
+  const { submissionId } = useParams<{ submissionId: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const [submission, setSubmission] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSubmission = async () => {
+      try {
+        const response = await fetch(`${API_ENDPOINTS.BASE}/slido/submissions/${submissionId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSubmission(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch submission:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (submissionId) fetchSubmission();
+  }, [submissionId]);
 
   const handleGradeSubmit = async (grade: number, feedback: string) => {
+    if (!user?.id) throw new Error("User not authenticated");
+
     const response = await fetch(
-      `/api/slido/submissions/${submissionId}/grade`,
+      `${API_ENDPOINTS.BASE}/slido/submissions/${submissionId}/grade?teacher_id=${user.id}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -268,15 +286,34 @@ export const LiveGradingContainer: React.FC<LiveGradingContainerProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (!submission) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-500 font-bold">Submission not found</p>
+        <button onClick={() => navigate(-1)} className="mt-4 text-blue-600 underline">Go Back</button>
+      </div>
+    );
+  }
 
   return (
-    <LiveGradingForm
-      submissionId={submissionId}
-      studentId={studentId}
-      onSubmit={handleGradeSubmit}
-      onClose={() => setIsOpen(false)}
-    />
+    <div className="p-8 flex justify-center bg-slate-50 min-h-screen">
+      <LiveGradingForm
+        submissionId={Number(submissionId)}
+        studentId={submission.student_id}
+        onSubmit={handleGradeSubmit}
+        onClose={() => navigate(-1)}
+        initialGrade={submission.grade}
+        initialFeedback={submission.teacher_feedback}
+      />
+    </div>
   );
 };
 

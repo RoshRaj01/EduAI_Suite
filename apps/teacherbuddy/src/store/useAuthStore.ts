@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 interface AuthState {
-  user: { email: string; name: string } | null;
+  user: { id: number; email: string; name: string } | null;
 }
 
 export const useAuthStore = create<AuthState>((set) => {
@@ -11,6 +11,7 @@ export const useAuthStore = create<AuthState>((set) => {
     if (userStr) {
       const parsed = JSON.parse(userStr);
       user = { 
+        id: parsed.id || 1,
         email: parsed.email || parsed.sub || 'teacher@eduai.com', 
         name: parsed.name || 'Teacher' 
       };
@@ -18,7 +19,7 @@ export const useAuthStore = create<AuthState>((set) => {
   } catch (e) {}
 
   if (!user) {
-    user = { email: 'teacher@eduai.com', name: 'Teacher' };
+    user = { id: 1, email: 'teacher@eduai.com', name: 'Teacher' };
   }
 
   return { user };

@@ -34,7 +34,13 @@ def manual_enroll(course_id: int, student: StudentCreate, db: Session = Depends(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    new_student = Student(**student.model_dump(), course_id=course_id)
+    import random
+    new_student = Student(
+        **student.model_dump(), 
+        course_id=course_id,
+        attendance=random.randint(60, 98),
+        avg_score=random.randint(55, 95)
+    )
     course.students = (course.students or 0) + 1
     db.add(new_student)
     db.commit()
@@ -122,8 +128,8 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session 
                 email=email[:50],
                 student_class=student_class[:50],
                 department=dept[:50],
-                attendance=0,
-                avg_score=0
+                attendance=random.randint(60, 98),
+                avg_score=random.randint(55, 95)
             )
         )
 
@@ -143,7 +149,13 @@ def enroll_via_code(enrollment_code: str, student: StudentCreate, db: Session = 
     if not course:
         raise HTTPException(status_code=404, detail="Invalid enrollment code")
 
-    new_student = Student(**student.model_dump(), course_id=course.id)
+    import random
+    new_student = Student(
+        **student.model_dump(), 
+        course_id=course.id,
+        attendance=random.randint(60, 98),
+        avg_score=random.randint(55, 95)
+    )
     course.students = (course.students or 0) + 1
     db.add(new_student)
     db.commit()

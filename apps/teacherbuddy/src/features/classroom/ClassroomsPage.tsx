@@ -33,6 +33,7 @@ import {
   Sparkles,
   ShieldAlert,
 } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 const API_URL = API_ENDPOINTS.BASE;
@@ -47,17 +48,28 @@ const DEPARTMENTS = [
 ];
 
 export const ClassroomsPage: React.FC = () => {
+  const { courseId } = useParams<{ courseId: string }>();
+  const navigate = useNavigate();
   const [classrooms, setClassrooms] = useState<any[]>([]);
+
   const [assignments, setAssignments] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (courseId) {
+      setSelectedId(parseInt(courseId));
+    }
+  }, [courseId]);
+
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<
     "home" | "assignments" | "students" | "engagement"
   >("home");
+
 
   // Engagement State
   const [engagementData, setEngagementData] = useState<any>(null);
@@ -102,7 +114,7 @@ export const ClassroomsPage: React.FC = () => {
   const [courseForm, setCourseForm] = useState({
     code: "",
     name: "",
-    batch: "2026-A",
+    batch: `${new Date().getFullYear()}-A`,
     description: "",
     enrollment_code: "",
     color: "#264796",
@@ -661,7 +673,7 @@ export const ClassroomsPage: React.FC = () => {
             .map((c) => (
               <div
                 key={c.id}
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => navigate(`/classrooms/${c.id}`)}
                 className={`p-5 cursor-pointer relative group flex justify-between items-start transition-all duration-300 rounded-2xl border ${selectedId === c.id ? "ring-2 ring-brand-blue/40 border-brand-blue shadow-lg shadow-brand-blue/10 scale-105 z-10 bg-brand-blue-pale " : "border-slate-200 bg-white shadow-sm hover:shadow-md hover:scale-[1.02] hover:border-slate-300 "}`}
               >
                 <div>
