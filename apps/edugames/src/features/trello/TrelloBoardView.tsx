@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
 import { ArrowLeft, Star, Plus, X, MoreHorizontal, Trash2, Pencil, Users } from 'lucide-react';
@@ -7,11 +7,12 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { BoardColumn } from './components/BoardColumn';
 import { CardDetailModal } from './components/CardDetailModal';
 import { ShareModal } from './components/ShareModal';
+import './trello.css';
 
 export const TrelloBoardView: React.FC = () => {
   const { boardId } = useParams<{ boardId: string }>();
   const navigate = useNavigate();
-  const { boards, columns, cards, toggleStar, deleteBoard, addColumn, reorderColumns, moveCard, updateBoard } =
+  const { boards, columns, cards, toggleStar, deleteBoard, addColumn, reorderColumns, moveCard, updateBoard, syncWithBackend, pullFromBackend } =
     useTrelloStore();
 
   const board = boards.find((b) => b.id === boardId);
@@ -27,6 +28,16 @@ export const TrelloBoardView: React.FC = () => {
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const user = useAuthStore((s) => s.user);
+  const userEmail = user?.email || 'guest@eduai.com';
+
+  useEffect(() => {
+    if (userEmail) {
+      pullFromBackend(userEmail);
+      // Auto-sync every 10 seconds (pull only)
+      const interval = setInterval(() => pullFromBackend(userEmail), 10000);
+      return () => clearInterval(interval);
+    }
+  }, [userEmail, pullFromBackend]);
 
   if (!board) {
     return (
@@ -76,9 +87,11 @@ export const TrelloBoardView: React.FC = () => {
     setEditingName(false);
   };
 
-  const handleDeleteBoard = () => {
-    deleteBoard(board.id);
-    navigate('/games/trello');
+  const handleDeleteBoard = async () => {
+    const deleted = await deleteBoard(board.id);
+    if (deleted) {
+      navigate('/games/trello');
+    }
   };
 
   const selectedColumn = selectedCard
@@ -135,7 +148,7 @@ export const TrelloBoardView: React.FC = () => {
 
         <button
           onClick={() => setShowShareModal(true)}
-          className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-2 mr-2"
+          className="hidden bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-2 mr-2"
         >
           <Users size={16} /> Share
           {board.joinRequests && board.joinRequests.length > 0 && (user?.email || 'guest@eduai.com') === board.creatorEmail && (

@@ -1,24 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Star, LayoutGrid, Trash2, MoreHorizontal } from 'lucide-react';
+import { Plus, Star, LayoutGrid, Trash2, MoreHorizontal, ShieldAlert } from 'lucide-react';
 import { useTrelloStore } from '../../store/useTrelloStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { CreateBoardModal } from './components/CreateBoardModal';
-import { JoinBoardModal } from './components/JoinBoardModal';
 import './trello.css';
 
 export const TrelloBoardsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { boards, toggleStar, deleteBoard } = useTrelloStore();
+  const { boards, toggleStar, deleteBoard, pullFromBackend } = useTrelloStore();
   const user = useAuthStore((s) => s.user);
-  const fallbackEmail = user?.email || 'guest@eduai.com';
+  const fallbackEmail = user?.email || 'teacher@eduai.com';
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showJoinModal, setShowJoinModal] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (fallbackEmail) {
+      pullFromBackend(fallbackEmail);
+    }
+  }, [fallbackEmail, pullFromBackend]);
 
   const accessibleBoards = boards.filter(
     (b) => b.creatorEmail === fallbackEmail || b.members?.includes(fallbackEmail)
   );
+
+  const totalPendingRequests = 0; // Disabled per user request
 
   const starredBoards = accessibleBoards.filter((b) => b.starred);
   const recentBoards = [...accessibleBoards].sort(
@@ -43,10 +49,7 @@ export const TrelloBoardsPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => setShowJoinModal(true)} className="btn hover:bg-slate-100 transition-colors bg-white font-semibold shadow-sm border border-slate-200" style={{ color: 'var(--color-brand-blue)' }}>
-            Join Board
-          </button>
-          <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
+          <button onClick={() => setShowCreateModal(true)} className="btn btn-primary shadow-md flex items-center gap-2">
             <Plus size={18} />
             Create Board
           </button>
@@ -92,7 +95,7 @@ export const TrelloBoardsPage: React.FC = () => {
             <BoardTile
               key={board.id}
               board={board}
-              onOpen={() => navigate(`/tools/trello/${board.id}`)}
+              onOpen={() => navigate(`/games/trello/${board.id}`)}
               onStar={() => toggleStar(board.id)}
               onDelete={() => deleteBoard(board.id)}
               menuOpen={menuOpenId === board.id}
@@ -126,9 +129,6 @@ export const TrelloBoardsPage: React.FC = () => {
             Create your first project board to get started
           </p>
           <div className="flex gap-4">
-            <button onClick={() => setShowJoinModal(true)} className="btn hover:bg-slate-100 transition-colors bg-white font-semibold shadow-sm border border-slate-200" style={{ color: 'var(--color-brand-blue)' }}>
-              Join a Board
-            </button>
             <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
               <Plus size={18} />
               Create Your First Board
@@ -145,17 +145,21 @@ export const TrelloBoardsPage: React.FC = () => {
           onCreated={handleBoardCreated}
         />
       )}
-
-      {showJoinModal && (
-        <JoinBoardModal onClose={() => setShowJoinModal(false)} />
-      )}
     </div>
   );
 };
 
 /* ─── Board Tile Sub-Component ────────────────────────────── */
 interface BoardTileProps {
-  board: { id: string; name: string; background: string; starred: boolean; createdAt: string };
+  board: { 
+    id: string; 
+    name: string; 
+    background: string; 
+    starred: boolean; 
+    createdAt: string;
+    joinRequests?: string[];
+    creatorEmail: string;
+  };
   onOpen: () => void;
   onStar: () => void;
   onDelete: () => void;
@@ -173,6 +177,11 @@ const BoardTile: React.FC<BoardTileProps> = ({ board, onOpen, onStar, onDelete, 
         <div className="flex justify-between items-start">
           <h3 className="text-white font-bold text-[15px] leading-tight pr-6 line-clamp-2">
             {board.name}
+            {board.joinRequests && board.joinRequests.length > 0 && (
+              <span className="inline-flex items-center justify-center w-5 h-5 ml-2 bg-red-500 text-white text-[10px] rounded-full align-middle animate-pulse">
+                {board.joinRequests.length}
+              </span>
+            )}
           </h3>
           <div className="flex gap-0.5">
             <button

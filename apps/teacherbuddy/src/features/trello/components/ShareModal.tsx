@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Users, Copy, CheckCircle2, UserPlus, UserMinus, ShieldAlert } from 'lucide-react';
 import { useTrelloStore, type TrelloBoard } from '../../../store/useTrelloStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -9,10 +9,12 @@ interface Props {
 }
 
 export const ShareModal: React.FC<Props> = ({ board, onClose }) => {
-  const { approveJoinRequest, rejectJoinRequest, removeMember, addMemberDirectly } = useTrelloStore();
+  const { removeMember, addMemberDirectly, syncWithBackend } = useTrelloStore();
   const user = useAuthStore((s) => s.user);
   const [copied, setCopied] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   const userEmail = user?.email || 'guest@eduai.com';
   const isCreator = userEmail === board.creatorEmail;
@@ -23,11 +25,34 @@ export const ShareModal: React.FC<Props> = ({ board, onClose }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleInvite = () => {
-    if (!inviteEmail.trim() || !inviteEmail.includes('@')) return;
-    addMemberDirectly(board.id, inviteEmail.trim().toLowerCase());
+  const handleInvite = async (email?: string) => {
+    const targetEmail = email || inviteEmail.trim().toLowerCase();
+    if (!targetEmail || !targetEmail.includes('@')) return;
+    await addMemberDirectly(board.id, targetEmail);
     setInviteEmail('');
   };
+
+  useEffect(() => {
+    syncWithBackend(userEmail);
+    
+    // Fetch suggested members
+    const fetchSuggestions = async () => {
+      setLoadingSuggestions(true);
+      try {
+        const role = 'teacher'; // TeacherBuddy is always teacher role
+        const res = await fetch(`http://localhost:8000/trello/suggested-members?email=${userEmail}&role=${role}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestions(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch suggestions:', err);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+    fetchSuggestions();
+  }, [board.id, userEmail]);
 
   return (
     <div className="trello-modal-overlay" onClick={onClose}>
@@ -42,57 +67,7 @@ export const ShareModal: React.FC<Props> = ({ board, onClose }) => {
             </button>
           </div>
 
-          <div className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-              Board ID (Share with others)
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono text-slate-700">
-                {board.id}
-              </code>
-              <button
-                onClick={handleCopyId}
-                className="btn btn-primary py-2 px-3 flex items-center gap-2"
-                style={{ background: copied ? '#10b981' : undefined }}
-              >
-                {copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-2">
-              Users can request access using this ID from the Trello dashboard.
-            </p>
-          </div>
 
-          {isCreator && board.joinRequests && board.joinRequests.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-3" style={{ color: 'var(--color-text-primary)' }}>
-                <ShieldAlert size={16} className="text-amber-500" />
-                Pending Requests ({board.joinRequests.length})
-              </h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                {board.joinRequests.map((email) => (
-                  <div key={email} className="flex items-center justify-between p-2.5 bg-amber-50 border border-amber-100 rounded-lg">
-                    <span className="text-sm font-medium text-amber-900">{email}</span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => approveJoinRequest(board.id, email)}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => rejectJoinRequest(board.id, email)}
-                        className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-100 hover:bg-red-200 rounded-md transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Direct Add Member Interface */}
           {isCreator && (
@@ -111,7 +86,7 @@ export const ShareModal: React.FC<Props> = ({ board, onClose }) => {
                   className="form-input text-sm py-2 flex-1"
                 />
                 <button
-                  onClick={handleInvite}
+                  onClick={() => handleInvite()}
                   disabled={!inviteEmail.trim() || !inviteEmail.includes('@')}
                   className="btn btn-primary py-2 px-4 whitespace-nowrap"
                   style={{ opacity: (!inviteEmail.trim() || !inviteEmail.includes('@')) ? 0.5 : 1 }}
@@ -119,6 +94,29 @@ export const ShareModal: React.FC<Props> = ({ board, onClose }) => {
                   Add User
                 </button>
               </div>
+
+              {/* Suggestions list */}
+              {suggestions.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Suggested Connections</p>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions
+                      .filter(s => s.email !== userEmail && !board.members?.includes(s.email))
+                      .slice(0, 5)
+                      .map(s => (
+                        <button
+                          key={s.email}
+                          onClick={() => handleInvite(s.email)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-medium transition-colors"
+                          title={`Invite ${s.name}`}
+                        >
+                          <div className={`w-2 h-2 rounded-full ${s.role === 'teacher' ? 'bg-brand-gold' : 'bg-brand-blue'}`} />
+                          {s.name}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

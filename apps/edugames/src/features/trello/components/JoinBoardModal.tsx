@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, LogIn } from 'lucide-react';
+import { X, LogIn, Loader2 } from 'lucide-react';
 import { useTrelloStore } from '../../../store/useTrelloStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 
@@ -8,37 +8,80 @@ interface Props {
 }
 
 export const JoinBoardModal: React.FC<Props> = ({ onClose }) => {
-  const { requestJoinBoard, boards } = useTrelloStore();
+  const { requestJoinBoard, boards, syncWithBackend } = useTrelloStore();
   const user = useAuthStore((s) => s.user);
   const [boardId, setBoardId] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     setError('');
     if (!boardId.trim()) return;
-    
-    const board = boards.find(b => b.id === boardId.trim());
-    if (!board) {
-      setError('Board not found. Please check the ID.');
-      return;
-    }
 
     const userEmail = user?.email || 'guest@eduai.com';
+    const trimmedId = boardId.trim();
 
-    if (board.creatorEmail === userEmail || board.members?.includes(userEmail)) {
-      setError('You are already a member of this board.');
+    // First check local store
+    const localBoard = boards.find(b => b.id === trimmedId);
+    if (localBoard) {
+      if (localBoard.creatorEmail === userEmail || localBoard.members?.includes(userEmail)) {
+        setError('You are already a member of this board.');
+        return;
+      }
+      if (localBoard.joinRequests?.includes(userEmail)) {
+        setError('You have already requested to join this board. Please wait for approval.');
+        return;
+      }
+      await requestJoinBoard(localBoard.id, userEmail);
+      syncWithBackend(userEmail);
+      setSuccess(true);
+      setTimeout(() => onClose(), 2000);
       return;
     }
 
-    if (board.joinRequests?.includes(userEmail)) {
-      setError('You have already requested to join this board. Please wait for approval.');
-      return;
-    }
+    // Not found locally — check backend (cross-app board)
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:8000/trello/board/${trimmedId}`);
+      if (!res.ok) {
+        setError('Board not found. Please check the ID.');
+        setLoading(false);
+        return;
+      }
 
-    requestJoinBoard(board.id, userEmail);
-    setSuccess(true);
-    setTimeout(() => onClose(), 2000);
+      const boardData = await res.json();
+
+      if (boardData.creatorEmail === userEmail || boardData.members?.includes(userEmail)) {
+        setError('You are already a member of this board.');
+        setLoading(false);
+        return;
+      }
+      if (boardData.joinRequests?.includes(userEmail)) {
+        setError('You have already requested to join this board. Please wait for approval.');
+        setLoading(false);
+        return;
+      }
+
+      // Submit join request via backend
+      const joinRes = await fetch(`http://localhost:8000/trello/board/${trimmedId}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail }),
+      });
+
+      if (joinRes.ok) {
+        setSuccess(true);
+        setTimeout(() => onClose(), 2000);
+      } else {
+        const errData = await joinRes.json();
+        setError(errData.detail || 'Failed to submit join request.');
+      }
+    } catch (err) {
+      setError('Could not connect to server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,11 +121,12 @@ export const JoinBoardModal: React.FC<Props> = ({ onClose }) => {
 
               <button
                 onClick={handleJoin}
-                disabled={!boardId.trim()}
-                className="btn btn-primary w-full py-2.5 text-sm"
-                style={{ opacity: boardId.trim() ? 1 : 0.5 }}
+                disabled={!boardId.trim() || loading}
+                className="btn btn-primary w-full py-2.5 text-sm flex items-center justify-center gap-2"
+                style={{ opacity: boardId.trim() && !loading ? 1 : 0.5 }}
               >
-                Request Access
+                {loading && <Loader2 size={16} className="animate-spin" />}
+                {loading ? 'Looking up board...' : 'Request Access'}
               </button>
             </>
           ) : (
