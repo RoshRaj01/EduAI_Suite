@@ -378,7 +378,7 @@ export const QuizCreator: React.FC = () => {
       {showSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
-            <h2 className="text-2xl font-black mb-6">Quiz Settings</h2>
+            <h2 className="text-2xl font-black mb-6">Quiz Description</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-black uppercase text-gray-400">Description</label>
