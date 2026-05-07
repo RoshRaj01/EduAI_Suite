@@ -14,6 +14,10 @@ export const ReportsPage: React.FC = () => {
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [sendEmailAddress, setSendEmailAddress] = useState("");
   const [selectedReportId, setSelectedReportId] = useState("");
+  const [availableCourses, setAvailableCourses] = useState<any[]>([]);
+  const [availableStudents, setAvailableStudents] = useState<any[]>([]);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingReport, setViewingReport] = useState<any>(null);
 
   const fetchReports = async () => {
     try {
@@ -27,11 +31,33 @@ export const ReportsPage: React.FC = () => {
     }
   };
 
+  const fetchMeta = async () => {
+    try {
+      const [cRes, sRes] = await Promise.all([
+        fetch(API_ENDPOINTS.COURSES),
+        fetch(API_ENDPOINTS.STUDENTS)
+      ]);
+      if (cRes.ok) setAvailableCourses(await cRes.json());
+      if (sRes.ok) setAvailableStudents(await sRes.json());
+    } catch (err) {
+      console.error("Failed to fetch metadata:", err);
+    }
+  };
+
   useEffect(() => {
     fetchReports();
+    fetchMeta();
     const interval = setInterval(fetchReports, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (newReportType === 'Student Report' && availableStudents.length > 0) {
+      setNewReportTargetId(availableStudents[0].id);
+    } else if (newReportType === 'Class Report' && availableCourses.length > 0) {
+      setNewReportTargetId(availableCourses[0].id);
+    }
+  }, [newReportType, availableCourses.length, availableStudents.length]);
 
   const handleGenerate = async (type: string, target_id: number) => {
     try {
@@ -95,6 +121,11 @@ export const ReportsPage: React.FC = () => {
     }
   };
 
+  const handleViewClick = (rep: any) => {
+    setViewingReport(rep);
+    setIsViewModalOpen(true);
+  };
+
   const openModal = (type: string) => {
     setNewReportType(type);
     setIsModalOpen(true);
@@ -116,13 +147,11 @@ export const ReportsPage: React.FC = () => {
         {[
           { type: 'Class Report', title: 'Class-Level Reports', desc: 'Generate aggregated performance stats.', icon: <Users size={20}/>, color: 'blue' },
           { type: 'Student Report', title: 'Parent-Ready Auto Reports', desc: 'AI summarizes student strengths & weaknesses.', icon: <FileSpreadsheet size={20}/>, color: 'green' },
-          { type: 'Analytics Export', title: 'Scheduled Exports', desc: 'Manage automated weekly/monthly exports.', icon: <RefreshCw size={20}/>, color: 'purple' }
         ].map((item) => (
           <GlassCard key={item.title} className="p-6 group hover:scale-[1.02] transition-all duration-300">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300 ${
-              item.color === 'blue' ? 'bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white' :
-              item.color === 'green' ? 'bg-green-500/10 text-green-500 group-hover:bg-green-500 group-hover:text-white' :
-              'bg-purple-500/10 text-purple-500 group-hover:bg-purple-500 group-hover:text-white'
+              item.color === 'blue' ? 'bg-[#264796]/10 text-[#264796] group-hover:bg-[#264796] group-hover:text-white' :
+              'bg-[#d0ae61]/10 text-[#d0ae61] group-hover:bg-[#d0ae61] group-hover:text-white'
             }`}>
               {item.icon}
             </div>
@@ -131,9 +160,8 @@ export const ReportsPage: React.FC = () => {
             <button 
               onClick={() => openModal(item.type)} 
               className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-all duration-300 ${
-                item.color === 'blue' ? 'text-blue-500 hover:text-blue-600' :
-                item.color === 'green' ? 'text-green-500 hover:text-green-600' :
-                'text-purple-500 hover:text-purple-600'
+                item.color === 'blue' ? 'text-[#264796] hover:text-[#2a52a8]' :
+                'text-[#d0ae61] hover:text-[#ddb867]'
               }`}
             >
               Generate
@@ -168,7 +196,7 @@ export const ReportsPage: React.FC = () => {
                   <td className="px-6 py-4 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{rep.id}</td>
                   <td className="px-6 py-4 font-semibold" style={{ color: "var(--color-text-primary)" }}>
                      <div className="flex items-center gap-2">
-                       {rep.status === 'generating' && <RefreshCw size={14} className="animate-spin text-blue-500" />}
+                       {rep.status === 'generating' && <RefreshCw size={14} className="animate-spin text-[#264796]" />}
                        {rep.status === 'failed' && <span className="text-red-500 text-xs px-1 border border-red-500 rounded">Failed</span>}
                        {rep.name}
                      </div>
@@ -176,9 +204,9 @@ export const ReportsPage: React.FC = () => {
                   <td className="px-6 py-4" style={{ color: "var(--color-text-secondary)" }}>{rep.type}</td>
                   <td className="px-6 py-4" style={{ color: "var(--color-text-secondary)" }}>{rep.date}</td>
                   <td className="px-6 py-4 text-right space-x-3">
-                    <button onClick={() => rep.content && alert(rep.content)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-blue-600 disabled:opacity-30" title="View Content"><FileSpreadsheet size={16}/></button>
-                    <button onClick={() => handleDownload(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-blue-600 disabled:opacity-30" title="Download"><Download size={16}/></button>
-                    <button onClick={() => handleSendClick(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-green-600 disabled:opacity-30" title="Send"><Send size={16}/></button>
+                    <button onClick={() => handleViewClick(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-[#264796] disabled:opacity-30" title="View Content"><FileSpreadsheet size={16}/></button>
+                    <button onClick={() => handleDownload(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-[#264796] disabled:opacity-30" title="Download"><Download size={16}/></button>
+                    <button onClick={() => handleSendClick(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-[#d0ae61] disabled:opacity-30" title="Send"><Send size={16}/></button>
                   </td>
                 </tr>
               ))}
@@ -209,16 +237,15 @@ export const ReportsPage: React.FC = () => {
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-blue-500 mb-2 ml-1">Report Type</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-[#d0ae61] mb-2 ml-1">Report Type</label>
                   <div className="relative group">
                     <select 
                       value={newReportType} 
                       onChange={(e) => setNewReportType(e.target.value)}
-                      className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer hover:bg-white/10"
+                      className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white appearance-none focus:outline-none focus:ring-2 focus:ring-[#264796]/50 transition-all cursor-pointer hover:bg-white/10"
                     >
                       <option value="Student Report" className="bg-[#1a1a1a]">Student Report</option>
                       <option value="Class Report" className="bg-[#1a1a1a]">Class Report</option>
-                      <option value="Analytics Export" className="bg-[#1a1a1a]">Analytics Export</option>
                     </select>
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
                       <Users size={16} />
@@ -228,19 +255,44 @@ export const ReportsPage: React.FC = () => {
                 
                 {newReportType !== 'Analytics Export' && (
                   <div className="animate-in slide-in-from-top-2 duration-300">
-                    <label className="block text-xs font-bold uppercase tracking-widest text-blue-500 mb-2 ml-1">
-                      {newReportType === 'Student Report' ? 'Student ID' : 'Course ID'}
+                    <label className="block text-xs font-bold uppercase tracking-widest text-[#d0ae61] mb-2 ml-1">
+                      {newReportType === 'Student Report' ? 'Student' : 'Course Name'}
                     </label>
-                    <input 
-                      type="number" 
-                      value={newReportTargetId} 
-                      onChange={(e) => setNewReportTargetId(Number(e.target.value))}
-                      className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all hover:bg-white/10 placeholder:text-gray-600"
-                      placeholder={`Enter ${newReportType === 'Student Report' ? 'Student' : 'Course'} ID...`}
-                    />
+                    <div className="relative group">
+                      <select 
+                        value={newReportTargetId} 
+                        onChange={(e) => setNewReportTargetId(Number(e.target.value))}
+                        className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white appearance-none focus:outline-none focus:ring-2 focus:ring-[#264796]/50 transition-all cursor-pointer hover:bg-white/10"
+                      >
+                        {newReportType === 'Student Report' ? (
+                          availableStudents.length > 0 ? (
+                            availableStudents.map(s => (
+                              <option key={s.id} value={s.id} className="bg-[#1a1a1a]">
+                                {s.name} - {s.registration_number || s.id}
+                              </option>
+                            ))
+                          ) : (
+                            <option value={0} disabled className="bg-[#1a1a1a]">No students found</option>
+                          )
+                        ) : (
+                          availableCourses.length > 0 ? (
+                            availableCourses.map(c => (
+                              <option key={c.id} value={c.id} className="bg-[#1a1a1a]">
+                                {c.name}
+                              </option>
+                            ))
+                          ) : (
+                            <option value={0} disabled className="bg-[#1a1a1a]">No courses found</option>
+                          )
+                        )}
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                        <Users size={16} />
+                      </div>
+                    </div>
                     <p className="text-[10px] mt-2 text-gray-500 italic ml-1 flex items-center gap-1">
                       <RefreshCw size={10} className="animate-spin-slow" />
-                      Tip: Use ID 1, 2, or 3 for demonstration purposes.
+                      Tip: Selecting a {newReportType === 'Student Report' ? 'student' : 'course'} will generate the report for that specific entity.
                     </p>
                   </div>
                 )}
@@ -248,7 +300,7 @@ export const ReportsPage: React.FC = () => {
                 <button 
                   onClick={() => handleGenerate(newReportType, newReportTargetId)} 
                   disabled={loading}
-                  className="w-full h-14 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white font-bold rounded-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(37,99,235,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(37,99,235,0.6)] group mt-4"
+                  className="w-full h-14 bg-[#264796] hover:bg-[#1c3570] disabled:bg-[#1c3570] disabled:text-gray-400 text-white font-bold rounded-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(38,71,150,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(38,71,150,0.6)] group mt-4"
                 >
                   {loading ? (
                     <RefreshCw size={20} className="animate-spin" />
@@ -261,7 +313,7 @@ export const ReportsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-            <div className="h-1 w-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500" />
+            <div className="h-1 w-full bg-gradient-to-r from-[#264796] via-[#d0ae61] to-[#264796]" />
           </div>
         </div>
       )}
@@ -288,14 +340,14 @@ export const ReportsPage: React.FC = () => {
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-green-500 mb-2 ml-1">Recipient Email</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-[#d0ae61] mb-2 ml-1">Recipient Email</label>
                   <div className="relative group">
                     <input 
                       type="email" 
                       value={sendEmailAddress} 
                       onChange={(e) => setSendEmailAddress(e.target.value)}
                       placeholder="parent@school.com"
-                      className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all hover:bg-white/10 placeholder:text-gray-600"
+                      className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#264796]/50 transition-all hover:bg-white/10 placeholder:text-gray-600"
                     />
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
                       <Send size={16} />
@@ -306,7 +358,7 @@ export const ReportsPage: React.FC = () => {
                 <button 
                   onClick={confirmSend} 
                   disabled={loading}
-                  className="w-full h-14 bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:text-gray-400 text-white font-bold rounded-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(22,163,74,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(22,163,74,0.6)] group mt-4"
+                  className="w-full h-14 bg-[#264796] hover:bg-[#1c3570] disabled:bg-[#1c3570] disabled:text-gray-400 text-white font-bold rounded-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(38,71,150,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(38,71,150,0.6)] group mt-4"
                 >
                   {loading ? (
                     <RefreshCw size={20} className="animate-spin" />
@@ -319,7 +371,69 @@ export const ReportsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-            <div className="h-1 w-full bg-gradient-to-r from-green-500 via-emerald-500 to-green-500" />
+            <div className="h-1 w-full bg-gradient-to-r from-[#264796] via-[#d0ae61] to-[#264796]" />
+          </div>
+        </div>
+      )}
+      {isViewModalOpen && viewingReport && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-50 flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
+          <div 
+            className="bg-[#0f0f0f] rounded-3xl max-w-4xl w-full h-[85vh] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.5)] border border-white/10 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-white/5">
+              <div>
+                <h2 className="text-xl font-bold text-white font-display mb-1">{viewingReport.name}</h2>
+                <p className="text-gray-400 text-xs uppercase tracking-widest">{viewingReport.type} • Generated on {viewingReport.date}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => handleDownload(viewingReport)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all border border-white/5"
+                  title="Download TXT"
+                >
+                  <Download size={18} />
+                </button>
+                <button 
+                  onClick={() => setIsViewModalOpen(false)} 
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-red-500/20 text-gray-400 hover:text-red-500 transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 md:p-12 text-gray-300 leading-relaxed font-serif text-lg selection:bg-blue-500/30">
+               <div className="max-w-2xl mx-auto space-y-6">
+                 {viewingReport.content?.split('\n').map((line: string, i: number) => {
+                   if (!line.trim()) return <div key={i} className="h-4" />;
+                   
+                   // Handle bold headers/sections
+                   const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+                   return (
+                     <p key={i} dangerouslySetInnerHTML={{ __html: formattedLine }} />
+                   );
+                 })}
+               </div>
+            </div>
+
+            <div className="p-6 border-t border-white/5 bg-white/5 flex justify-end gap-4">
+              <button 
+                onClick={() => setIsViewModalOpen(false)}
+                className="px-6 py-2.5 rounded-xl text-gray-400 hover:text-white font-bold transition-all"
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  handleSendClick(viewingReport);
+                }}
+                className="px-8 py-2.5 bg-[#264796] hover:bg-[#1c3570] text-white font-bold rounded-xl flex items-center gap-2 transition-all shadow-lg"
+              >
+                <Send size={16} /> Send via Email
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -67,23 +67,62 @@ def generate_report_background(report_db_id: int, type: str, target_id: int, db:
                 db.commit()
                 return
 
-            # Get grades
+            # Get grades and performance data
             submissions = db.query(Submission).filter(Submission.student_name == student.name).all()
             attempts = db.query(ExamAttempt).filter(ExamAttempt.student_id == student.id).all()
             
+            sub_details = []
+            for s in submissions:
+                assignment = db.query(Assignment).filter(Assignment.id == s.assignment_id).first()
+                title = assignment.title if assignment else "Unknown Assignment"
+                sub_details.append(f"- {title}: {s.grade}%")
+
+            exam_details = []
+            for a in attempts:
+                exam = db.query(Exam).filter(Exam.id == a.exam_id).first()
+                title = exam.title if exam else "Unknown Exam"
+                exam_details.append(f"- {title}: {a.score}%")
+
             sub_scores = [s.grade for s in submissions if s.grade is not None]
             exam_scores = [a.score for a in attempts if a.score is not None]
             
             avg_sub = sum(sub_scores)/len(sub_scores) if sub_scores else 0
             avg_exam = sum(exam_scores)/len(exam_scores) if exam_scores else 0
             
-            prompt = f"Write a professional, encouraging parent-ready academic report for student '{student.name}'. Their average assignment score is {avg_sub:.1f}% and average exam score is {avg_exam:.1f}%. Highlight strengths and suggest areas for improvement."
+            prompt = f"""
+            Generate a COMPREHENSIVE and PROFESSIONAL academic report for the following student:
+            
+            STUDENT NAME: {student.name}
+            REGISTRATION NUMBER: {student.registration_number}
+            DEPARTMENT: {student.department}
+            ATTENDANCE: {student.attendance}%
+            
+            PERFORMANCE SUMMARY:
+            - Average Assignment Score: {avg_sub:.1f}%
+            - Average Exam Score: {avg_exam:.1f}%
+            
+            DETAILED ASSIGNMENTS:
+            {chr(10).join(sub_details) if sub_details else "No assignments recorded."}
+            
+            DETAILED EXAMS:
+            {chr(10).join(exam_details) if exam_details else "No exams recorded."}
+            
+            REPORT STRUCTURE:
+            1. Introduction: Briefly mention the student's background and general standing.
+            2. Academic Performance: Detailed analysis of assignment and exam performance.
+            3. Attendance & Engagement: Discuss the student's commitment based on their {student.attendance}% attendance.
+            4. Strengths: Identify specific areas where the student is excelling.
+            5. Areas for Improvement: Provide constructive feedback on where to focus.
+            6. Conclusion & Recommendations: Final word for the parents/student.
+            
+            Tone: Professional, encouraging, and detailed. Do not use placeholders.
+            """
             
             message = GroqService._client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model="llama-3.3-70b-versatile",
                 temperature=0.7,
-                max_tokens=500,
+                max_tokens=1500,
             )
             report.content = message.choices[0].message.content
             report.status = "ready"
@@ -97,13 +136,32 @@ def generate_report_background(report_db_id: int, type: str, target_id: int, db:
                 db.commit()
                 return
             
-            prompt = f"Write an analytical report for the class '{course.name}'. Mention that the class is generally performing well but there are specific areas where students struggle."
+            # Fetch class stats
+            students = db.query(Student).filter(Student.course_id == course.id).all()
+            total_students = len(students)
+            avg_attendance = sum([s.attendance for s in students])/total_students if total_students > 0 else 0
+            
+            prompt = f"""
+            Generate a DETAILED Class-Level Analytical Report for the following course:
+            
+            COURSE: {course.name}
+            TOTAL STUDENTS: {total_students}
+            AVERAGE ATTENDANCE: {avg_attendance:.1f}%
+            
+            REPORT STRUCTURE:
+            1. Executive Summary: Overall performance of the batch.
+            2. Engagement Analysis: How the attendance and participation looks across the class.
+            3. Subjective Analysis: Common areas where the class is excelling and where common misconceptions lie.
+            4. Future Roadmap: Recommended teaching strategies for the next month.
+            
+            Tone: Analytical, administrative, and strategic.
+            """
             
             message = GroqService._client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model="llama-3.3-70b-versatile",
                 temperature=0.7,
-                max_tokens=500,
+                max_tokens=1500,
             )
             report.content = message.choices[0].message.content
             report.status = "ready"

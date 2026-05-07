@@ -18,6 +18,11 @@ def get_db():
         db.close()
 
 
+@student_router.get("/", response_model=list[StudentResponse])
+def get_all_students(db: Session = Depends(get_db)):
+    return db.query(Student).all()
+
+
 @student_router.get("/{course_id}", response_model=list[StudentResponse])
 def get_students(course_id: int, db: Session = Depends(get_db)):
     return db.query(Student).filter(Student.course_id == course_id).all()
