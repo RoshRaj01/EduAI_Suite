@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Search,
   Users,
+  User,
   XCircle,
   MessageSquareText,
 } from "lucide-react";
@@ -52,7 +53,14 @@ type Appointment = {
 };
 
 const formatTimestamp = (value: string) => {
-  const parsed = new Date(value);
+  if (!value) return "";
+  
+  // Ensure the timestamp is treated as UTC if it's an ISO-like string without a timezone
+  const isoValue = (value.includes("T") && !value.includes("Z") && !value.includes("+")) 
+    ? `${value}Z` 
+    : value;
+    
+  const parsed = new Date(isoValue);
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
@@ -62,7 +70,38 @@ const formatTimestamp = (value: string) => {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    hour12: true
   }).format(parsed);
+};
+
+const formatSlot = (slot: string) => {
+  if (!slot) return { date: "No date set", time: "No time set" };
+  
+  const parts = slot.split(" ");
+  if (parts.length < 2) return { date: slot, time: "" };
+
+  const [datePart, timePart] = parts;
+  
+  // Date formatting
+  let dateDisplay = datePart;
+  try {
+    const d = new Date(datePart);
+    if (!isNaN(d.getTime())) {
+      dateDisplay = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+  } catch (e) {}
+
+  // Time formatting (12h)
+  let timeDisplay = timePart;
+  try {
+    const [hoursStr, minutes] = timePart.split(":");
+    const hours = parseInt(hoursStr, 10);
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const h12 = hours % 12 || 12;
+    timeDisplay = `${h12}:${minutes} ${ampm}`;
+  } catch (e) {}
+
+  return { date: dateDisplay, time: timeDisplay };
 };
 
 const statusTabs: Array<{ id: "all" | AppointmentStatus; label: string }> = [
@@ -91,6 +130,8 @@ export const TeacherAppointmentsPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [rejectingAppointment, setRejectingAppointment] = useState<Appointment | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState("");
+  const [suggestedDate, setSuggestedDate] = useState("");
+  const [suggestedTime, setSuggestedTime] = useState("");
 
   const teacherOptions = useMemo(() => {
     const names = new Set<string>();
@@ -217,6 +258,8 @@ export const TeacherAppointmentsPage: React.FC = () => {
       setActioningId(null);
       setRejectingAppointment(null);
       setRejectionReasonInput("");
+      setSuggestedDate("");
+      setSuggestedTime("");
     }
   };
 
@@ -237,32 +280,20 @@ export const TeacherAppointmentsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <label className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Teacher Filter</span>
-            <select
-              value={selectedTeacher}
-              onChange={(event) => setSelectedTeacher(event.target.value)}
-              className="rounded-xl px-4 py-3 text-sm outline-none"
-              style={{ background: "var(--color-surface-base)", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
-            >
-              {teacherOptions.map((teacher) => <option key={teacher} value={teacher}>{teacher}</option>)}
-            </select>
-          </label>
-
-          <label className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>Search</span>
-            <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-text-muted)" }} />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Student, teacher, agenda..."
-                className="rounded-xl pl-9 pr-4 py-3 text-sm outline-none"
-                style={{ background: "var(--color-surface-base)", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
-              />
-            </div>
-          </label>
+        <div className="relative w-full sm:w-80">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--color-text-muted)" }} />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search bookings, students, or agendas..."
+            className="w-full rounded-2xl pl-12 pr-4 py-3.5 text-sm outline-none transition-all focus:shadow-lg"
+            style={{ 
+              background: "var(--color-surface-base)", 
+              border: "1px solid var(--color-border)", 
+              color: "var(--color-text-primary)",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.02)"
+            }}
+          />
         </div>
       </div>
 
@@ -283,18 +314,51 @@ export const TeacherAppointmentsPage: React.FC = () => {
               className="w-full rounded-xl px-4 py-3 text-sm outline-none resize-none"
               style={{ background: "var(--color-surface-base)", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
               placeholder="e.g., I have a conflicting lecture. Please reschedule for tomorrow."
-              rows={4}
+              rows={3}
               autoFocus
             />
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1.5">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Suggest New Date</span>
+                <input
+                  type="date"
+                  value={suggestedDate}
+                  onChange={(e) => setSuggestedDate(e.target.value)}
+                  className="w-full rounded-xl px-3 py-2.5 text-xs outline-none"
+                  style={{ background: "var(--color-surface-base)", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
+                />
+              </label>
+              <label className="space-y-1.5">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Suggest New Time</span>
+                <input
+                  type="time"
+                  value={suggestedTime}
+                  onChange={(e) => setSuggestedTime(e.target.value)}
+                  className="w-full rounded-xl px-3 py-2.5 text-xs outline-none"
+                  style={{ background: "var(--color-surface-base)", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
+                />
+              </label>
+            </div>
+
             <div className="flex gap-3 pt-2">
               <button
-                onClick={() => setRejectingAppointment(null)}
+                onClick={() => {
+                  setRejectingAppointment(null);
+                  setSuggestedDate("");
+                  setSuggestedTime("");
+                }}
                 className="btn btn-outline flex-1"
               >
                 Cancel
               </button>
               <button
-                onClick={() => respondToAppointment(rejectingAppointment, "rejected", rejectionReasonInput)}
+                onClick={() => {
+                  const finalReason = suggestedDate && suggestedTime 
+                    ? `${rejectionReasonInput}\n\n[RESCHEDULE SUGGESTION: ${suggestedDate} at ${suggestedTime}]`
+                    : rejectionReasonInput;
+                  respondToAppointment(rejectingAppointment, "rejected", finalReason);
+                }}
                 className="btn btn-primary bg-red-600 hover:bg-red-700 flex-1"
                 disabled={!rejectionReasonInput.trim() || actioningId === rejectingAppointment.id}
               >
@@ -373,21 +437,52 @@ export const TeacherAppointmentsPage: React.FC = () => {
                   style={{ borderLeftColor: selected ? "#264796" : "transparent" }}
                   onClick={() => setSelectedId(appointment.id)}
                 >
-                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="badge text-[10px]" style={{ background: meta.bg, color: meta.color }}>{meta.label}</span>
-                        <span className="badge text-[10px]" style={{ background: "rgba(38,71,150,0.08)", color: "var(--color-brand-blue)" }}>
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="badge text-[10px] font-black uppercase tracking-wider" style={{ background: meta.bg, color: meta.color }}>{meta.label}</span>
+                        <span className="badge text-[10px] font-black uppercase tracking-wider" style={{ background: "rgba(38,71,150,0.08)", color: "var(--color-brand-blue)" }}>
                           {appointment.teacher_name}
                         </span>
                       </div>
-                      <p className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>{appointment.student_name}</p>
-                      <p className="text-sm font-semibold" style={{ color: "var(--color-brand-blue)" }}>{appointment.agenda}</p>
-                      {appointment.details && <p className="text-xs line-clamp-1" style={{ color: "var(--color-text-secondary)" }}>{appointment.details}</p>}
-                      <div className="flex flex-wrap gap-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
-                        <span className="flex items-center gap-1"><Calendar size={12} /> {appointment.time_slot}</span>
-                        <span className="flex items-center gap-1"><Clock size={12} /> {formatTimestamp(appointment.requested_at)}</span>
-                        <span className="flex items-center gap-1"><Users size={12} /> {appointment.meeting_mode}</span>
+                      <h4 className="text-xl font-black tracking-tight" style={{ color: "var(--color-text-primary)" }}>{appointment.student_name}</h4>
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-bold leading-tight" style={{ color: "var(--color-brand-blue)" }}>{appointment.agenda}</p>
+                        {appointment.details && <p className="text-xs line-clamp-1 italic" style={{ color: "var(--color-text-muted)" }}>{appointment.details}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest pt-1" style={{ color: "var(--color-text-muted)" }}>
+                        <Clock size={12} /> {formatTimestamp(appointment.requested_at)}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-8 lg:px-8 lg:border-x border-slate-100">
+                      <div className="flex items-center gap-3 min-w-[200px]">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                          <Calendar size={24} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Scheduled Slot</p>
+                          <div className="leading-tight">
+                            <p className="text-[13px] font-bold text-slate-600">
+                              {formatSlot(appointment.time_slot).date}
+                            </p>
+                            <p className="text-lg font-black tracking-tight" style={{ color: "var(--color-text-primary)" }}>
+                              {formatSlot(appointment.time_slot).time}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                          <Users size={18} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Mode</p>
+                          <p className="text-sm font-black" style={{ color: "var(--color-text-secondary)" }}>
+                            {appointment.meeting_mode}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -424,7 +519,7 @@ export const TeacherAppointmentsPage: React.FC = () => {
             <GlassCard className="py-16 text-center">
               <CircleDashed size={28} className="mx-auto mb-3" style={{ color: "var(--color-text-muted)" }} />
               <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>No bookings match this view.</p>
-              <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>Try another teacher or status filter.</p>
+              <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>Try adjusting your search or status filter.</p>
             </GlassCard>
           )}
         </div>
@@ -459,14 +554,28 @@ export const TeacherAppointmentsPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="rounded-xl p-3 border" style={{ borderColor: "var(--color-border)" }}>
-                    <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{selectedAppointment.teacher_name}</p>
-                    <p className="mt-1" style={{ color: "var(--color-text-muted)" }}>{selectedAppointment.teacher_department || "Not specified"}</p>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="rounded-2xl p-4 border flex items-center gap-4" style={{ borderColor: "var(--color-border)", background: "rgba(38,71,150,0.02)" }}>
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700 shrink-0">
+                      <User size={20} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Teacher</p>
+                      <p className="text-sm font-black" style={{ color: "var(--color-text-primary)" }}>{selectedAppointment.teacher_name}</p>
+                      <p className="text-[11px] font-bold" style={{ color: "var(--color-text-muted)" }}>{selectedAppointment.teacher_department || "General Department"}</p>
+                    </div>
                   </div>
-                  <div className="rounded-xl p-3 border" style={{ borderColor: "var(--color-border)" }}>
-                    <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{selectedAppointment.meeting_mode}</p>
-                    <p className="mt-1" style={{ color: "var(--color-text-muted)" }}>{selectedAppointment.time_slot}</p>
+
+                  <div className="rounded-2xl p-4 border flex items-center gap-4" style={{ borderColor: "var(--color-border)", background: "rgba(208,174,97,0.05)" }}>
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
+                      <Calendar size={20} />
+                    </div>
+                    <div className="leading-tight">
+                      <p className="text-[10px] font-black text-amber-600/60 uppercase tracking-widest mb-0.5">Meeting Schedule</p>
+                      <p className="text-[12px] font-bold text-slate-500">{formatSlot(selectedAppointment.time_slot).date}</p>
+                      <p className="text-sm font-black" style={{ color: "var(--color-text-primary)" }}>{formatSlot(selectedAppointment.time_slot).time}</p>
+                      <p className="text-[11px] font-black uppercase tracking-widest mt-0.5" style={{ color: "var(--color-text-muted)" }}>{selectedAppointment.meeting_mode}</p>
+                    </div>
                   </div>
                 </div>
 

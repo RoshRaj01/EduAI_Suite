@@ -59,6 +59,8 @@ export const router = createBrowserRouter([
       { path: "exams", element: <ExamsPage /> },
       { path: "games/trello", element: <TrelloBoardsPage /> },
       { path: "games/trello/:boardId", element: <TrelloBoardView /> },
+      { path: "tools/trello", element: <TrelloBoardsPage /> },
+      { path: "tools/trello/:boardId", element: <TrelloBoardView /> },
       { path: "*", element: <ConstructionPage /> },
     ],
   },

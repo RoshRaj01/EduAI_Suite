@@ -36,6 +36,8 @@ export const router = createBrowserRouter([
       { path: "games/slido/live/:pin", element: <LiveSessionInterface /> },
       { path: "games/trello", element: <TrelloBoardsPage /> },
       { path: "games/trello/:boardId", element: <TrelloBoardView /> },
+      { path: "trello", element: <TrelloBoardsPage /> },
+      { path: "trello/:boardId", element: <TrelloBoardView /> },
       { path: "appointments", element: <AppointmentBookingPage /> },
       { path: "*", element: <ConstructionPage /> },
     ],

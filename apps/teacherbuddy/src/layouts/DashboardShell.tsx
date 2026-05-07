@@ -294,14 +294,14 @@ export const DashboardShell: React.FC = () => {
 
       {/* ── Sidebar Drawer ───────────────────────────────────── */}
       <aside
-        className={`fixed top-[64px] bottom-0 left-0 z-40 w-[260px] overflow-y-auto transition-transform duration-300 transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed top-[64px] bottom-0 left-0 z-40 w-[260px] flex flex-col transition-transform duration-300 transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         style={{
           background: "var(--color-surface-sidebar)",
           borderRight: "1px solid var(--color-border)",
         }}
       >
-        <nav className="py-4 pr-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto py-4 pr-3 space-y-1 custom-scrollbar">
           {navItems.map((item) => (
             <NavLink
               key={item.href}
@@ -325,17 +325,17 @@ export const DashboardShell: React.FC = () => {
               )}
             </NavLink>
           ))}
-
-          <div className="mx-5 my-4 border-t" style={{ borderColor: "var(--color-border)" }} />
-
-          <button
-            onClick={() => navigate("/login")}
-            className="w-full flex items-center gap-4 px-5 py-3.5 rounded-r-full transition-colors text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-          >
-            <LogOut size={22} className="opacity-70" />
-            <span className="font-medium">Logout</span>
-          </button>
         </nav>
+
+        <div className="p-4 border-t" style={{ borderColor: "var(--color-border)" }}>
+          <button
+            onClick={() => { localStorage.clear(); navigate("/login"); }}
+            className="w-full flex items-center gap-4 px-5 py-3.5 rounded-xl transition-all text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold"
+          >
+            <LogOut size={22} className="opacity-80" />
+            <span className="font-display uppercase tracking-widest text-xs">Logout</span>
+          </button>
+        </div>
       </aside>
 
       {/* ── Main Content ─────────────────────────────────────── */}

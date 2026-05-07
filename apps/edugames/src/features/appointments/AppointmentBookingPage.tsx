@@ -63,7 +63,14 @@ type TeacherGroup = {
 };
 
 const formatTimestamp = (value: string) => {
-  const parsed = new Date(value);
+  if (!value) return "";
+
+  // Ensure the timestamp is treated as UTC if it's an ISO-like string without a timezone
+  const isoValue = (value.includes("T") && !value.includes("Z") && !value.includes("+")) 
+    ? `${value}Z` 
+    : value;
+
+  const parsed = new Date(isoValue);
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
@@ -73,6 +80,7 @@ const formatTimestamp = (value: string) => {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    hour12: true
   }).format(parsed);
 };
 
@@ -82,11 +90,37 @@ const statusMeta: Record<AppointmentStatus, { label: string; color: string; bg: 
   rejected: { label: "Rejected", color: "#dc2626", bg: "rgba(220,38,38,0.12)" },
 };
 
-const quickStats = [
-  { label: "Available Teachers", value: "Live", icon: Users, color: "#264796" },
-  { label: "Open Slots", value: "Choose", icon: Clock, color: "#d0ae61" },
-  { label: "Booked Requests", value: "Shared", icon: BadgeCheck, color: "#16a34a" },
-];
+
+
+const formatSlot = (slot: string) => {
+  if (!slot) return { date: "No date set", time: "No time set" };
+  
+  const parts = slot.split(" ");
+  if (parts.length < 2) return { date: slot, time: "" };
+
+  const [datePart, timePart] = parts;
+  
+  // Date formatting
+  let dateDisplay = datePart;
+  try {
+    const d = new Date(datePart);
+    if (!isNaN(d.getTime())) {
+      dateDisplay = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+  } catch (e) {}
+
+  // Time formatting (12h)
+  let timeDisplay = timePart;
+  try {
+    const [hoursStr, minutes] = timePart.split(":");
+    const hours = parseInt(hoursStr, 10);
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const h12 = hours % 12 || 12;
+    timeDisplay = `${h12}:${minutes} ${ampm}`;
+  } catch (e) {}
+
+  return { date: dateDisplay, time: timeDisplay };
+};
 
 export const AppointmentBookingPage: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -211,6 +245,26 @@ export const AppointmentBookingPage: React.FC = () => {
 
   const myAppointments = appointments.filter((appointment) => appointment.student_name === CURRENT_STUDENT);
 
+  const handleReschedule = (appointment: Appointment) => {
+    setSelectedTeacherName(appointment.teacher_name);
+    setAgenda(appointment.agenda);
+    setDetails(appointment.details || "");
+    
+    // Parse suggestion if exists: [RESCHEDULE SUGGESTION: 2026-05-16 at 19:56]
+    const suggestionMatch = appointment.rejection_reason?.match(/\[RESCHEDULE SUGGESTION: (.*?) at (.*?)\]/);
+    if (suggestionMatch) {
+      setPreferredDate(suggestionMatch[1]);
+      setPreferredTime(suggestionMatch[2]);
+    } else {
+      // Fallback to original slot if no suggestion, but usually better to let student pick fresh
+      setPreferredDate("");
+      setPreferredTime("");
+    }
+    
+    // Scroll to the top where the booking form is
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -228,21 +282,7 @@ export const AppointmentBookingPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
-          {quickStats.map((stat) => (
-            <GlassCard key={stat.label} padding="sm" variant={stat.label === "Booked Requests" ? "gold" : stat.label === "Open Slots" ? "blue" : "default"} className="min-w-[160px]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${stat.color}18` }}>
-                  <stat.icon size={18} style={{ color: stat.color }} />
-                </div>
-                <div>
-                  <p className="text-xl font-bold" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>{stat.value}</p>
-                  <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{stat.label}</p>
-                </div>
-              </div>
-            </GlassCard>
-          ))}
-        </div>
+
       </div>
 
       {(syncing || syncError || notice) && (
@@ -442,6 +482,30 @@ export const AppointmentBookingPage: React.FC = () => {
         </div>
 
         <div className="space-y-6">
+          <GlassCard>
+            <div className="flex items-center gap-2 mb-4">
+              <User size={18} style={{ color: "var(--color-brand-blue)" }} />
+              <h2 className="section-title text-sm">Sync Status</h2>
+            </div>
+            <div className="space-y-3 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              <div className="flex items-start gap-3">
+                <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(22,163,74,0.12)", color: "#16a34a" }}>1</span>
+                <p>Booking requests are saved to the shared backend so teacher approvals update the same record.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(208,174,97,0.12)", color: "#d97706" }}>2</span>
+                <p>The page refreshes on a timer so approved or rejected statuses show up without manual intervention.</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadData}
+                className="btn btn-outline w-full text-sm mt-2"
+              >
+                <RefreshCw size={14} /> Refresh Now
+              </button>
+            </div>
+          </GlassCard>
+
           <GlassCard variant="blue">
             <div className="flex items-center gap-2 mb-4">
               <BadgeCheck size={18} style={{ color: "var(--color-brand-blue)" }} />
@@ -469,13 +533,28 @@ export const AppointmentBookingPage: React.FC = () => {
                           <p className="text-[11px] text-red-700 italic">{appointment.rejection_reason}</p>
                         </div>
                       )}
-                      <div className="mt-3 flex items-center justify-between text-[11px]" style={{ color: "var(--color-text-muted)" }}>
-                        <span className="flex items-center gap-1"><Calendar size={12} /> {appointment.time_slot || "No time selected"}</span>
-                        <span className="flex items-center gap-1"><Clock size={12} /> {formatTimestamp(appointment.requested_at)}</span>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="flex items-center gap-1 font-bold text-slate-400 uppercase tracking-widest text-[9px]">Date</span>
+                          <span className="flex items-center gap-1"><Calendar size={12} /> {formatSlot(appointment.time_slot).date}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="flex items-center gap-1 font-bold text-slate-400 uppercase tracking-widest text-[9px]">Time</span>
+                          <span className="flex items-center gap-1 font-bold" style={{ color: "var(--color-text-primary)" }}><Clock size={12} /> {formatSlot(appointment.time_slot).time}</span>
+                        </div>
                       </div>
+                      {appointment.status === "rejected" && (
+                        <button
+                          onClick={() => handleReschedule(appointment)}
+                          className="mt-3 w-full btn btn-primary text-[10px] font-black uppercase tracking-widest py-2 h-auto"
+                          style={{ background: "linear-gradient(135deg, #264796, #3460c4)" }}
+                        >
+                          <RefreshCw size={12} strokeWidth={3} /> Reschedule Meeting
+                        </button>
+                      )}
                       {appointment.reviewed_by && (
-                        <p className="text-[11px] mt-2" style={{ color: "var(--color-text-secondary)" }}>
-                          Reviewed by {appointment.reviewed_by}
+                        <p className="text-[11px] mt-2 italic flex items-center gap-1.5" style={{ color: "var(--color-text-secondary)" }}>
+                          <BadgeCheck size={12} className="text-blue-500" /> Reviewed by {appointment.reviewed_by}
                         </p>
                       )}
                     </div>
@@ -487,30 +566,6 @@ export const AppointmentBookingPage: React.FC = () => {
                   <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>Your booking requests will appear here after submission.</p>
                 </div>
               )}
-            </div>
-          </GlassCard>
-
-          <GlassCard>
-            <div className="flex items-center gap-2 mb-4">
-              <User size={18} style={{ color: "var(--color-brand-blue)" }} />
-              <h2 className="section-title text-sm">Sync Status</h2>
-            </div>
-            <div className="space-y-3 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              <div className="flex items-start gap-3">
-                <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(22,163,74,0.12)", color: "#16a34a" }}>1</span>
-                <p>Booking requests are saved to the shared backend so teacher approvals update the same record.</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(208,174,97,0.12)", color: "#d97706" }}>2</span>
-                <p>The page refreshes on a timer so approved or rejected statuses show up without manual intervention.</p>
-              </div>
-              <button
-                type="button"
-                onClick={loadData}
-                className="btn btn-outline w-full text-sm mt-2"
-              >
-                <RefreshCw size={14} /> Refresh Now
-              </button>
             </div>
           </GlassCard>
         </div>

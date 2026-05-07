@@ -14,12 +14,11 @@ export const useAuthStore = create<AuthState>()(
       role: null,
       user: null,
       setRole: (role) => {
-        const id = Math.floor(Math.random() * 9000) + 1000;
         set({ 
           role,
           user: {
-            email: role === 'teacher' ? 'teacher@eduai.com' : `student${id}@eduai.com`,
-            name: role === 'teacher' ? 'Teacher' : `Student ${id}`
+            email: role === 'teacher' ? 'teacher@eduai.com' : 'student@eduai.com',
+            name: role === 'teacher' ? 'Teacher' : 'Student'
           }
         });
       },

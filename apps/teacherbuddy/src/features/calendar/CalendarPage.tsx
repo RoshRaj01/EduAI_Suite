@@ -319,9 +319,9 @@ export const CalendarPage: React.FC = () => {
                 key={idx} 
                 className="text-[10px] px-1.5 py-0.5 rounded truncate border"
                 style={{ 
-                  backgroundColor: `${ev.color}15`, 
-                  color: ev.color,
-                  borderColor: `${ev.color}30`
+                  backgroundColor: `${eventTypeColors[ev.type.toLowerCase()] || ev.color}15`, 
+                  color: eventTypeColors[ev.type.toLowerCase()] || ev.color,
+                  borderColor: `${eventTypeColors[ev.type.toLowerCase()] || ev.color}30`
                 }}
                 title={ev.title}
               >
@@ -386,7 +386,11 @@ export const CalendarPage: React.FC = () => {
             <div className="mt-1 flex flex-wrap gap-2">
               {notifications.map((notif, i) => (
                 <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border"
-                      style={{ backgroundColor: `${notif.color}15`, color: notif.color, borderColor: `${notif.color}30` }}>
+                      style={{ 
+                        backgroundColor: `${eventTypeColors[notif.type.toLowerCase()] || notif.color}15`, 
+                        color: eventTypeColors[notif.type.toLowerCase()] || notif.color, 
+                        borderColor: `${eventTypeColors[notif.type.toLowerCase()] || notif.color}30` 
+                      }}>
                   {notif.message}
                 </span>
               ))}
@@ -492,11 +496,11 @@ export const CalendarPage: React.FC = () => {
               ) : (
                 selectedDayEvents.sort((a: CalendarEvent, b: CalendarEvent) => new Date(a.start).getTime() - new Date(b.start).getTime()).map((ev: CalendarEvent) => (
                   <div key={ev.id} className="p-3 rounded-xl border relative overflow-hidden group" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-base)" }}>
-                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: ev.color }} />
-                    <div className="pl-2">
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: eventTypeColors[ev.type.toLowerCase()] || ev.color }} />
+                    <div className="pl-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: ev.color }}>
-                          {eventTypeIcons[ev.type]} {ev.type}
+                        <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: eventTypeColors[ev.type.toLowerCase()] || ev.color }}>
+                          {eventTypeIcons[ev.type.toLowerCase()] || eventTypeIcons["custom"]} {ev.type}
                         </span>
                         <span className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
                           {new Date(ev.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}

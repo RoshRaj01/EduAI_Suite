@@ -251,11 +251,7 @@ export const GamesPage: React.FC = () => {
                       style={{ color: "var(--color-text-primary)" }}
                     >
                       {category.title}
-                      {category.hasImplementation && (
-                        <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full ml-2">
-                          Ready
-                        </span>
-                      )}
+
                     </h3>
                     <p
                       className="text-sm"

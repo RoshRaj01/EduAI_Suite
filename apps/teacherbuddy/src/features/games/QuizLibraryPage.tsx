@@ -173,7 +173,7 @@ export const QuizLibraryPage: React.FC = () => {
                       <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                         quiz.is_draft ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
                       }`}>
-                        {quiz.is_draft ? 'Draft' : 'Ready to Play'}
+                        {quiz.is_draft ? 'Draft' : 'Live'}
                       </div>
                       <div className="text-gray-300 group-hover:text-blue-500 transition-colors">
                         <MoreVertical size={20} />
