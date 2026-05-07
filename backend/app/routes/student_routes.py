@@ -43,29 +43,87 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session 
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    contents = await file.read()
-    decoded = contents.decode("utf-8")
-    reader = csv.reader(io.StringIO(decoded))
+    import re
+    import pandas as pd
+    import io
 
-    next(reader, None)  # Skip header row
+    contents = await file.read()
+    filename = file.filename.lower()
+    
+    text_content = ""
+    try:
+        if filename.endswith(".xlsx"):
+            df = pd.read_excel(io.BytesIO(contents))
+            text_content = df.to_csv(index=False)
+        elif filename.endswith(".csv") or filename.endswith(".txt"):
+            text_content = contents.decode("utf-8", errors="ignore")
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
 
     students_to_add = []
-    for row in reader:
-        # Expected format: registration_number, name, email, class, department
-        if len(row) >= 5:
-            reg_num, name, email, student_class, dept = row[0], row[1], row[2], row[3], row[4]
-            students_to_add.append(
-                Student(
-                    course_id=course_id,
-                    registration_number=reg_num,
-                    name=name,
-                    email=email,
-                    student_class=student_class,
-                    department=dept,
-                    attendance=0,
-                    avg_score=0
-                )
+    
+    for line in text_content.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+            
+        email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', line)
+        if not email_match:
+            continue
+        email = email_match.group(0)
+        
+        # Regex for Reg/Roll Number
+        reg_match = re.search(r'(?i)(?:reg(?:ister)?|roll|id)?[\s#:\.-]*\b([A-Z0-9]*\d[A-Z0-9]*)\b', line)
+        reg_num = reg_match.group(1).replace('"', '').strip() if reg_match else "UNKNOWN"
+        
+        # Regex for Department
+        dept_match = re.search(r'(?i)(?:dept|department)[\s:\.-]*([a-zA-Z\s]+)(?:,|;|$)', line)
+        dept = dept_match.group(1).replace('"', '').strip() if dept_match else "General"
+        
+        # Regex for Class
+        class_match = re.search(r'(?i)(?:class|batch|section)[\s:\.-]*([a-zA-Z0-9\s-]+)(?:,|;|$)', line)
+        student_class = class_match.group(1).replace('"', '').strip() if class_match else "General"
+        
+        # Regex for Name
+        name_match = re.search(r'(?i)(?:name|student)[\s:\.-]*([a-zA-Z\s]+)(?:,|;|$)', line)
+        if name_match:
+            name = name_match.group(1).replace('"', '').strip()
+        else:
+            prefix = line.split(email)[0]
+            name_candidates = re.findall(r'\b[A-Z][a-z]+\b', prefix)
+            if len(name_candidates) >= 2:
+                name = " ".join(name_candidates[-2:])
+            elif len(name_candidates) == 1:
+                name = name_candidates[0]
+            else:
+                words = re.findall(r'[a-zA-Z]+', prefix)
+                name = " ".join(words[:2]) if words else "Student"
+
+        # Tabular fallback: if line is comma-separated, try extracting fixed indices
+        csv_match = re.match(r'^([^,]+),([^,]+),([^,]+@[^,]+),([^,]+),([^,]+)$', line)
+        if csv_match:
+            reg_num = csv_match.group(1).replace('"', '').strip()
+            name = csv_match.group(2).replace('"', '').strip()
+            student_class = csv_match.group(4).replace('"', '').strip()
+            dept = csv_match.group(5).replace('"', '').strip()
+
+        students_to_add.append(
+            Student(
+                course_id=course_id,
+                registration_number=reg_num[:20],
+                name=name[:50],
+                email=email[:50],
+                student_class=student_class[:50],
+                department=dept[:50],
+                attendance=0,
+                avg_score=0
             )
+        )
+
+    if not students_to_add:
+        raise HTTPException(status_code=400, detail="Could not extract student details using regex.")
 
     db.bulk_save_objects(students_to_add)
     course.students = (course.students or 0) + len(students_to_add)

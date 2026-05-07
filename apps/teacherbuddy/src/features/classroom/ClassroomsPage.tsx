@@ -1595,7 +1595,7 @@ export const ClassroomsPage: React.FC = () => {
                 onClick={() => setStudentTab("csv")}
                 className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${studentTab === "csv" ? "bg-white text-brand-blue shadow-sm" : "text-slate-500"}`}
               >
-                Bulk CSV
+                Bulk Upload
               </button>
             </div>
 
@@ -1688,17 +1688,16 @@ export const ClassroomsPage: React.FC = () => {
               <div className="space-y-6 py-4">
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 ">
                   <p className="text-sm font-semibold text-brand-blue mb-1">
-                    CSV Format Required
+                    Supported Formats: CSV, XLSX, TXT
                   </p>
-                  <code className="text-xs font-bold text-slate-600 ">
-                    Column Order: Registration Number, Name, Email, Class,
-                    Department
+                  <code className="text-xs font-bold text-slate-600 block mt-1">
+                    Please ensure the file contains: Registration Number, Name, Email, Class, and Department. Our engine will automatically extract the details!
                   </code>
                 </div>
                 <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors">
                   <input
                     type="file"
-                    accept=".csv"
+                    accept=".csv,.xlsx,.txt"
                     ref={studentFileInputRef}
                     onChange={handleBulkUpload}
                     className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-6 file:rounded-xl file:border-0 file:font-extrabold file:bg-brand-blue file:text-white hover:file:bg-blue-700 cursor-pointer shadow-lg shadow-blue-500/20"
