@@ -43,7 +43,7 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({ attempt, onClose }) =>
       </header>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto py-8 px-6 space-y-6">
+        <div className="max-w-6xl mx-auto py-8 px-4 md:px-8 space-y-6">
           
           {/* Summary Banner */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
