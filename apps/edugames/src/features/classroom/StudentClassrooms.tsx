@@ -107,18 +107,15 @@ export const StudentClassrooms: React.FC = () => {
   );
 
   const loadCourses = async () => {
-    const response = await fetch(`${API_URL}/courses/`);
+    const response = await fetch(`${API_URL}/api/dashboard/student-summary?student_name=Aarav Gupta`);
     if (!response.ok) {
       throw new Error(`Failed to load classrooms (${response.status})`);
     }
 
     const data = await response.json();
-    if (!Array.isArray(data)) {
-      throw new Error("Invalid classroom payload");
-    }
-
-    setCourses(data);
-    return data;
+    const coursesList = data.courses || [];
+    setCourses(coursesList);
+    return coursesList;
   };
 
   const loadCourseData = async (courseId: number) => {

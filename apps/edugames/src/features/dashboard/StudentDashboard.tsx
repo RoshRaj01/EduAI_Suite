@@ -57,18 +57,16 @@ export const StudentDashboard: React.FC = () => {
     const loadDashboard = async () => {
       setLoading(true);
       try {
-        const [coursesRes, lessonsRes, summaryRes] = await Promise.all([
-          fetch(`${API_URL}/courses/`),
+        const [lessonsRes, summaryRes] = await Promise.all([
           fetch(`${API_URL}/lessons?posted_only=true`),
           fetch(`${API_URL}/api/dashboard/student-summary?student_name=Aarav Gupta`),
         ]);
 
-        const courses = await coursesRes.json();
         const lessons = await lessonsRes.json();
         const summaryData = await summaryRes.json();
 
-        if (Array.isArray(courses)) {
-          setEnrolledCourses(courses);
+        if (summaryData && Array.isArray(summaryData.courses)) {
+          setEnrolledCourses(summaryData.courses);
         }
 
         if (Array.isArray(lessons)) {
