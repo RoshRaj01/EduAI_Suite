@@ -36,6 +36,8 @@ interface ExamPlayerProps {
   onClose: () => void;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClose }) => {
   const [displayQuestions, setDisplayQuestions] = useState<Question[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -97,7 +99,10 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     try {
       setError(null);
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:8000/exams/${exam.id}/start`, {
+      if (!token) {
+        throw new Error("You are not logged in. Please log in to take the exam.");
+      }
+      const response = await fetch(`${API_BASE_URL}/exams/${exam.id}/start`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -111,7 +116,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
       setAttemptId(data.id);
     } catch (err: any) {
       console.error("Failed to start attempt", err);
-      setError(err.message || "Connection error. Please check if the server is running.");
+      setError(err.message || "Connection error. Please check your internet.");
     }
   };
 
@@ -122,7 +127,12 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
   };
 
   const submitExam = async (status: "submitted" | "time_up" = "submitted") => {
-    if (isSubmitted || !attemptId || isSubmitting) return;
+    if (isSubmitted || isSubmitting) return;
+
+    if (!attemptId) {
+      alert("No active session found. Please try refreshing the page or contact support.");
+      return;
+    }
 
     if (status === "submitted") {
       const unansweredCount = displayQuestions.length - Object.keys(answers).length;
@@ -144,7 +154,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     };
 
     try {
-      const response = await fetch(`http://localhost:8000/exams/attempts/${attemptId}/submit`, {
+      const response = await fetch(`${API_BASE_URL}/exams/attempts/${attemptId}/submit`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -185,7 +195,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     try {
       setIsLoadingReview(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:8000/exams/attempts/${attemptId}`, {
+      const response = await fetch(`${API_BASE_URL}/exams/attempts/${attemptId}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (response.ok) {
@@ -354,7 +364,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
               {currentIdx === displayQuestions.length - 1 ? (
                 <button 
                   onClick={() => submitExam()}
-                  disabled={isSubmitting || !attemptId}
+                  disabled={isSubmitting}
                   className="btn btn-primary px-10 py-2.5 flex items-center gap-2 font-bold shadow-lg disabled:opacity-50"
                 >
                   {isSubmitting ? (

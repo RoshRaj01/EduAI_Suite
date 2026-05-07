@@ -3,6 +3,8 @@ import { Clock, PlayCircle, AlertCircle, FileText } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ExamPlayer } from "./ExamPlayer";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 export const StudentExams: React.FC = () => {
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,7 @@ export const StudentExams: React.FC = () => {
   const fetchExams = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:8000/exams/");
+      const response = await fetch(`${API_BASE_URL}/exams/`);
       if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
       setExams(data.filter((e: any) => e.status === "published"));
@@ -28,7 +30,7 @@ export const StudentExams: React.FC = () => {
 
   const startExam = async (examId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/exams/${examId}`);
+      const response = await fetch(`${API_BASE_URL}/exams/${examId}`);
       const data = await response.json();
       setActiveExam(data);
     } catch (err) {
