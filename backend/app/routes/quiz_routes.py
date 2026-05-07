@@ -217,6 +217,11 @@ def delete_quiz(quiz_id: int, db: Session = Depends(get_db)):
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     
+    # Explicitly delete sessions to ensure all players/answers are cleaned up first
+    # This prevents FOREIGN KEY constraint errors in some SQLite environments
+    for session in quiz.sessions:
+        db.delete(session)
+    
     db.delete(quiz)
     db.commit()
     return None

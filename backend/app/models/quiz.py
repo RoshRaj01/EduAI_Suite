@@ -29,6 +29,7 @@ class QuizQuestion(Base):
     
     quiz = relationship("Quiz", back_populates="questions")
     options = relationship("QuizOption", back_populates="question", cascade="all, delete-orphan")
+    answers = relationship("QuizAnswer", back_populates="question", cascade="all, delete-orphan")
 
 class QuizOption(Base):
     __tablename__ = "quiz_options"
@@ -39,6 +40,7 @@ class QuizOption(Base):
     color = Column(String, nullable=True) # Kahoot colors
     
     question = relationship("QuizQuestion", back_populates="options")
+    answers = relationship("QuizAnswer", back_populates="option", cascade="all, delete-orphan")
 
 class QuizSession(Base):
     __tablename__ = "quiz_sessions"
@@ -79,3 +81,5 @@ class QuizAnswer(Base):
     response_time_ms = Column(Integer)
     
     player = relationship("QuizPlayer", back_populates="answers")
+    question = relationship("QuizQuestion", back_populates="answers")
+    option = relationship("QuizOption", back_populates="answers")
