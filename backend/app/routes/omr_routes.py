@@ -9,7 +9,6 @@ import json
 import base64
 from io import BytesIO
 from PIL import Image
-from PIL import Image
 import hashlib
 import random
 
@@ -37,7 +36,6 @@ async def create_omr_job(title: str = Form(...), answer_key: str = Form(None), f
     if file:
         content = await file.read()
         try:
-            base64_image = compress_image_to_base64(content)
             
             # 1. Try OpenCV OMR first (as requested by user)
             # Save temporary file for OpenCV
@@ -110,7 +108,6 @@ async def update_omr_job(
     if file:
         content = await file.read()
         try:
-            base64_image = compress_image_to_base64(content)
             # Re-extract key from image
             temp_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "uploads", "omr"))
             os.makedirs(temp_dir, exist_ok=True)
@@ -158,7 +155,6 @@ async def upload_omr_sheet(job_id: int, student_id: str = Form(...), file: Uploa
     
     # Process image with OMR Service (OpenCV) and AI Backup
     try:
-        base64_image = compress_image_to_base64(content)
         
         # 1. OpenCV OMR
         detected_answers = OMRService.process_omr_sheet(file_path, num_questions=len(job.answer_key))

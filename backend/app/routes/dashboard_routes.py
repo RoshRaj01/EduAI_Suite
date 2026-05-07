@@ -251,7 +251,6 @@ def get_student_dashboard_summary(student_name: str = "Aarav Gupta", db: Session
     
     # 3. Pending Assignments & Deadlines
     from app.models.assignment import Assignment
-    from app.models.submission import Submission
     
     # Get all assignments for these courses
     all_assignments = db.query(Assignment).filter(Assignment.course_id.in_(course_ids)).all() if course_ids else []

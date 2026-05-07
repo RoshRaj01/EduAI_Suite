@@ -142,7 +142,6 @@ def submit_exam_attempt(attempt_id: int, submission: ExamAttemptSubmit, db: Sess
     if attempt.status != "in_progress":
         raise HTTPException(status_code=400, detail="Attempt already submitted or invalid")
 
-    exam = attempt.exam
     total_score = 0.0
     
     for ans in submission.answers:

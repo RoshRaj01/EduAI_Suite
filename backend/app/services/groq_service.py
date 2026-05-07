@@ -80,7 +80,7 @@ class GroqService:
 
         try:
             # Test the API with a simple request
-            message = GroqService._client.chat.completions.create(
+            GroqService._client.chat.completions.create(
                 messages=[
                     {
                         "role": "user",

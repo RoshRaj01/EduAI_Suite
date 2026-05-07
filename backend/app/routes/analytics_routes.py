@@ -106,16 +106,12 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
         s_att = s.attendance or 0
         
         is_risk = False
-        reason = ""
         if s_avg < 40:
             is_risk = True
-            reason = "Critically low academic performance"
         elif s_att < 50:
             is_risk = True
-            reason = "Critically low attendance"
         elif s_avg < 55 or s_att < 75:
             is_risk = True # Moderate risk
-            reason = "Performance or attendance needs attention"
             
         if is_risk:
             at_risk_count += 1
