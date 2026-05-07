@@ -6,7 +6,7 @@ from datetime import datetime
 class Quiz(Base):
     __tablename__ = "quizzes"
     id = Column(Integer, primary_key=True, index=True)
-    teacher_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    teacher_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     title = Column(String)
     description = Column(Text, nullable=True)
     cover_image = Column(String, nullable=True)
@@ -14,12 +14,12 @@ class Quiz(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
-    sessions = relationship("QuizSession", back_populates="quiz")
+    sessions = relationship("QuizSession", back_populates="quiz", cascade="all, delete-orphan")
 
 class QuizQuestion(Base):
     __tablename__ = "quiz_questions"
     id = Column(Integer, primary_key=True, index=True)
-    quiz_id = Column(Integer, ForeignKey("quizzes.id"))
+    quiz_id = Column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"))
     question_text = Column(Text)
     question_type = Column(String, default="mcq") # mcq, true_false, puzzle, open_ended
     image_url = Column(String, nullable=True)
@@ -33,7 +33,7 @@ class QuizQuestion(Base):
 class QuizOption(Base):
     __tablename__ = "quiz_options"
     id = Column(Integer, primary_key=True, index=True)
-    question_id = Column(Integer, ForeignKey("quiz_questions.id"))
+    question_id = Column(Integer, ForeignKey("quiz_questions.id", ondelete="CASCADE"))
     option_text = Column(String)
     is_correct = Column(Boolean, default=False)
     color = Column(String, nullable=True) # Kahoot colors
@@ -43,7 +43,7 @@ class QuizOption(Base):
 class QuizSession(Base):
     __tablename__ = "quiz_sessions"
     id = Column(Integer, primary_key=True, index=True)
-    quiz_id = Column(Integer, ForeignKey("quizzes.id"))
+    quiz_id = Column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"))
     pin = Column(String, unique=True, index=True)
     status = Column(String, default="lobby") # lobby, question, result, leaderboard, finished
     current_question_index = Column(Integer, default=0)
@@ -56,7 +56,7 @@ class QuizSession(Base):
 class QuizPlayer(Base):
     __tablename__ = "quiz_players"
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("quiz_sessions.id"))
+    session_id = Column(Integer, ForeignKey("quiz_sessions.id", ondelete="CASCADE"))
     student_id = Column(String, nullable=True)
     nickname = Column(String)
     avatar = Column(String, nullable=True) # Emoji character
@@ -70,9 +70,9 @@ class QuizPlayer(Base):
 class QuizAnswer(Base):
     __tablename__ = "quiz_answers"
     id = Column(Integer, primary_key=True, index=True)
-    player_id = Column(Integer, ForeignKey("quiz_players.id"))
-    question_id = Column(Integer, ForeignKey("quiz_questions.id"))
-    option_id = Column(Integer, ForeignKey("quiz_options.id"), nullable=True)
+    player_id = Column(Integer, ForeignKey("quiz_players.id", ondelete="CASCADE"))
+    question_id = Column(Integer, ForeignKey("quiz_questions.id", ondelete="CASCADE"))
+    option_id = Column(Integer, ForeignKey("quiz_options.id", ondelete="CASCADE"), nullable=True)
     text_answer = Column(String, nullable=True)
     is_correct = Column(Boolean)
     points_earned = Column(Integer)
