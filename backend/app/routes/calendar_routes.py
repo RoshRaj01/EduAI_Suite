@@ -191,9 +191,13 @@ def get_calendar_events(
 
     # ── Appointments ─────────────────────────────────────────
     for appt in db.query(Appointment).all():
-        dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
+        dt = _parse_date_safe(appt.time_slot) if appt.time_slot else None
+        if not dt:
+            dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
+            
         if not dt:
             continue
+            
         if range_start and dt < range_start:
             continue
         if range_end and dt > range_end:
@@ -205,7 +209,7 @@ def get_calendar_events(
             "id": f"appointment-{appt.id}",
             "raw_id": appt.id,
             "title": f"👤 {appt.student_name}: {appt.agenda}",
-            "description": f"Mode: {appt.meeting_mode} | Slot: {appt.time_slot}",
+            "description": f"Mode: {appt.meeting_mode} | Booked for: {appt.time_slot}",
             "start": dt.isoformat(),
             "end": (dt + timedelta(minutes=30)).isoformat(),
             "type": "appointment",
@@ -420,7 +424,10 @@ def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session =
 
     # Appointments tomorrow
     for appt in db.query(Appointment).all():
-        dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
+        dt = _parse_date_safe(appt.time_slot) if appt.time_slot else None
+        if not dt:
+            dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
+            
         if dt and tomorrow_start <= dt < tomorrow_end:
             if teacher_name and appt.teacher_name != teacher_name:
                 continue

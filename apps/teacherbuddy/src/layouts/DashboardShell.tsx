@@ -23,6 +23,7 @@ import {
   Mail,
 } from "lucide-react";
 import logo from "../assets/logo (5).png";
+import { API_ENDPOINTS } from "../shared/utils/apiConfig";
 
 
 // uncomment to view the modesl
@@ -43,11 +44,32 @@ const navItems = [
   // { icon: Settings, label: "Settings", href: "/settings", keywords: "preferences config account" },
 ];
 
-const notifications = [
-  { id: 1, title: "Exam submitted", desc: "John S. submitted Neural Networks Mid-Term", time: "2m ago", unread: true },
-  { id: 2, title: "Risk Alert", desc: "Student #4122 flagged — high absenteeism", time: "18m ago", unread: true },
-  { id: 3, title: "AI Evaluation", desc: "55 answers evaluated by AI — ready for review", time: "1h ago", unread: false },
-];
+const formatRelativeTime = (date: string | Date) => {
+  const now = new Date();
+  const then = new Date(date);
+  const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return "Just now";
+  const minutes = Math.floor(diffInSeconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
+
+const getNotifHref = (feature: string) => {
+  switch (feature.toLowerCase()) {
+    case 'appointment': return '/appointments';
+    case 'mail': return '/mail';
+    case 'calendar': return '/calendar';
+    case 'exam': return '/exams';
+    case 'student': return '/classrooms';
+    case 'classroom': return '/classrooms';
+    case 'omr': return '/exams';
+    default: return '/';
+  }
+};
 
 export const DashboardShell: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -58,16 +80,75 @@ export const DashboardShell: React.FC = () => {
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
+  
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [lastNotifId, setLastNotifId] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ title: string; desc: string; href: string } | null>(null);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.HISTORY}/`);
+      if (response.ok) {
+        const data = await response.json();
+        const lastRead = localStorage.getItem("last_notif_read") || "0";
+        const lastReadTime = new Date(lastRead).getTime();
+        
+        const formatted = data.slice(0, 10).map((h: any) => ({
+          id: h.id,
+          title: h.feature.charAt(0).toUpperCase() + h.feature.slice(1),
+          desc: h.action.replace(/_/g, ' '),
+          time: formatRelativeTime(h.timestamp),
+          timestamp: new Date(h.timestamp).getTime(),
+          unread: new Date(h.timestamp).getTime() > lastReadTime,
+          href: getNotifHref(h.feature)
+        }));
+        
+        setNotifications(formatted);
+        const newUnread = formatted.filter((n: any) => n.unread);
+        setUnreadCount(newUnread.length);
+
+        if (formatted.length > 0) {
+          const newest = formatted[0];
+          // If we have a new notification that is unread and not previously seen
+          if (lastNotifId !== null && newest.id > lastNotifId && newest.unread) {
+            setToast({ title: newest.title, desc: newest.desc, href: newest.href });
+            setTimeout(() => setToast(null), 6000);
+          }
+          setLastNotifId(newest.id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    }
+  }, [lastNotifId]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       setUser(JSON.parse(storedUser));
+      fetchNotifications();
+      // Polling for new notifications every 60 seconds
+      const interval = setInterval(fetchNotifications, 60000);
+      return () => clearInterval(interval);
     } else {
-      // If no user, redirect to login
       navigate("/login");
     }
-  }, [navigate]);
+  }, [navigate, fetchNotifications]);
+
+  const handleNotifToggle = () => {
+    if (!notifOpen) {
+      setNotifOpen(true);
+      setProfileOpen(false);
+      // Mark as read
+      const now = new Date().toISOString();
+      localStorage.setItem("last_notif_read", now);
+      setUnreadCount(0);
+      setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+    } else {
+      setNotifOpen(false);
+    }
+  };
 
   // Filter nav items based on search query
   const searchResults = searchQuery.trim()
@@ -207,7 +288,7 @@ export const DashboardShell: React.FC = () => {
           {/* Notification Bell */}
           <div className="relative">
             <button
-              onClick={() => { setNotifOpen(o => !o); setProfileOpen(false); }}
+              onClick={handleNotifToggle}
               className="p-2 rounded-full transition-colors relative"
               style={{
                 color: notifOpen ? "var(--color-brand-blue)" : "var(--color-text-muted)",
@@ -217,8 +298,10 @@ export const DashboardShell: React.FC = () => {
               onMouseLeave={e => !notifOpen && (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2"
-                style={{ background: "var(--color-brand-gold)", borderColor: "var(--color-header-bg)" }} />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2"
+                  style={{ background: "var(--color-brand-gold)", borderColor: "var(--color-header-bg)" }} />
+              )}
             </button>
 
             {/* Notifications Dropdown */}
@@ -229,21 +312,29 @@ export const DashboardShell: React.FC = () => {
                   <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>Notifications</p>
                   <button onClick={() => setNotifOpen(false)} style={{ color: 'var(--color-text-muted)' }}><X size={16} /></button>
                 </div>
-                <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
-                  {notifications.map(n => (
-                    <div key={n.id} className="px-4 py-3 flex gap-3 cursor-pointer transition-colors"
-                      style={{ backgroundColor: n.unread ? 'rgba(38, 71, 150, 0.05)' : 'transparent' }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-border)'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = n.unread ? 'rgba(38, 71, 150, 0.05)' : 'transparent'}>
-                      <div className="w-2 h-2 rounded-full mt-1.5 shrink-0"
-                        style={{ background: n.unread ? "var(--color-brand-blue)" : "transparent", border: n.unread ? "none" : "1.5px solid var(--color-text-muted)" }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>{n.title}</p>
-                        <p className="text-[11px] leading-relaxed mt-0.5 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>{n.desc}</p>
-                        <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>{n.time}</p>
+                <div className="divide-y max-h-[400px] overflow-y-auto custom-scrollbar" style={{ borderColor: 'var(--color-border)' }}>
+                  {notifications.length > 0 ? (
+                    notifications.map(n => (
+                      <div key={n.id} className="px-4 py-3 flex gap-3 cursor-pointer transition-colors"
+                        onClick={() => { navigate(n.href); setNotifOpen(false); }}
+                        style={{ backgroundColor: n.unread ? 'rgba(38, 71, 150, 0.05)' : 'transparent' }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-border)'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = n.unread ? 'rgba(38, 71, 150, 0.05)' : 'transparent'}>
+                        <div className="w-2 h-2 rounded-full mt-1.5 shrink-0"
+                          style={{ background: n.unread ? "var(--color-brand-blue)" : "transparent", border: n.unread ? "none" : "1.5px solid var(--color-text-muted)" }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>{n.title}</p>
+                          <p className="text-[11px] leading-relaxed mt-0.5 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>{n.desc}</p>
+                          <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>{n.time}</p>
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-8 text-center">
+                      <Bell size={24} className="mx-auto mb-2 opacity-20" />
+                      <p className="text-sm font-medium opacity-40">No new notifications</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )}
@@ -356,6 +447,26 @@ export const DashboardShell: React.FC = () => {
       {/* Overlay to close dropdowns */}
       {(notifOpen || profileOpen || searchFocused) && (
         <div className="fixed inset-0 z-30" onClick={() => { setNotifOpen(false); setProfileOpen(false); setSearchFocused(false); setSearchQuery(""); }} />
+      )}
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-20 right-6 z-[100] animate-slide-in-right">
+          <div className="glass-card p-4 flex items-start gap-4 shadow-2xl border-l-4 border-l-[#264796] min-w-[300px] cursor-pointer"
+            onClick={() => { navigate(toast.href); setToast(null); }}
+            style={{ background: "var(--color-surface-base)", backdropFilter: "blur(20px)" }}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: "rgba(38, 71, 150, 0.12)" }}>
+              <Bell size={20} className="text-[#264796]" />
+            </div>
+            <div className="flex-1 min-w-0 pr-6">
+              <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>{toast.title}</p>
+              <p className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>{toast.desc}</p>
+            </div>
+            <button onClick={() => setToast(null)} className="absolute top-2 right-2 p-1 hover:bg-black/5 rounded-full transition-colors">
+              <X size={14} style={{ color: "var(--color-text-muted)" }} />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

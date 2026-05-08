@@ -28,4 +28,5 @@ export const API_ENDPOINTS = {
   SLIDO: `${API_BASE_URL}/api/slido`,
   LESSONS: `${API_BASE_URL}/lessons`,
   DASHBOARD: `${API_BASE_URL}/api/dashboard`,
+  HISTORY: `${API_BASE_URL}/history`,
 };

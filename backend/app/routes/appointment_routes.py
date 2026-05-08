@@ -1,9 +1,12 @@
 from datetime import datetime
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, status
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models.appointment import Appointment
+from app.models.history import ActionHistory
 from app.schemas.appointment import AppointmentCreate, AppointmentResponse, AppointmentStatusUpdate
 
 appointment_router = APIRouter(prefix="/appointments", tags=["Appointments"])
@@ -63,6 +66,23 @@ def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)
         requested_at=datetime.utcnow().isoformat(timespec="minutes"),
     )
     db.add(appointment)
+    
+    # Log to ActionHistory for notifications
+    history = ActionHistory(
+        feature="appointment",
+        action="book_appointment",
+        reaction="student_triggered",
+        result="pending",
+        timestamp=datetime.now(),
+        metadata_json={
+            "student_name": appointment.student_name,
+            "teacher_name": appointment.teacher_name,
+            "agenda": appointment.agenda,
+            "time_slot": appointment.time_slot
+        }
+    )
+    db.add(history)
+    
     db.commit()
     db.refresh(appointment)
     return appointment
@@ -83,6 +103,23 @@ def update_appointment_status(
     appointment.reviewed_at = datetime.utcnow().isoformat(timespec="minutes")
     appointment.rejection_reason = payload.rejection_reason
     appointment.notes = payload.notes
+    
+    # Log to ActionHistory for notifications
+    history = ActionHistory(
+        feature="appointment",
+        action=f"{payload.status}_appointment",
+        reaction="teacher_triggered",
+        result=payload.status,
+        timestamp=datetime.now(),
+        metadata_json={
+            "appointment_id": appointment.id,
+            "student_name": appointment.student_name,
+            "status": payload.status,
+            "rejection_reason": payload.rejection_reason
+        }
+    )
+    db.add(history)
+    
     db.commit()
     db.refresh(appointment)
     return appointment

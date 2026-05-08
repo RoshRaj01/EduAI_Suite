@@ -13,11 +13,11 @@ import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 type ExamView = "list" | "take" | "review";
 
 const statusStyle: Record<string, { color: string; bg: string; label: string }> = {
-  upcoming:  { color: "#264796", bg: "rgba(38,71,150,0.1)",  label: "Upcoming"  },
-  ongoing:   { color: "#d97706", bg: "rgba(217,119,6,0.1)",  label: "Ongoing"   },
-  completed: { color: "#16a34a", bg: "rgba(22,163,74,0.1)",  label: "Completed" },
-  published: { color: "#264796", bg: "rgba(38,71,150,0.1)",  label: "Live"      },
-  draft:     { color: "#64748b", bg: "rgba(100,116,139,0.1)", label: "Draft"    },
+  upcoming: { color: "#264796", bg: "rgba(38,71,150,0.1)", label: "Upcoming" },
+  ongoing: { color: "#d97706", bg: "rgba(217,119,6,0.1)", label: "Ongoing" },
+  completed: { color: "#16a34a", bg: "rgba(22,163,74,0.1)", label: "Completed" },
+  published: { color: "#264796", bg: "rgba(38,71,150,0.1)", label: "Live" },
+  draft: { color: "#64748b", bg: "rgba(100,116,139,0.1)", label: "Draft" },
 };
 
 export const ExamsPage: React.FC = () => {
@@ -88,16 +88,16 @@ export const ExamsPage: React.FC = () => {
 
   const handleSaveExam = async (examData: any) => {
     try {
-      const url = editingExam 
+      const url = editingExam
         ? `${API_ENDPOINTS.EXAMS}/${editingExam.id}`
         : `${API_ENDPOINTS.EXAMS}/`;
-      
+
       const token = localStorage.getItem("token");
       const response = await fetch(url, {
         method: editingExam ? "PUT" : "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify(examData),
       });
@@ -132,22 +132,22 @@ export const ExamsPage: React.FC = () => {
 
   const handleExportStats = () => {
     if (!selectedExam) return;
-    
+
     // Prepare CSV content
     const headers = ["Student Name", "Email", "Score", "Finished Date", "Status"];
     const rows = attempts.map(a => [
-        a.student_name,
-        a.student_email,
-        a.score,
-        a.end_time ? new Date(a.end_time).toLocaleDateString() : "N/A",
-        a.status
+      a.student_name,
+      a.student_email,
+      a.score,
+      a.end_time ? new Date(a.end_time).toLocaleDateString() : "N/A",
+      a.status
     ]);
-    
+
     const csvContent = [
-        headers.join(","),
-        ...rows.map(r => r.join(","))
+      headers.join(","),
+      ...rows.map(r => r.join(","))
     ].join("\n");
-    
+
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -162,50 +162,50 @@ export const ExamsPage: React.FC = () => {
   const handlePublishExam = async () => {
     if (!selectedExam) return;
     try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(`${API_ENDPOINTS.EXAMS}/${selectedExam.id}`, {
-            method: "PUT",
-            headers: { 
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}` 
-            },
-            body: JSON.stringify({ ...selectedExam, status: "published" }),
-        });
-        if (response.ok) {
-            const updated = await response.json();
-            setExamsList(prev => prev.map(e => e.id === updated.id ? updated : e));
-            setSelectedExam(updated);
-        }
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/${selectedExam.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ ...selectedExam, status: "published" }),
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setExamsList(prev => prev.map(e => e.id === updated.id ? updated : e));
+        setSelectedExam(updated);
+      }
     } catch (err) {
-        console.error("Publish failed", err);
+      console.error("Publish failed", err);
     }
   };
 
   const handleUnpublishExam = async () => {
     if (!selectedExam) return;
     try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(`${API_ENDPOINTS.EXAMS}/${selectedExam.id}`, {
-            method: "PUT",
-            headers: { 
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}` 
-            },
-            body: JSON.stringify({ ...selectedExam, status: "draft" }),
-        });
-        if (response.ok) {
-            const updated = await response.json();
-            setExamsList(prev => prev.map(e => e.id === updated.id ? updated : e));
-            setSelectedExam(updated);
-        }
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/${selectedExam.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ ...selectedExam, status: "draft" }),
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setExamsList(prev => prev.map(e => e.id === updated.id ? updated : e));
+        setSelectedExam(updated);
+      }
     } catch (err) {
-        console.error("Unpublish failed", err);
+      console.error("Unpublish failed", err);
     }
   };
 
   const openEditCreator = (exam: any) => {
-      setEditingExam(exam);
-      setShowCreator(true);
+    setEditingExam(exam);
+    setShowCreator(true);
   };
 
   const fetchAttempts = async (examId: number) => {
@@ -256,7 +256,7 @@ export const ExamsPage: React.FC = () => {
             Examinations
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
-            Create, manage, review AI evaluations, track student submissions.
+            Create, manage, review and track student submissions.
           </p>
         </div>
         <button onClick={() => { setEditingExam(null); setShowCreator(true); }} className="btn btn-primary text-sm">
@@ -265,20 +265,19 @@ export const ExamsPage: React.FC = () => {
       </div>
 
       {showCreator && (
-        <ExamCreator 
-          onClose={() => { setShowCreator(false); setEditingExam(null); }} 
+        <ExamCreator
+          onClose={() => { setShowCreator(false); setEditingExam(null); }}
           onSave={handleSaveExam}
           initialData={editingExam}
         />
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {[
-          { label: "Total Exams",      value: String(stats.total_exams),  icon: ClipboardList, color: "#264796" },
-          { label: "Pending AI Review",value: String(stats.pending_ai_review), icon: BrainCircuit,  color: "#d97706" },
-          { label: "Submissions Today",value: String(stats.submissions_today), icon: CheckCircle2,  color: "#16a34a" },
-          { label: "Avg Completion",   value: stats.avg_completion, icon: Users,         color: "#7c3aed" },
+          { label: "Total Exams", value: String(stats.total_exams), icon: ClipboardList, color: "#264796" },
+          { label: "Submissions Today", value: String(stats.submissions_today), icon: CheckCircle2, color: "#16a34a" },
+          { label: "Avg Completion", value: stats.avg_completion, icon: Users, color: "#7c3aed" },
         ].map(s => (
           <GlassCard key={s.label} padding="sm" className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -298,14 +297,14 @@ export const ExamsPage: React.FC = () => {
         <div className="space-y-3">
           {loading ? (
             <div className="p-10 text-center text-slate-400">
-               <div className="w-8 h-8 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
-               Loading exams...
+              <div className="w-8 h-8 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
+              Loading exams...
             </div>
           ) : error ? (
             <div className="p-8 text-center bg-red-50 rounded-2xl border border-red-100">
-               <AlertCircle size={24} className="text-red-500 mx-auto mb-2" />
-               <p className="text-sm font-semibold text-red-600">{error}</p>
-               <button onClick={fetchExams} className="btn bg-white border-red-200 text-red-600 text-xs mt-3 px-4 py-1.5 hover:bg-red-100">Try Again</button>
+              <AlertCircle size={24} className="text-red-500 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-red-600">{error}</p>
+              <button onClick={fetchExams} className="btn bg-white border-red-200 text-red-600 text-xs mt-3 px-4 py-1.5 hover:bg-red-100">Try Again</button>
             </div>
           ) : examsList.length === 0 ? (
             <div className="p-10 text-center text-slate-400">No exams found.</div>
@@ -316,9 +315,8 @@ export const ExamsPage: React.FC = () => {
                 <div
                   key={exam.id}
                   onClick={() => setSelectedExam(exam)}
-                  className={`glass-card p-4 cursor-pointer transition-all hover:shadow-md border-l-4 ${
-                    selectedExam?.id === exam.id ? "border-l-[#264796] shadow-lg" : "border-l-transparent"
-                  }`}
+                  className={`glass-card p-4 cursor-pointer transition-all hover:shadow-md border-l-4 ${selectedExam?.id === exam.id ? "border-l-[#264796] shadow-lg" : "border-l-transparent"
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0">
@@ -362,17 +360,17 @@ export const ExamsPage: React.FC = () => {
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <div className="text-right">
-                          <p className="text-3xl font-black">{selectedExam.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 0}</p>
-                          <p className="text-white/60 text-xs">Total Marks</p>
+                        <p className="text-3xl font-black">{selectedExam.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 0}</p>
+                        <p className="text-white/60 text-xs">Total Marks</p>
                       </div>
                       <div className="flex gap-2">
-                          <button 
-                              onClick={() => handleDeleteExam(selectedExam.id)}
-                              className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-lg transition-colors text-white"
-                              title="Delete Exam"
-                          >
-                              <Trash2 size={14} />
-                          </button>
+                        <button
+                          onClick={() => handleDeleteExam(selectedExam.id)}
+                          className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-lg transition-colors text-white"
+                          title="Delete Exam"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -386,9 +384,8 @@ export const ExamsPage: React.FC = () => {
                 <div className="flex border-b" style={{ borderColor: "rgba(38,71,150,0.1)" }}>
                   {(["overview", "take", "review"] as const).map(tab => (
                     <button key={tab} onClick={() => setActiveTab(tab)}
-                      className={`px-5 py-3.5 text-sm font-semibold capitalize transition-colors flex items-center gap-1.5 ${
-                        activeTab === tab ? "border-b-2 border-[#264796] text-[#264796]" : "text-slate-400 hover:text-slate-600"
-                      }`}>
+                      className={`px-5 py-3.5 text-sm font-semibold capitalize transition-colors flex items-center gap-1.5 ${activeTab === tab ? "border-b-2 border-[#264796] text-[#264796]" : "text-slate-400 hover:text-slate-600"
+                        }`}>
                       {tab === "take" && <Play size={13} />}
                       {tab === "review" && <Eye size={13} />}
                       {tab}
@@ -403,7 +400,7 @@ export const ExamsPage: React.FC = () => {
                       <div className="grid grid-cols-2 gap-3">
                         {[
                           { label: "Questions", value: `${selectedExam.questions?.length || 0}` },
-                          { label: "Status",  value: `${selectedExam.status}` },
+                          { label: "Status", value: `${selectedExam.status}` },
                           { label: "Time Limit", value: `${selectedExam.time_limit}m` },
                           { label: "Randomized", value: selectedExam.randomize_questions ? "Yes" : "No" },
                         ].map(item => (
@@ -418,16 +415,16 @@ export const ExamsPage: React.FC = () => {
                         {selectedExam.status === "draft" ? (
                           <>
                             <button onClick={handlePublishExam} className="btn btn-primary flex-1 text-sm bg-green-600 hover:bg-green-700 border-green-600">
-                                <CheckCircle2 size={14} /> Publish Now
+                              <CheckCircle2 size={14} /> Publish Now
                             </button>
                             <button onClick={() => openEditCreator(selectedExam)} className="btn btn-outline flex-1 text-sm">
-                                <Settings size={14} /> Edit Exam
+                              <Settings size={14} /> Edit Exam
                             </button>
                           </>
                         ) : (
                           <>
                             <button onClick={handleUnpublishExam} className="btn btn-primary flex-1 text-sm bg-orange-600 hover:bg-orange-700 border-orange-600">
-                                <X size={14} /> Unpublish
+                              <X size={14} /> Unpublish
                             </button>
                             <button onClick={handleExportStats} className="btn btn-outline text-sm flex-1">
                               <FileText size={14} /> Export Stats
@@ -442,7 +439,7 @@ export const ExamsPage: React.FC = () => {
                   {activeTab === "take" && (
                     <div className="space-y-5">
                       <div className="p-10 text-center text-slate-400">
-                          Take exam preview not yet implemented for teacher view.
+                        Take exam preview not yet implemented for teacher view.
                       </div>
                     </div>
                   )}
@@ -451,13 +448,13 @@ export const ExamsPage: React.FC = () => {
                   {activeTab === "review" && (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between mb-4">
-                         <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                           <Users size={16} className="text-blue-600" />
-                           Student Submissions ({attempts.length})
-                         </h3>
-                         <button onClick={() => fetchAttempts(selectedExam.id)} className="text-blue-600 text-xs hover:underline flex items-center gap-1">
-                           <RefreshCw size={12} /> Refresh
-                         </button>
+                        <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                          <Users size={16} className="text-blue-600" />
+                          Student Submissions ({attempts.length})
+                        </h3>
+                        <button onClick={() => fetchAttempts(selectedExam.id)} className="text-blue-600 text-xs hover:underline flex items-center gap-1">
+                          <RefreshCw size={12} /> Refresh
+                        </button>
                       </div>
 
                       {loadingAttempts ? (
@@ -473,7 +470,7 @@ export const ExamsPage: React.FC = () => {
                         <div className="space-y-3">
                           {attempts.map(attempt => (
                             <div key={attempt.id} className="p-4 rounded-2xl border transition-all hover:shadow-sm flex items-center justify-between gap-4"
-                               style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)" }}>
+                              style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)" }}>
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
                                   {attempt.student_name?.charAt(0) || "S"}
@@ -494,11 +491,11 @@ export const ExamsPage: React.FC = () => {
                                 <div className="text-right">
                                   <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-0.5" style={{ fontSize: '9px' }}>Score</p>
                                   <div className="flex items-center gap-1.5">
-                                     <span className="text-lg font-black text-blue-600">{attempt.score || 0}</span>
-                                     <span className="text-[10px] font-bold text-slate-400">pts</span>
+                                    <span className="text-lg font-black text-blue-600">{attempt.score || 0}</span>
+                                    <span className="text-[10px] font-bold text-slate-400">pts</span>
                                   </div>
                                 </div>
-                                <button 
+                                <button
                                   onClick={() => fetchAttemptDetail(attempt.id)}
                                   className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors"
                                 >
@@ -513,10 +510,10 @@ export const ExamsPage: React.FC = () => {
                   )}
                 </div>
               </GlassCard>
-              
+
               {/* Answer Sheet Viewer Modal */}
               {selectedAttempt && (
-                 <AnswerSheet attempt={selectedAttempt} onClose={() => setSelectedAttempt(null)} />
+                <AnswerSheet attempt={selectedAttempt} onClose={() => setSelectedAttempt(null)} />
               )}
             </>
           ) : (

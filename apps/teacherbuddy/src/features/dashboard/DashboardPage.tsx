@@ -35,7 +35,8 @@ export const DashboardPage: React.FC = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API_ENDPOINTS.DASHBOARD}/summary`);
+        const query = authUser?.name ? `?teacher_name=${encodeURIComponent(authUser.name)}` : '';
+        const response = await fetch(`${API_ENDPOINTS.DASHBOARD}/summary${query}`);
         if (!response.ok) throw new Error("Failed to fetch dashboard data");
         const json = await response.json();
         setData(json);
@@ -102,7 +103,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {stats.map((stat: any, i: number) => {
           const Icon = iconMap[stat.icon] || Activity;
           return (
@@ -185,9 +186,14 @@ export const DashboardPage: React.FC = () => {
         <div className="space-y-4">
           {/* Upcoming */}
           <GlassCard padding="sm">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar size={15} style={{ color: "var(--color-brand-blue)" }} />
-              <h3 className="section-title text-sm">Today's Schedule</h3>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Calendar size={15} style={{ color: "var(--color-brand-blue)" }} />
+                <h3 className="section-title text-sm">Today's Schedule</h3>
+              </div>
+              <Link to="/calendar" className="text-[10px] font-semibold" style={{ color: "var(--color-brand-blue)" }}>
+                View all
+              </Link>
             </div>
             <div className="space-y-2.5">
               {schedule.map((s: any) => (
@@ -214,14 +220,9 @@ export const DashboardPage: React.FC = () => {
 
           {/* Risk Alerts */}
           <GlassCard padding="sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={15} className="text-red-500" />
-                <h3 className="section-title text-sm">AI Risk Alerts</h3>
-              </div>
-              <Link to="/analytics" className="text-[10px] font-semibold" style={{ color: "var(--color-brand-blue)" }}>
-                View all
-              </Link>
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle size={15} className="text-red-500" />
+              <h3 className="section-title text-sm">AI Risk Alerts</h3>
             </div>
             <div className="space-y-2">
               {riskAlerts.map((alert: any) => (

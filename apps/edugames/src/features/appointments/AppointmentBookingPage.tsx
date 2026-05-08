@@ -191,8 +191,6 @@ export const AppointmentBookingPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    const interval = window.setInterval(loadData, 12000);
-    return () => window.clearInterval(interval);
   }, [loadData]);
 
   useEffect(() => {
@@ -494,7 +492,7 @@ export const AppointmentBookingPage: React.FC = () => {
               </div>
               <div className="flex items-start gap-3">
                 <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(208,174,97,0.12)", color: "#d97706" }}>2</span>
-                <p>The page refreshes on a timer so approved or rejected statuses show up without manual intervention.</p>
+                <p>Use the refresh button below to manually sync statuses from the teacher portal.</p>
               </div>
               <button
                 type="button"

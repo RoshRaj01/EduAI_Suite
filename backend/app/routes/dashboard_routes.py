@@ -1,5 +1,8 @@
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
+# pyrefly: ignore [missing-import]
 from sqlalchemy import func
 from app.database import get_db
 from app.models.student import Student
@@ -10,6 +13,8 @@ from app.models.appointment import Appointment
 from app.models.omr import OMRSubmission
 from app.models.submission import Submission
 from app.models.lesson import Lesson
+from app.models.assignment import Assignment
+from app.routes.calendar_routes import CalendarEvent
 from datetime import datetime, date, timedelta
 from typing import Optional
 
@@ -36,9 +41,18 @@ def _parse_date_safe(value: str) -> Optional[datetime]:
     return None
 
 @dashboard_router.get("/summary")
-def get_dashboard_summary(db: Session = Depends(get_db)):
+def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depends(get_db)):
     # 1. Stats
-    total_students = db.query(Student).count()
+    student_query = db.query(Student)
+    teacher_courses = []
+    teacher_course_ids = []
+    if teacher_name:
+        teacher_courses = db.query(Course).filter(Course.teacher_name == teacher_name).all()
+        teacher_course_ids = [c.id for c in teacher_courses]
+        student_query = student_query.filter(Student.course_id.in_(teacher_course_ids))
+    
+    total_students = student_query.count()
+    students = student_query.all()
     
     # AI Evaluations Done: Count OMR submissions
     omr_evals = db.query(OMRSubmission).filter(OMRSubmission.status == "verified").count()
@@ -58,7 +72,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     student_delta = f"+{new_student_actions}" if new_student_actions > 0 else "0%"
 
     real_risk_alerts = []
-    students = db.query(Student).all()
+    # students is already defined above and filtered if teacher_name was provided
     for s in students:
         att = s.attendance or 0
         avg = s.avg_score or 0
@@ -100,15 +114,6 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
             "accent": "border-l-[#264796]"
         },
         {
-            "label": "AI Evaluations Done",
-            "value": str(ai_evaluations),
-            "delta": eval_delta,
-            "icon": "BrainCircuit",
-            "color": "#d0ae61",
-            "bg": "rgba(208,174,97,0.12)",
-            "accent": "border-l-[#d0ae61]"
-        },
-        {
             "label": "Risk Alerts",
             "value": str(risk_alerts_count),
             "delta": f"{risk_alerts_count} active",
@@ -129,9 +134,13 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     ]
 
     # 2. Ongoing Classrooms
-    courses = db.query(Course).limit(4).all()
+    courses_query = db.query(Course)
+    if teacher_name:
+        courses_query = courses_query.filter(Course.teacher_name == teacher_name)
+    
+    courses_list = courses_query.limit(4).all()
     classrooms = []
-    for i, c in enumerate(courses):
+    for i, c in enumerate(courses_list):
         # Try to find a lesson to get a real time, otherwise stagger them
         latest_lesson = db.query(Lesson).filter(Lesson.course_id == c.id).order_by(Lesson.posted_at.desc()).first()
         time_str = "09:00 AM"
@@ -141,12 +150,15 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
             times = ["09:00 AM", "11:30 AM", "02:00 PM", "04:30 PM"]
             time_str = times[i % len(times)]
 
+        # Actual student count from the DB
+        real_count = db.query(Student).filter(Student.course_id == c.id).count()
+
         classrooms.append({
             "id": c.id,
             "code": c.code,
             "name": c.name,
             "batch": c.batch,
-            "students": c.students or 0,
+            "students": real_count,
             "time": time_str,
             "progress": c.progress or 0,
             "teacher": c.teacher_name or "Not Assigned"
@@ -191,29 +203,47 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     schedule_items = []
 
     # 5a. Appointments
-    all_appointments = db.query(Appointment).all()
-    for appt in all_appointments:
-        dt = _parse_date_safe(appt.requested_at)
+    appt_query = db.query(Appointment)
+    if teacher_name:
+        appt_query = appt_query.filter(Appointment.teacher_name == teacher_name)
+    
+    for appt in appt_query.all():
+        dt = _parse_date_safe(appt.time_slot)
+        if not dt:
+            dt = _parse_date_safe(appt.requested_at)
+            
         if dt and today_start <= dt < today_end:
             schedule_items.append({
-                "name": appt.agenda or appt.topic or "Meeting",
+                "name": appt.agenda or "Meeting",
                 "code": "APT",
                 "course_id": getattr(appt, 'course_id', None),
                 "time": dt,
-                "room": appt.meeting_mode or "Office / Online",
+                "room": appt.meeting_mode or "Office",
                 "status": "upcoming"
             })
 
-    # 5b. Lessons
-    today_lessons = db.query(Lesson).filter(
+    # 5b. Lessons & Courses
+    courses_query = db.query(Course)
+    if teacher_name:
+        courses_query = courses_query.filter(Course.teacher_name == teacher_name)
+    teacher_courses = courses_query.all()
+    teacher_course_ids = [c.id for c in teacher_courses]
+    courses_map = {c.id: c for c in teacher_courses}
+
+    lesson_query = db.query(Lesson)
+    if teacher_name:
+        lesson_query = lesson_query.filter(Lesson.course_id.in_(teacher_course_ids))
+    
+    today_lessons = lesson_query.filter(
         Lesson.posted_at >= today_start,
         Lesson.posted_at < today_end
     ).all()
     
     for lesson in today_lessons:
+        course = courses_map.get(lesson.course_id)
         schedule_items.append({
             "name": lesson.title or lesson.topic,
-            "code": "CLASS",
+            "code": course.code if course else "CLASS",
             "course_id": lesson.course_id,
             "time": lesson.posted_at,
             "room": "Lecture Hall",
@@ -221,12 +251,15 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         })
 
     # 5c. Calendar Events
-    from app.routes.calendar_routes import CalendarEvent
     try:
-        today_events = db.query(CalendarEvent).filter(
+        ce_query = db.query(CalendarEvent).filter(
             CalendarEvent.start_time >= today_start,
             CalendarEvent.start_time < today_end
-        ).all()
+        )
+        if teacher_name:
+            ce_query = ce_query.filter(CalendarEvent.teacher_name == teacher_name)
+            
+        today_events = ce_query.all()
         for ev in today_events:
             schedule_items.append({
                 "name": ev.title,
@@ -238,11 +271,43 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     except:
         pass
 
+    # 5d. Assignments Due Today
+    assg_query = db.query(Assignment)
+    if teacher_name:
+        assg_query = assg_query.filter(Assignment.course_id.in_(teacher_course_ids))
+    
+    for assg in assg_query.all():
+        dt = _parse_date_safe(assg.due_date)
+        if dt and today_start <= dt < today_end:
+            course = courses_map.get(assg.course_id)
+            schedule_items.append({
+                "name": f"Due: {assg.title}",
+                "code": course.code if course else "DUE",
+                "time": dt,
+                "room": "Submission",
+                "status": "upcoming"
+            })
+
+    # 5e. Exams Today
+    for exam in db.query(Exam).all():
+        if teacher_name and exam.course_id not in teacher_course_ids:
+            continue
+        dt = exam.created_at # Assuming created_at is the schedule for now as per previous logic
+        if dt and today_start <= dt < today_end:
+            course = courses_map.get(exam.course_id)
+            schedule_items.append({
+                "name": f"Exam: {exam.title}",
+                "code": course.code if course else "EXAM",
+                "time": dt,
+                "room": "Online",
+                "status": "upcoming"
+            })
+
     # Sort by time
     schedule_items.sort(key=lambda x: x["time"])
     
     schedule = []
-    for item in schedule_items[:4]:
+    for item in schedule_items[:5]:
         schedule.append({
             "name": item["name"],
             "code": item["code"],
@@ -251,23 +316,6 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
             "room": item["room"],
             "status": item["status"]
         })
-        
-    if not schedule:
-        # Dynamic fallback based on available courses
-        if courses:
-            for i, c in enumerate(courses[:2]):
-                schedule.append({
-                    "name": f"{c.name} Review",
-                    "code": c.code,
-                    "time": "03:00 PM" if i == 0 else "05:00 PM",
-                    "room": "Seminar Hall",
-                    "status": "upcoming"
-                })
-        else:
-            schedule = [
-                {"name": "Neural Networks", "code": "CSC401", "time": "10:00 AM", "room": "CS-Lab 3", "status": "upcoming"},
-                {"name": "DSA Lecture", "code": "CSC312", "time": "12:00 PM", "room": "Seminar Hall", "status": "live"},
-            ]
 
     return {
         "stats": stats,

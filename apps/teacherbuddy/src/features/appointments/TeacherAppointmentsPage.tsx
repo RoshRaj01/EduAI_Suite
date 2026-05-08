@@ -487,24 +487,26 @@ export const TeacherAppointmentsPage: React.FC = () => {
                     </div>
 
                     <div className="flex flex-col items-start lg:items-end gap-2">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={(event) => { event.stopPropagation(); respondToAppointment(appointment, "approved"); }}
-                          className="btn btn-primary text-xs"
-                          disabled={actioningId === appointment.id || appointment.status !== "pending"}
-                        >
-                          {actioningId === appointment.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                          Approve
-                        </button>
+                      {appointment.status === "pending" && (
+                        <div className="flex gap-2">
                           <button
-                           onClick={(event) => { event.stopPropagation(); setRejectingAppointment(appointment); }}
-                           className="btn btn-outline text-xs text-red-600 border-red-200 hover:bg-red-50"
-                           disabled={actioningId === appointment.id || appointment.status !== "pending"}
-                         >
-                           <XCircle size={14} />
-                           Reject
-                         </button>
-                      </div>
+                            onClick={(event) => { event.stopPropagation(); respondToAppointment(appointment, "approved"); }}
+                            className="btn btn-primary text-xs"
+                            disabled={actioningId === appointment.id}
+                          >
+                            {actioningId === appointment.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                            Approve
+                          </button>
+                          <button
+                            onClick={(event) => { event.stopPropagation(); setRejectingAppointment(appointment); }}
+                            className="btn btn-outline text-xs text-red-600 border-red-200 hover:bg-red-50"
+                            disabled={actioningId === appointment.id}
+                          >
+                            <XCircle size={14} />
+                            Reject
+                          </button>
+                        </div>
+                      )}
                       {appointment.status !== "pending" && (
                         <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
                           Reviewed by {appointment.reviewed_by ?? "TeacherBuddy"}
