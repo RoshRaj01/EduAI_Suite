@@ -231,6 +231,25 @@ export const StudentClassrooms: React.FC = () => {
     }
   };
 
+  const handleUnsubmit = async (assignmentId: number) => {
+    try {
+      const user = get_user();
+      const studentName = user.name;
+      const response = await fetch(`${API_URL}/submissions/assignment/${assignmentId}/student/${encodeURIComponent(studentName)}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to unsubmit assignment.");
+      }
+
+      alert("Assignment unsubmitted successfully!");
+      setSubmittedAssignmentIds(prev => prev.filter(id => id !== assignmentId));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not unsubmit work");
+    }
+  };
+
   const handleJoinByCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (joinCode.length !== 6) {
@@ -511,49 +530,117 @@ export const StudentClassrooms: React.FC = () => {
               </div>
 
               {activeTab === "overview" && (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <GlassCard
-                    className="p-5"
-                    interactive
-                    role="button"
-                    tabIndex={0}
-                    aria-label="View upcoming assignments"
-                    onClick={() => setActiveTab("assignments")}
-                    onKeyDown={e => {
-                      if (e.key === "Enter" || e.key === " ") setActiveTab("assignments");
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Clock className="text-blue-600" size={18} />
-                      <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>
-                        Upcoming work
-                      </p>
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Upcoming Work Summary */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-2">
+                      <div className="flex items-center gap-2">
+                        <Clock className="text-blue-600" size={18} />
+                        <h3 className="font-bold text-lg" style={{ color: "var(--color-text-primary)" }}>Upcoming Work</h3>
+                      </div>
+                      <button 
+                        onClick={() => setActiveTab("assignments")}
+                        className="text-xs font-bold text-blue-600 hover:underline"
+                      >
+                        View All
+                      </button>
                     </div>
-                    <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                      Track class assignments and due dates from one place.
-                    </p>
-                  </GlassCard>
-                  <GlassCard
-                    className="p-5"
-                    interactive
-                    role="button"
-                    tabIndex={0}
-                    aria-label="View announcements"
-                    onClick={() => setActiveTab("announcements")}
-                    onKeyDown={e => {
-                      if (e.key === "Enter" || e.key === " ") setActiveTab("announcements");
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Megaphone className="text-blue-600" size={18} />
-                      <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>
-                        Announcements
-                      </p>
+                    
+                    <div className="space-y-3">
+                      {assignments.filter(a => !submittedAssignmentIds.includes(a.id)).length === 0 ? (
+                        <GlassCard className="p-8 text-center bg-white/40 border-dashed border-2 border-slate-200">
+                          <div className="flex flex-col items-center gap-2">
+                             <CheckCircle2 className="text-green-500" size={24} />
+                             <p className="text-sm font-medium text-slate-500">No pending assignments!</p>
+                          </div>
+                        </GlassCard>
+                      ) : (
+                        assignments
+                          .filter(a => !submittedAssignmentIds.includes(a.id))
+                          .slice(0, 5)
+                          .map(assignment => (
+                            <GlassCard 
+                              key={assignment.id} 
+                              className="p-4 border-l-4 border-l-orange-400 hover:bg-white/60 transition-all cursor-pointer group"
+                              onClick={() => setActiveTab("assignments")}
+                            >
+                              <div className="flex justify-between items-start gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-bold text-sm truncate group-hover:text-blue-600 transition-colors" style={{ color: "var(--color-text-primary)" }}>
+                                    {assignment.title}
+                                  </p>
+                                  <p className="mt-1 text-xs line-clamp-1 text-slate-500">
+                                    {assignment.description}
+                                  </p>
+                                </div>
+                                <div className="shrink-0 text-right">
+                                  <p className="text-[10px] font-black text-orange-600 uppercase">Due</p>
+                                  <p className="text-[10px] font-bold text-slate-400">
+                                    {formatDueDate(assignment.due_date).split(' at ')[0]}
+                                  </p>
+                                </div>
+                              </div>
+                            </GlassCard>
+                          ))
+                      )}
                     </div>
-                    <p className="mt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                      Important class updates and reminders appear here.
-                    </p>
-                  </GlassCard>
+                  </div>
+
+                  {/* Announcements Summary */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-2">
+                      <div className="flex items-center gap-2">
+                        <Megaphone className="text-blue-600" size={18} />
+                        <h3 className="font-bold text-lg" style={{ color: "var(--color-text-primary)" }}>Recent Announcements</h3>
+                      </div>
+                      <button 
+                        onClick={() => setActiveTab("announcements")}
+                        className="text-xs font-bold text-blue-600 hover:underline"
+                      >
+                        View All
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {announcements.length === 0 ? (
+                        <GlassCard className="p-8 text-center bg-white/40 border-dashed border-2 border-slate-200">
+                          <div className="flex flex-col items-center gap-2">
+                             <Megaphone className="text-slate-300" size={24} />
+                             <p className="text-sm font-medium text-slate-500">No announcements yet.</p>
+                          </div>
+                        </GlassCard>
+                      ) : (
+                        announcements
+                          .slice(0, 5)
+                          .map(announcement => (
+                            <GlassCard 
+                              key={announcement.id} 
+                              className="p-4 hover:bg-white/60 transition-all cursor-pointer group"
+                              onClick={() => setActiveTab("announcements")}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="rounded-xl bg-blue-50 p-2 text-blue-600 shrink-0 group-hover:bg-blue-100 transition-colors">
+                                  <Megaphone size={14} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex justify-between items-start gap-2">
+                                    <p className="font-bold text-sm truncate group-hover:text-blue-600 transition-colors" style={{ color: "var(--color-text-primary)" }}>
+                                      {announcement.title}
+                                    </p>
+                                    <span className="shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                                      {announcement.time.split(' ')[0]}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-xs line-clamp-1 text-slate-500">
+                                    {announcement.body}
+                                  </p>
+                                </div>
+                              </div>
+                            </GlassCard>
+                          ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
