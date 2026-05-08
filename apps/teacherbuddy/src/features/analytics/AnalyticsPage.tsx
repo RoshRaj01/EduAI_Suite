@@ -88,6 +88,40 @@ export const AnalyticsPage: React.FC = () => {
   const [fileName, setFileName] = useState("");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isHydrated = useRef(false);
+
+  // Persistence logic: Load from sessionStorage on reload, clear on fresh navigation
+  useEffect(() => {
+    const navEntries = performance.getEntriesByType("navigation");
+    const isReload = navEntries.length > 0 && (navEntries[0] as PerformanceNavigationTiming).type === 'reload';
+    
+    if (isReload) {
+      const saved = sessionStorage.getItem("teacher_analytics_cache");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.analytics) setAnalytics(parsed.analytics);
+          if (parsed.uploadedData) setUploadedData(parsed.uploadedData);
+          if (parsed.dataSource) setDataSource(parsed.dataSource);
+          if (parsed.selectedCourseId) setSelectedCourseId(parsed.selectedCourseId);
+          if (parsed.activeTab) setActiveTab(parsed.activeTab);
+          if (parsed.fileName) setFileName(parsed.fileName);
+          isHydrated.current = true;
+        } catch (e) {
+          console.error("Failed to parse persisted analytics", e);
+        }
+      }
+    } else {
+      // It's a fresh navigation (or hard refresh in some contexts), clear cache
+      sessionStorage.removeItem("teacher_analytics_cache");
+    }
+  }, []);
+
+  // Sync state to sessionStorage whenever it changes
+  useEffect(() => {
+    const state = { analytics, uploadedData, dataSource, selectedCourseId, activeTab, fileName };
+    sessionStorage.setItem("teacher_analytics_cache", JSON.stringify(state));
+  }, [analytics, uploadedData, dataSource, selectedCourseId, activeTab, fileName]);
 
   // Fetch courses on mount
   useEffect(() => {
@@ -99,7 +133,10 @@ export const AnalyticsPage: React.FC = () => {
       .then(data => {
         if (Array.isArray(data)) {
           setCourses(data);
-          if (data.length > 0) setSelectedCourseId(data[0].id);
+          // Only set default if we didn't just hydrate from session
+          if (data.length > 0 && !isHydrated.current) {
+            setSelectedCourseId(data[0].id);
+          }
         } else {
           setCourses([]);
         }
@@ -113,6 +150,11 @@ export const AnalyticsPage: React.FC = () => {
   // Fetch analytics when course changes
   useEffect(() => {
     if (selectedCourseId && dataSource === "platform") {
+      // If we just hydrated from session, skip the initial fetch to prevent flickering
+      if (isHydrated.current) {
+        isHydrated.current = false;
+        return;
+      }
       setLoading(true);
       fetch(`${API_BASE}/analytics/course/${selectedCourseId}`)
         .then(res => res.json())
