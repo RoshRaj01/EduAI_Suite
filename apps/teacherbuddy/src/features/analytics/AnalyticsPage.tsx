@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   BarChart3, TrendingUp, AlertTriangle, Users, Download,
   ChevronDown, Filter, RefreshCw, Activity, ArrowUp, ArrowDown,
@@ -74,45 +74,43 @@ const RiskCell: React.FC<{ value: number; label: string }> = ({ value, label }) 
 };
 
 export const AnalyticsPage: React.FC = () => {
+  // 1. Determine if this is a reload and get persisted state immediately
+  const persisted = useMemo(() => {
+    const navEntries = performance.getEntriesByType("navigation");
+    const isReload = navEntries.length > 0 && (navEntries[0] as PerformanceNavigationTiming).type === 'reload';
+    if (!isReload) return null;
+    
+    const saved = sessionStorage.getItem("teacher_analytics_cache");
+    if (!saved) return null;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return null;
+    }
+  }, []);
+
   const [courses, setCourses] = useState<Course[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
-  const [dataSource, setDataSource] = useState<"platform" | "upload">("platform");
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [uploadedData, setUploadedData] = useState<UploadedData | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(persisted?.selectedCourseId || null);
+  const [dataSource, setDataSource] = useState<"platform" | "upload">(persisted?.dataSource || "platform");
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(persisted?.analytics || null);
+  const [uploadedData, setUploadedData] = useState<UploadedData | null>(persisted?.uploadedData || null);
   
-  const [activeTab, setActiveTab] = useState<"overview" | "risk" | "subjects" | "raw">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "risk" | "subjects" | "raw">(persisted?.activeTab || "overview");
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [imputeMethod, setImputeMethod] = useState("auto");
-  const [fileName, setFileName] = useState("");
+  const [fileName, setFileName] = useState(persisted?.fileName || "");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isHydrated = useRef(false);
+  const lastFetchedCourseId = useRef<number | null>(persisted?.dataSource === "platform" ? persisted?.selectedCourseId : null);
 
-  // Persistence logic: Load from sessionStorage on reload, clear on fresh navigation
+  // Persistence logic: Clear storage if this is a fresh navigation (not a reload)
   useEffect(() => {
     const navEntries = performance.getEntriesByType("navigation");
     const isReload = navEntries.length > 0 && (navEntries[0] as PerformanceNavigationTiming).type === 'reload';
     
-    if (isReload) {
-      const saved = sessionStorage.getItem("teacher_analytics_cache");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (parsed.analytics) setAnalytics(parsed.analytics);
-          if (parsed.uploadedData) setUploadedData(parsed.uploadedData);
-          if (parsed.dataSource) setDataSource(parsed.dataSource);
-          if (parsed.selectedCourseId) setSelectedCourseId(parsed.selectedCourseId);
-          if (parsed.activeTab) setActiveTab(parsed.activeTab);
-          if (parsed.fileName) setFileName(parsed.fileName);
-          isHydrated.current = true;
-        } catch (e) {
-          console.error("Failed to parse persisted analytics", e);
-        }
-      }
-    } else {
-      // It's a fresh navigation (or hard refresh in some contexts), clear cache
+    if (!isReload) {
       sessionStorage.removeItem("teacher_analytics_cache");
     }
   }, []);
@@ -133,8 +131,8 @@ export const AnalyticsPage: React.FC = () => {
       .then(data => {
         if (Array.isArray(data)) {
           setCourses(data);
-          // Only set default if we didn't just hydrate from session
-          if (data.length > 0 && !isHydrated.current) {
+          // Only set default if we don't have a persisted selection
+          if (data.length > 0 && !selectedCourseId) {
             setSelectedCourseId(data[0].id);
           }
         } else {
@@ -150,16 +148,17 @@ export const AnalyticsPage: React.FC = () => {
   // Fetch analytics when course changes
   useEffect(() => {
     if (selectedCourseId && dataSource === "platform") {
-      // If we just hydrated from session, skip the initial fetch to prevent flickering
-      if (isHydrated.current) {
-        isHydrated.current = false;
+      // Prevent redundant fetch if we already have the data for this course from session
+      if (analytics && selectedCourseId === lastFetchedCourseId.current) {
         return;
       }
+      
       setLoading(true);
       fetch(`${API_BASE}/analytics/course/${selectedCourseId}`)
         .then(res => res.json())
         .then(data => {
           setAnalytics(data);
+          lastFetchedCourseId.current = selectedCourseId;
           setLoading(false);
         })
         .catch(err => {
