@@ -22,6 +22,7 @@ import {
   ClipboardList,
   Mail,
 } from "lucide-react";
+import { useAuthStore } from "../store/useAuthStore";
 import logo from "../assets/logo (5).png";
 import { API_ENDPOINTS } from "../shared/utils/apiConfig";
 
@@ -79,11 +80,12 @@ export const DashboardShell: React.FC = () => {
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { user: authUser, logout } = useAuthStore();
   const [user, setUser] = useState<any>(null);
   
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [lastNotifId, setLastNotifId] = useState<number | null>(null);
+  const lastNotifIdRef = useRef<number | null>(null);
   const [toast, setToast] = useState<{ title: string; desc: string; href: string } | null>(null);
 
   const fetchNotifications = useCallback(async () => {
@@ -110,31 +112,44 @@ export const DashboardShell: React.FC = () => {
 
         if (formatted.length > 0) {
           const newest = formatted[0];
-          // If we have a new notification that is unread and not previously seen
-          if (lastNotifId !== null && newest.id > lastNotifId && newest.unread) {
+          if (lastNotifIdRef.current !== null && newest.id > lastNotifIdRef.current && newest.unread) {
             setToast({ title: newest.title, desc: newest.desc, href: newest.href });
             setTimeout(() => setToast(null), 6000);
           }
-          setLastNotifId(newest.id);
+          lastNotifIdRef.current = newest.id;
         }
       }
     } catch (err) {
       console.error("Failed to fetch notifications:", err);
     }
-  }, [lastNotifId]);
+  }, []);  // stable — no deps that change
 
+  // Auth check — runs ONCE on mount only
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      fetchNotifications();
-      // Polling for new notifications every 60 seconds
-      const interval = setInterval(fetchNotifications, 60000);
-      return () => clearInterval(interval);
+    const token = localStorage.getItem("token");
+    
+    if (storedUser && token) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        logout();
+        navigate("/login");
+      }
     } else {
+      logout();
       navigate("/login");
     }
-  }, [navigate, fetchNotifications]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Notification polling — separate from auth, only runs when user is set
+  useEffect(() => {
+    if (!user) return;
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [user, fetchNotifications]);
 
   const handleNotifToggle = () => {
     if (!notifOpen) {
@@ -369,7 +384,7 @@ export const DashboardShell: React.FC = () => {
                   <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{user?.sub || "user@eduai.com"}</p>
                 </div>
                 <div className="border-t mt-1" style={{ borderColor: 'var(--color-border)' }}>
-                  <button onClick={() => { localStorage.clear(); navigate("/login"); }}
+                  <button onClick={() => { logout(); navigate("/login"); }}
                     className="w-full text-left px-4 py-2.5 text-sm text-red-500 transition-colors"
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -420,7 +435,7 @@ export const DashboardShell: React.FC = () => {
 
         <div className="p-4 border-t" style={{ borderColor: "var(--color-border)" }}>
           <button
-            onClick={() => { localStorage.clear(); navigate("/login"); }}
+            onClick={() => { logout(); navigate("/login"); }}
             className="w-full flex items-center gap-4 px-5 py-3.5 rounded-xl transition-all text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold"
           >
             <LogOut size={22} className="opacity-80" />

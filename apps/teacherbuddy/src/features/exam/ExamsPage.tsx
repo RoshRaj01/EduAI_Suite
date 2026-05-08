@@ -7,8 +7,10 @@ import {
 import { useNavigate } from "react-router-dom";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ExamCreator } from "./ExamCreator";
+import { useAuthStore } from "../../store/useAuthStore";
 import { AnswerSheet } from "./AnswerSheet";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
+import { getGreeting, getFormattedDate } from "../../shared/utils/dateUtils";
 
 type ExamView = "list" | "take" | "review";
 
@@ -22,6 +24,7 @@ const statusStyle: Record<string, { color: string; bg: string; label: string }> 
 
 export const ExamsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user: authUser, logout } = useAuthStore();
   const [examsList, setExamsList] = useState<any[]>([]);
   const [selectedExam, setSelectedExam] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "take" | "review">("overview");
@@ -47,6 +50,7 @@ export const ExamsPage: React.FC = () => {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (response.status === 401) {
+        logout();
         navigate("/login");
         return;
       }
@@ -69,6 +73,7 @@ export const ExamsPage: React.FC = () => {
         signal: AbortSignal.timeout(10000) // 10 second timeout
       });
       if (response.status === 401) {
+        logout();
         navigate("/login");
         return;
       }
@@ -253,10 +258,10 @@ export const ExamsPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
-            Examinations
+            {getGreeting()}, {authUser?.name || "Professor"} 👋
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
-            Create, manage, review and track student submissions.
+            {getFormattedDate()} — Manage and track your examinations.
           </p>
         </div>
         <button onClick={() => { setEditingExam(null); setShowCreator(true); }} className="btn btn-primary text-sm">

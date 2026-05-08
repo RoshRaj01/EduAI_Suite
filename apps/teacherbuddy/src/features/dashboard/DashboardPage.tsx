@@ -8,6 +8,7 @@ import { GlassCard } from "../../shared/components/GlassCard";
 import { Link } from "react-router-dom";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 import { useAuthStore } from "../../store/useAuthStore";
+import { getGreeting, getFormattedDate } from "../../shared/utils/dateUtils";
 
 const iconMap: Record<string, any> = {
   Users,
@@ -81,15 +82,10 @@ export const DashboardPage: React.FC = () => {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>
-            {(() => {
-              const hour = new Date().getHours();
-              if (hour < 12) return "Good morning";
-              if (hour < 17) return "Good afternoon";
-              return "Good evening";
-            })()}, {authUser?.name || "Professor"} 👋
+            {getGreeting()}, {authUser?.name || "Professor"} 👋
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
-            {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} — Here's your academic overview for today.
+            {getFormattedDate()} — Here's your academic overview for today.
           </p>
         </div>
         <div className="flex gap-2">

@@ -35,14 +35,18 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastPlayerId, setLastPlayerId] = useState<string | null>(null);
   // Use WebSocket sync if sessionId is provided
+  // Only activate sync when we have a real session
+  const syncEnabled = Boolean(sessionId);
   const {
     isConnected,
+    connectionMode,
     gameState: wsGameState,
     submitWord,
     startGame,
     endGame,
+    skipTurn: wsSkipTurn,
   } = useGameSync({
-    sessionId: sessionId || "",
+    sessionId: syncEnabled ? sessionId! : "",
     gameId: gameId || 0,
     playerId: playerId || "",
     userType,
@@ -121,12 +125,17 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     setLastPlayerId(currentPlayerIdStr);
 
     const skipTimer = setTimeout(() => {
-      if (actions?.skipTurn && currentPlayer) {
+      const skipId = currentPlayer?.student_id || currentPlayer?.id;
+      if (syncEnabled && skipId) {
+        // WebSocket mode: send skip_turn via WS (server broadcasts to all)
+        wsSkipTurn(String(skipId));
+      } else if (actions?.skipTurn && currentPlayer) {
+        // Local mode: use local state actions
         actions.skipTurn(currentPlayer.id || currentPlayer.student_id);
       }
       setInputWord("");
       setStartTime(Date.now());
-    }, 500); // Small delay to avoid race conditions
+    }, 500);
 
     return () => clearTimeout(skipTimer);
   }, [
@@ -136,6 +145,8 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     gameState?.players,
     actions,
     lastPlayerId,
+    syncEnabled,
+    wsSkipTurn,
   ]);
 
   // Handle game ended state
@@ -181,17 +192,20 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
         <div className="text-right space-y-2">
           {sessionId && (
             <div className="flex items-center justify-end gap-2 text-sm">
-              {isConnected ? (
+              {connectionMode === "ws" && isConnected ? (
                 <>
                   <Wifi size={16} style={{ color: "#10b981" }} />
-                  <span style={{ color: "#10b981" }}>Connected</span>
+                  <span style={{ color: "#10b981" }}>Live</span>
+                </>
+              ) : connectionMode === "polling" ? (
+                <>
+                  <Wifi size={16} style={{ color: "#f59e0b" }} />
+                  <span style={{ color: "#f59e0b" }}>Polling</span>
                 </>
               ) : (
                 <>
                   <WifiOff size={16} style={{ color: "var(--color-error)" }} />
-                  <span style={{ color: "var(--color-error)" }}>
-                    Offline (Polling)
-                  </span>
+                  <span style={{ color: "var(--color-error)" }}>Connecting…</span>
                 </>
               )}
             </div>

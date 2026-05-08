@@ -308,6 +308,271 @@ async def wordcloud_websocket_endpoint(
         db.close()
 
 
+# ==================== CHAIN ANSWER WEBSOCKET ENDPOINT ====================
+
+@ws_router.websocket("/ws/games/chain-answer/{session_id}")
+async def chain_answer_websocket_endpoint(
+    websocket: WebSocket,
+    session_id: str,
+    user_type: str = Query("student"),
+):
+    """
+    WebSocket endpoint for Chain Answer game real-time sync.
+
+    Events handled:
+    - join: Player identifies themselves
+    - submit_word: Player submits a word (persisted to DB, broadcast to all)
+    - start_game: Teacher starts the game
+    - end_game: Teacher/player ends the game
+    - ping: Keepalive
+    """
+    await manager.connect(session_id, websocket)
+    db = SessionLocal()
+
+    try:
+        # Look up game by session_id
+        game = db.query(ChainAnswerGame).filter(
+            ChainAnswerGame.session_id == session_id
+        ).first()
+
+        if not game:
+            await websocket.send_json({"type": "error", "message": "Game session not found"})
+            await websocket.close()
+            return
+
+        # Build and send initial state
+        players_list = []
+        for p in sorted(game.players, key=lambda x: x.join_order):
+            players_list.append({
+                "id": p.id,
+                "student_id": p.student_id,
+                "name": p.name,
+                "join_order": p.join_order,
+                "score": p.score,
+                "words_submitted": p.words_submitted,
+                "words_valid": p.words_valid,
+                "status": p.status,
+            })
+
+        chain = []
+        for w in sorted(game.words, key=lambda x: x.position):
+            chain.append({
+                "id": w.id,
+                "word": w.word,
+                "submitted_by": w.submitted_by,
+                "is_valid": w.is_valid,
+                "position": w.position,
+            })
+
+        # Calculate current player index from chain
+        current_player_index = 0
+        if len(chain) > 0 and len(players_list) > 0:
+            last_word = chain[-1]
+            last_submitter = last_word.get("submitted_by")
+            if last_submitter and last_submitter != "system":
+                for i, p in enumerate(players_list):
+                    if str(p["student_id"]) == str(last_submitter):
+                        current_player_index = (i + 1) % len(players_list)
+                        break
+
+        await websocket.send_json({
+            "type": "initial_state",
+            "game": {
+                "id": game.id,
+                "session_id": game.session_id,
+                "name": game.name,
+                "chain_variation": game.chain_variation,
+                "difficulty_level": game.difficulty_level,
+                "status": game.status,
+                "starting_word": game.starting_word,
+                "time_per_turn": game.time_per_turn or 30,
+            },
+            "players": players_list,
+            "chain": chain,
+            "currentPlayerIndex": current_player_index,
+        })
+
+        print(f"[ChainAnswer WS] {user_type} connected to session={session_id}, game_id={game.id}")
+
+        # Message loop
+        while True:
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            msg_type = message.get("type")
+
+            if msg_type == "ping":
+                await websocket.send_json({"type": "pong"})
+
+            elif msg_type == "join":
+                player_id = message.get("player_id")
+                print(f"[ChainAnswer WS] Player {player_id} joined session={session_id}")
+                # Broadcast updated player list
+                db.expire_all()
+                game = db.query(ChainAnswerGame).filter(
+                    ChainAnswerGame.session_id == session_id
+                ).first()
+                if game:
+                    updated_players = []
+                    for p in sorted(game.players, key=lambda x: x.join_order):
+                        updated_players.append({
+                            "id": p.id,
+                            "student_id": p.student_id,
+                            "name": p.name,
+                            "join_order": p.join_order,
+                            "score": p.score,
+                            "words_submitted": p.words_submitted,
+                            "words_valid": p.words_valid,
+                            "status": p.status,
+                        })
+                    await manager.broadcast(session_id, {
+                        "type": "player_joined",
+                        "player_id": player_id,
+                        "players": updated_players,
+                    })
+
+            elif msg_type == "submit_word":
+                word_text = message.get("word", "").strip()
+                player_id = str(message.get("player_id", ""))
+
+                if not word_text:
+                    await websocket.send_json({"type": "error", "message": "Empty word"})
+                    continue
+
+                # Refresh game state
+                db.expire_all()
+                game = db.query(ChainAnswerGame).filter(
+                    ChainAnswerGame.session_id == session_id
+                ).first()
+
+                if not game or game.status != "active":
+                    await websocket.send_json({"type": "error", "message": "Game is not active"})
+                    continue
+
+                # Get next position
+                max_pos_word = db.query(ChainAnswerGameWord).filter(
+                    ChainAnswerGameWord.game_id == game.id
+                ).order_by(ChainAnswerGameWord.position.desc()).first()
+                next_position = (max_pos_word.position + 1) if max_pos_word else 1
+
+                # Persist the word
+                new_word = ChainAnswerGameWord(
+                    game_id=game.id,
+                    word=word_text,
+                    submitted_by=player_id,
+                    is_valid=True,
+                    position=next_position,
+                )
+                db.add(new_word)
+
+                # Update player stats
+                player = db.query(ChainAnswerGamePlayer).filter(
+                    ChainAnswerGamePlayer.game_id == game.id,
+                    ChainAnswerGamePlayer.student_id == player_id
+                ).first()
+
+                player_stats = {}
+                if player:
+                    player.words_submitted += 1
+                    player.words_valid += 1
+                    player.score += 10
+                    player_stats = {
+                        "score": player.score,
+                        "words_submitted": player.words_submitted,
+                        "words_valid": player.words_valid,
+                    }
+
+                db.commit()
+                db.refresh(new_word)
+
+                print(f"[ChainAnswer WS] Word '{word_text}' submitted by {player_id} in session={session_id}")
+
+                # Broadcast to all connected clients
+                await manager.broadcast(session_id, {
+                    "type": "word_submitted",
+                    "word": {
+                        "id": new_word.id,
+                        "word": new_word.word,
+                        "submitted_by": new_word.submitted_by,
+                        "is_valid": new_word.is_valid,
+                        "position": new_word.position,
+                    },
+                    "player_stats": player_stats,
+                })
+
+            elif msg_type == "start_game" or msg_type == "game_started":
+                if user_type != "teacher":
+                    await websocket.send_json({"type": "error", "message": "Only teachers can start games"})
+                    continue
+
+                db.expire_all()
+                game = db.query(ChainAnswerGame).filter(
+                    ChainAnswerGame.session_id == session_id
+                ).first()
+
+                if game and game.status == "setup":
+                    game.status = "active"
+                    game.started_at = datetime.utcnow()
+                    db.commit()
+
+                    print(f"[ChainAnswer WS] Game started: session={session_id}")
+                    await manager.broadcast(session_id, {
+                        "type": "game_started",
+                        "status": "active",
+                    })
+
+            elif msg_type == "end_game" or msg_type == "game_ended":
+                db.expire_all()
+                game = db.query(ChainAnswerGame).filter(
+                    ChainAnswerGame.session_id == session_id
+                ).first()
+
+                if game and game.status != "completed":
+                    game.status = "completed"
+                    game.ended_at = datetime.utcnow()
+                    db.commit()
+
+                    print(f"[ChainAnswer WS] Game ended: session={session_id}")
+                    await manager.broadcast(session_id, {
+                        "type": "game_ended",
+                        "status": "completed",
+                    })
+
+            elif msg_type == "skip_turn":
+                # Timer expired — advance to next player
+                skipped_player_id = str(message.get("player_id", ""))
+
+                db.expire_all()
+                game = db.query(ChainAnswerGame).filter(
+                    ChainAnswerGame.session_id == session_id
+                ).first()
+
+                if game and game.status == "active":
+                    players = sorted(game.players, key=lambda x: x.join_order)
+                    # Find the skipped player and compute next index
+                    next_index = 0
+                    for i, p in enumerate(players):
+                        if str(p.student_id) == skipped_player_id:
+                            next_index = (i + 1) % len(players)
+                            break
+
+                    print(f"[ChainAnswer WS] Turn skipped for player {skipped_player_id}, next index={next_index}")
+                    await manager.broadcast(session_id, {
+                        "type": "turn_skipped",
+                        "skipped_player_id": skipped_player_id,
+                        "next_player_index": next_index,
+                        "time_per_turn": game.time_per_turn or 30,
+                    })
+
+    except WebSocketDisconnect:
+        print(f"[ChainAnswer WS] {user_type} disconnected from session={session_id}")
+        manager.disconnect(session_id, websocket)
+    except Exception as e:
+        print(f"[ChainAnswer WS] ERROR for {user_type} on session={session_id}: {type(e).__name__}: {e}")
+        manager.disconnect(session_id, websocket)
+    finally:
+        db.close()
+
+
 # ==================== SLIDO WEBSOCKET ENDPOINT ====================
 
 @ws_router.websocket("/ws/slido/{pin}")

@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import WordCloud from "react-d3-cloud";
+import React, { useState, useEffect, useMemo } from "react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { BarChart, Share2, ArrowLeft } from "lucide-react";
 
@@ -13,6 +12,52 @@ interface WordCloudHostProps {
   initialPin?: string;
 }
 
+/* ── Custom CSS Word Cloud ────────────────────────────────── */
+const CLOUD_COLORS = ["#264796", "#2a4fa7", "#d0ae61", "#ddb867", "#16a34a", "#7c3aed", "#dc2626", "#0891b2"];
+
+const SimpleWordCloud: React.FC<{ words: WordData[] }> = ({ words }) => {
+  const maxValue = Math.max(...words.map(w => w.value), 1);
+
+  // Deterministic rotation from word text
+  const hashRotation = (text: string) => {
+    let h = 0;
+    for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
+    const bucket = Math.abs(h) % 10;
+    if (bucket < 6) return 0;
+    return bucket < 8 ? 12 : -12;
+  };
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 p-6 w-full h-full content-center">
+      {words.map((word, i) => {
+        const ratio = maxValue <= 1 ? 1 : word.value / maxValue;
+        const fontSize = 18 + ratio * 46;
+        const color = CLOUD_COLORS[i % CLOUD_COLORS.length];
+        const rotation = hashRotation(word.text);
+
+        return (
+          <span
+            key={word.text}
+            className="inline-block transition-all duration-500 ease-out select-none"
+            style={{
+              fontSize: `${fontSize}px`,
+              color,
+              fontWeight: 700,
+              fontFamily: "Inter, sans-serif",
+              fontStyle: "italic",
+              transform: `rotate(${rotation}deg)`,
+              opacity: 0.85 + ratio * 0.15,
+            }}
+          >
+            {word.text}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
+/* ── Host Component ───────────────────────────────────────── */
 export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, initialPin }) => {
   const [prompt, setPrompt] = useState("");
   const [pin, setPin] = useState<string | null>(initialPin || null);
@@ -72,8 +117,9 @@ export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, i
         if (isCancelled) return;
         try {
           const message = JSON.parse(event.data);
+          console.log("[WordCloud] Received message:", message);
           if (message.type === "cloud_update") {
-            setWords(message.words);
+            setWords(message.words || []);
           }
         } catch (e) {
           console.error("[WordCloud] Failed to parse message", e);
@@ -122,8 +168,6 @@ export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, i
       console.error("Failed to end session", e);
     }
   };
-
-  const customColors = ["#264796", "#2a4fa7", "#d0ae61", "#ddb867"];
 
   if (!pin) {
     return (
@@ -210,21 +254,7 @@ return (
             <p className="text-lg">Waiting for responses...</p>
           </div>
         ) : (
-          <WordCloud
-            key={JSON.stringify(words)}
-            data={words}
-            width={800}
-            height={400}
-            font="Inter"
-            fontStyle="italic"
-            fontWeight="bold"
-            fontSize={(word: any) => Math.log2(word.value + 1) * 30 + 15}
-            spiral="rectangular"
-            rotate={(word: any) => (Math.random() > 0.5 ? 0 : 90)}
-            padding={5}
-            random={Math.random}
-            fill={(d: any, i: number) => customColors[i % customColors.length]}
-          />
+          <SimpleWordCloud words={words} />
         )}
       </div>
     </GlassCard>
