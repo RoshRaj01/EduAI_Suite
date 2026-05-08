@@ -52,14 +52,14 @@ const gameCategories = [
     icon: BarChart,
     color: "from-purple-400 to-violet-500",
   },
-  // {
-  //   id: "padlet-board",
-  //   title: "Padlet — Shared Visual Board",
-  //   description:
-  //     "Students post ideas, media, and responses on a shared visual board for collaborative ideation.",
-  //   icon: Users,
-  //   color: "from-cyan-400 to-blue-500",
-  // },
+  {
+    id: "slido-join",
+    title: "Join Live Session",
+    description:
+      "Enter a 6-digit PIN to join a classmate's live presentation. Vote on polls and ask questions in real-time.",
+    icon: Users,
+    color: "from-sky-400 to-blue-500",
+  },
   {
     id: "trello-projects",
     title: "Trello — Project Management",
@@ -107,6 +107,8 @@ export const GamesPage: React.FC = () => {
                 navigate("/games/word-cloud");
               } else if (category.id === "slido-polling") {
                 navigate("/games/slido/submit");
+              } else if (category.id === "slido-join") {
+                navigate("/games/slido/join");
               } else {
                 setSelectedGame(category.id);
               }

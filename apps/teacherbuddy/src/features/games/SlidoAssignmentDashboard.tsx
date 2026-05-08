@@ -1,6 +1,7 @@
 // TeacherBuddy - Presentation Assignments Dashboard
 // This file manages presentation assignments, submissions, and grading
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Loader2,
@@ -70,6 +71,7 @@ const formatDistanceToNowLocal = (
 };
 
 const SlidoAssignmentDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -408,16 +410,18 @@ const SlidoAssignmentDashboard: React.FC = () => {
                               <td className="px-4 py-3">
                                 <div className="flex gap-2">
                                   <button
-                                    className="p-1 hover:bg-slate-200 rounded transition"
-                                    title="View presentation"
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/games/slido/grade/${sub.id}`); }}
+                                    className="p-1.5 hover:bg-blue-50 rounded-lg transition group"
+                                    title="View & Grade"
                                   >
-                                    <Eye className="w-4 h-4 text-slate-600" />
+                                    <Eye className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
                                   </button>
                                   <button
-                                    className="p-1 hover:bg-slate-200 rounded transition"
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/games/slido/grade/${sub.id}`); }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition"
                                     title="Grade presentation"
                                   >
-                                    <Edit className="w-4 h-4 text-slate-600" />
+                                    <Edit className="w-3.5 h-3.5" /> Grade
                                   </button>
                                 </div>
                               </td>

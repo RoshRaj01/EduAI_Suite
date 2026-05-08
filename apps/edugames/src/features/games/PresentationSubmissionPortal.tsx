@@ -9,8 +9,11 @@ import {
   X,
   Clock,
   CheckCircle,
+  Radio,
+  Zap,
 } from "lucide-react";
 import InteractionStudio from "./InteractionStudio";
+import PresenterView from "./PresenterView";
 
 interface Assignment {
   id: number;
@@ -62,6 +65,7 @@ const PresentationSubmissionPortal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [studioMode, setStudioMode] = useState(false);
+  const [liveMode, setLiveMode] = useState(false);
   const studentId = localStorage.getItem("student_id") || "1";
 
   useEffect(() => {
@@ -194,6 +198,18 @@ const PresentationSubmissionPortal: React.FC = () => {
   const isOverdue =
     assignment?.deadline && isDeadlinePassed(assignment.deadline);
   const deadlinePassed = isDeadlinePassed(assignment?.deadline);
+
+  // ─── PresenterView Live Mode ──────────────────────────────
+  if (liveMode && submission) {
+    return (
+      <PresenterView
+        submissionId={submission.id}
+        fileUrl={submission.file_url}
+        fileName={submission.file_name}
+        onBack={() => setLiveMode(false)}
+      />
+    );
+  }
 
   // ─── InteractionStudio Mode ───────────────────────────────────
   if (studioMode && submission) {
@@ -343,6 +359,32 @@ const PresentationSubmissionPortal: React.FC = () => {
             >
               Submit Another File
             </button>
+
+            {submission.status === "submitted" && (
+              <button
+                onClick={() => setLiveMode(true)}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white transition"
+                style={{
+                  background: "linear-gradient(135deg, #264796, #3460c4)",
+                  boxShadow: "0 4px 16px rgba(38,71,150,0.3)",
+                }}
+              >
+                <Radio className="w-5 h-5" /> Go Live — Present Now
+              </button>
+            )}
+
+            {submission.status === "draft" && (
+              <button
+                onClick={() => setStudioMode(true)}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white transition"
+                style={{
+                  background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+                  boxShadow: "0 4px 16px rgba(124,58,237,0.3)",
+                }}
+              >
+                <Zap className="w-5 h-5" /> Open Interaction Studio
+              </button>
+            )}
           </div>
         ) : (
           <>

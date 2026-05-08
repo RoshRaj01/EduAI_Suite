@@ -316,13 +316,13 @@ const LiveSessionInterface: React.FC<Props> = ({
         {/* Pending Interaction Banner */}
         {isPresenter && pendingInteraction && (
           <div
-            className="border-t border-indigo-500/30 px-4 py-3 flex items-center justify-between"
-            style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.10))" }}
+            className="border-t border-blue-500/30 px-4 py-3 flex items-center justify-between"
+            style={{ background: "linear-gradient(135deg, rgba(38,71,150,0.15), rgba(52,96,196,0.10))" }}
           >
             <div className="flex items-center gap-3">
-              <BarChart3 className="w-5 h-5 text-indigo-400" />
+              <BarChart3 className="w-5 h-5 text-blue-400" />
               <div>
-                <p className="text-sm font-medium text-indigo-200">Interaction Ready</p>
+                <p className="text-sm font-medium text-blue-200">Interaction Ready</p>
                 <p className="text-xs text-slate-400 truncate max-w-[250px]">
                   {pendingInteraction.config.question}
                 </p>
@@ -331,7 +331,7 @@ const LiveSessionInterface: React.FC<Props> = ({
             <button
               onClick={() => launchInteraction(pendingInteraction)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition"
-              style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 4px 12px rgba(99,102,241,0.4)" }}
+              style={{ background: "linear-gradient(135deg, #264796, #3460c4)", boxShadow: "0 4px 12px rgba(38,71,150,0.4)" }}
             >
               <Zap className="w-4 h-4" /> Launch
             </button>

@@ -15,6 +15,7 @@ import { ConstructionPage } from "../shared/components/ConstructionPage";
 import { WordCloudPlayerPage } from "../features/games/WordCloudPlayerPage";
 import PresentationSubmissionPortal from "../features/games/PresentationSubmissionPortal";
 import LiveSessionInterface from "../features/games/LiveSessionInterface";
+import AudienceJoinHub from "../features/games/AudienceJoinHub";
 
 export const router = createBrowserRouter([
   {
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
       { path: "games", element: <GamesPage /> },
       { path: "games/word-cloud", element: <WordCloudPlayerPage /> },
       { path: "games/slido/submit", element: <PresentationSubmissionPortal /> },
+      { path: "games/slido/join", element: <AudienceJoinHub /> },
       { path: "games/slido/live/:pin", element: <LiveSessionInterface /> },
       { path: "games/trello", element: <TrelloBoardsPage /> },
       { path: "games/trello/:boardId", element: <TrelloBoardView /> },

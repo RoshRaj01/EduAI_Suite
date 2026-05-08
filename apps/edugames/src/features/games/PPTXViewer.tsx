@@ -62,7 +62,11 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
   const googleViewerUrl = isLocalUrl ? "" : `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
 
   // Build the actual download URL for local files
-  const downloadUrl = isLocalUrl ? `/api${fileUrl}` : fileUrl;
+  // If it's a relative path starting with /, prepend /api
+  // If it's already an absolute URL (like localhost:9000), use it as is
+  const downloadUrl = fileUrl && fileUrl.startsWith("/") && !fileUrl.startsWith("//") 
+    ? `/api${fileUrl}` 
+    : fileUrl;
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-900 text-white">
@@ -77,25 +81,46 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
           <div className="flex gap-2 bg-slate-700 p-1 rounded">
             <button
               onClick={() => setViewMode("embed")}
-              className={`px-3 py-1 text-sm rounded transition ${
+              className={`px-3 py-1 text-xs font-bold rounded transition ${
                 viewMode === "embed"
                   ? "bg-blue-600 text-white"
                   : "text-slate-300 hover:text-white"
               }`}
             >
-              View
+              PREVIEW
             </button>
             <button
               onClick={() => setViewMode("download")}
-              className={`px-3 py-1 text-sm rounded transition ${
+              className={`px-3 py-1 text-xs font-bold rounded transition ${
                 viewMode === "download"
                   ? "bg-blue-600 text-white"
                   : "text-slate-300 hover:text-white"
               }`}
             >
-              Download
+              FILES
             </button>
           </div>
+
+          {viewMode === "embed" && !isLocalUrl && (
+            <div className="flex gap-1 bg-slate-700 p-1 rounded ml-2">
+              <button
+                onClick={() => setViewerType("office")}
+                className={`px-2 py-1 text-[10px] font-black rounded transition ${
+                  viewerType === "office" ? "bg-slate-500 text-white" : "text-slate-400"
+                }`}
+              >
+                OFFICE
+              </button>
+              <button
+                onClick={() => setViewerType("fallback")}
+                className={`px-2 py-1 text-[10px] font-black rounded transition ${
+                  viewerType === "fallback" ? "bg-slate-500 text-white" : "text-slate-400"
+                }`}
+              >
+                GOOGLE
+              </button>
+            </div>
+          )}
 
           {/* Download Button */}
           <a
@@ -175,17 +200,17 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
             <div className="text-center">
               <Download className="w-16 h-16 text-slate-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">
-                {isLocalUrl ? "Presentation Uploaded" : "Download Presentation"}
+                {isLocalUrl ? "Local Preview Unavailable" : "Download Presentation"}
               </h3>
-              <p className="text-slate-400 mb-6">
+              <p className="text-slate-400 mb-6 max-w-sm mx-auto">
                 {isLocalUrl
-                  ? "Your file is stored locally. Download to preview in PowerPoint."
+                  ? "Microsoft Office Web Viewer cannot access localhost files. Download to preview in PowerPoint or use a public URL."
                   : "To view this presentation offline, download the file below."}
               </p>
               <a
                 href={downloadUrl}
                 download={fileName}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition font-medium"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition font-bold"
               >
                 <Download className="w-5 h-5" />
                 Download {fileName}

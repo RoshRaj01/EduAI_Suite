@@ -15,6 +15,7 @@ import { QuizLibraryPage } from "../features/games/QuizLibraryPage";
 import { QuizMonitoring } from "../features/games/QuizMonitoring";
 import SlidoAssignmentDashboard from "../features/games/SlidoAssignmentDashboard";
 import { LiveGradingPage } from "../features/games/LiveGradingForm";
+import SplitViewGrading from "../features/games/SplitViewGrading";
 import { TeacherAppointmentsPage } from "../features/appointments/TeacherAppointmentsPage";
 import { TeacherToolsPage } from "../features/tools/TeacherToolsPage";
 import { ClassroomsPage } from "../features/classroom/ClassroomsPage";
@@ -47,7 +48,7 @@ export const router = createBrowserRouter([
         path: "games/slido/assignments",
         element: <SlidoAssignmentDashboard />,
       },
-      { path: "games/slido/grade/:submissionId", element: <LiveGradingPage /> },
+      { path: "games/slido/grade/:submissionId", element: <SplitViewGrading /> },
       { path: "appointments", element: <TeacherAppointmentsPage /> },
       { path: "tools", element: <TeacherToolsPage /> },
       { path: "classrooms", element: <ClassroomsPage /> },
