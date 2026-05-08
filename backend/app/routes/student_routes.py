@@ -1,4 +1,6 @@
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.student import Student
@@ -6,6 +8,7 @@ from app.models.course import Course
 from app.schemas.student import StudentCreate, StudentResponse
 import csv
 import io
+import random
 
 student_router = APIRouter(prefix="/students", tags=["Students"])
 

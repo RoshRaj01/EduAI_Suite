@@ -92,7 +92,7 @@ const SplitViewGrading: React.FC = () => {
   useEffect(() => {
     const fetchSubmission = async () => {
       try {
-        const res = await fetch(`${API_ENDPOINTS.BASE}/api/slido/submissions/${submissionId}`);
+        const res = await fetch(`/api/slido/submissions/${submissionId}`);
         if (res.ok) {
           const data = await res.json();
           setSubmission(data);
@@ -131,7 +131,7 @@ const SplitViewGrading: React.FC = () => {
 
     try {
       const res = await fetch(
-        `${API_ENDPOINTS.BASE}/api/slido/submissions/${submissionId}/grade?teacher_id=${user.id}`,
+        `/api/slido/submissions/${submissionId}/grade?teacher_id=${user.id}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
