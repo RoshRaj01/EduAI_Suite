@@ -6,10 +6,10 @@ import { useAuthStore } from "../store/useAuthStore";
 
 const studentNavItems = [
   { icon: LayoutDashboard, label: "My Dashboard", href: "/", end: true },
-  { icon: BookOpen,        label: "My Classrooms",href: "/classroom" },
-  { icon: Clock,         label: "Upcoming Exams", href: "/exams" },
-  { icon: Gamepad2,        label: "EduGames",      href: "/games" },
-  { icon: Calendar,        label: "Appointments",  href: "/appointments" },
+  { icon: BookOpen, label: "My Classrooms", href: "/classroom" },
+  { icon: Clock, label: "Upcoming Exams", href: "/exams" },
+  { icon: Gamepad2, label: "EduGames", href: "/games" },
+  { icon: Calendar, label: "Appointments", href: "/appointments" },
 ];
 
 export const StudentShell: React.FC = () => {
@@ -30,7 +30,7 @@ export const StudentShell: React.FC = () => {
 
   if (!role) return null;
 
-  const initials = user?.name 
+  const initials = user?.name
     ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : "ST";
 
@@ -83,31 +83,31 @@ export const StudentShell: React.FC = () => {
               <Menu size={20} />
             </button>
           </div>
-          
-          <div className="flex items-center gap-3">
-             {/* Profile */}
-             <div className="relative">
-               <button
-                 onClick={() => setProfileOpen(o => !o)}
-                 className="flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full transition-all hover:bg-slate-100 border border-slate-200/80"
-               >
-                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow bg-emerald-500">
-                     {initials}
-                 </div>
-                 <div className="hidden md:block text-left">
-                   <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "Student"}</p>
-                   <p className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>Student</p>
-                 </div>
-               </button>
 
-               {profileOpen && (
-                 <div className="glass-card absolute right-0 top-12 w-52 z-50 overflow-hidden animate-fade-in py-1">
-                   <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                     <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "Student"}</p>
-                     <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{user?.email || "student@christuniversity.in"}</p>
-                     <span className="badge mt-2" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>Student</span>
-                   </div>
-                   {["View Profile", "Settings"].map(item => (
+          <div className="flex items-center gap-3">
+            {/* Profile */}
+            <div className="relative">
+              <button
+                onClick={() => setProfileOpen(o => !o)}
+                className="flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full transition-all hover:bg-slate-100 border border-slate-200/80"
+              >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow bg-emerald-500">
+                  {initials}
+                </div>
+                <div className="hidden md:block text-left">
+                  <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "Student"}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>Student</p>
+                </div>
+              </button>
+
+              {profileOpen && (
+                <div className="glass-card absolute right-0 top-12 w-52 z-50 overflow-hidden animate-fade-in py-1">
+                  <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                    <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "Student"}</p>
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{user?.email || "student@christuniversity.in"}</p>
+                    <span className="badge mt-2" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>Student</span>
+                  </div>
+                  {/* {["View Profile", "Settings"].map(item => (
                      <button key={item} 
                        className="w-full text-left px-4 py-2.5 text-sm transition-colors"
                        style={{ color: 'var(--color-text-secondary)' }}
@@ -116,19 +116,20 @@ export const StudentShell: React.FC = () => {
                      >
                        {item}
                      </button>
-                   ))}
-                   <div className="border-t mt-1" style={{ borderColor: 'var(--color-border)' }}>
-                     <button onClick={() => { logout(); navigate("/login"); }}
-                       className="w-full text-left px-4 py-2.5 text-sm text-red-500 transition-colors"
-                       onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
-                       onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                     >
-                       Sign Out
-                     </button>
-                   </div>
-                 </div>
-               )}
-             </div>
+                   ))} */}
+
+                  <div className="border-t mt-1" style={{ borderColor: 'var(--color-border)' }}>
+                    <button onClick={() => { logout(); navigate("/login"); }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-red-500 transition-colors"
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
