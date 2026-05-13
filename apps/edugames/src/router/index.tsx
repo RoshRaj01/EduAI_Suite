@@ -17,10 +17,16 @@ import PresentationSubmissionPortal from "../features/games/PresentationSubmissi
 import LiveSessionInterface from "../features/games/LiveSessionInterface";
 import AudienceJoinHub from "../features/games/AudienceJoinHub";
 
+import { WaitingPage } from "../features/auth/WaitingPage";
+
 export const router = createBrowserRouter([
   {
     path: "/login",
     element: <AuthPage />,
+  },
+  {
+    path: "/waiting",
+    element: <WaitingPage />,
   },
   {
     path: "/",

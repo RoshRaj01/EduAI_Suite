@@ -25,10 +25,16 @@ import { ConstructionPage } from "../shared/components/ConstructionPage";
 import { TrelloBoardsPage } from "../features/trello/TrelloBoardsPage";
 import { TrelloBoardView } from "../features/trello/TrelloBoardView";
 
+import { WaitingPage } from "../features/auth/WaitingPage";
+
 export const router = createBrowserRouter([
   {
     path: "/login",
     element: <AuthPage />,
+  },
+  {
+    path: "/waiting",
+    element: <WaitingPage />,
   },
   {
     path: "/",

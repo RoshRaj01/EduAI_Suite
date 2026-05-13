@@ -1,55 +1,56 @@
 import React, { useState } from "react";
-import { Eye, EyeOff, ArrowRight, Check, Loader } from "lucide-react";
+import { Loader } from "lucide-react";
+import { GoogleLogin } from "@react-oauth/google";
 import logo from "../../assets/logo (5).png";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigate } from "react-router-dom";
 
-type Mode = "login" | "forgot";
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const AuthPage: React.FC = () => {
-  const [mode, setMode] = useState<Mode>("login");
-  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-  const [form, setForm] = useState({ email: "", password: "" });
-  const { setRole } = useAuthStore();
+  const [error, setError] = useState("");
+  const { googleLogin } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    if (mode === "forgot") {
-      setTimeout(() => {
-        setLoading(false);
-        setDone(true);
-      }, 1500);
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    const credential = credentialResponse.credential;
+    if (!credential) {
+      setError("No credential received from Google.");
       return;
     }
 
+    setLoading(true);
+    setError("");
+
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const res = await fetch(`${API_BASE_URL}/auth/google-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ credential }),
       });
-      
-      const data = await response.json();
-      if (response.ok) {
-        localStorage.setItem("token", data.access_token);
-        // Decode token to get user details (name, email, etc.)
-        const payload = JSON.parse(atob(data.access_token.split(".")[1]));
-        localStorage.setItem("user", JSON.stringify(payload));
-        setRole(payload.role || "student");
-        navigate("/");
+
+      const data = await res.json();
+
+      if (res.ok) {
+        googleLogin(
+          data.access_token,
+          data.user,
+          data.user.role || "student",
+          data.status
+        );
+
+        if (data.status === "approved") {
+          navigate("/");
+        } else {
+          navigate("/waiting");
+        }
       } else {
-        alert(data.detail || "Invalid credentials");
+        setError(data.detail || "Authentication failed. Please try again.");
       }
     } catch (err) {
-      console.error("Login failed", err);
-      alert("Failed to connect to authentication server.");
+      console.error("Google login failed:", err);
+      setError("Failed to connect to authentication server.");
     } finally {
       setLoading(false);
     }
@@ -129,134 +130,58 @@ export const AuthPage: React.FC = () => {
               </div>
             </div>
 
-            {mode === "login" ? (
-              <>
-                <h2 className="text-2xl font-black mb-1" style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
-                  Welcome, Student!
-                </h2>
-                <p className="text-sm mb-6" style={{ color: "var(--color-text-muted)" }}>
-                  Sign in to your EduGames account.
-                </p>
+            <h2 className="text-2xl font-black mb-1" style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
+              Welcome, Student!
+            </h2>
+            <p className="text-sm mb-6" style={{ color: "var(--color-text-muted)" }}>
+              Sign in with your university Google account to get started.
+            </p>
 
-                {/* Role Selector Removed: EduGames is Strictly Student Mode */}
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--color-text-secondary)" }}>
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      className="form-input text-sm"
-                      placeholder="student@christuniversity.in"
-                      value={form.email}
-                      onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--color-text-secondary)" }}>
-                      Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPass ? "text" : "password"}
-                        className="form-input text-sm pr-10"
-                        placeholder="Enter your password"
-                        value={form.password}
-                        onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPass(s => !s)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-                        style={{ color: "var(--color-text-muted)" }}
-                      >
-                        {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" className="rounded" />
-                      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Remember me</span>
-                    </label>
-                    <button type="button" onClick={() => setMode("forgot")}
-                      className="text-xs font-semibold" style={{ color: "var(--color-brand-blue)" }}>
-                      Forgot password?
-                    </button>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn btn-primary w-full py-3 text-sm font-bold disabled:opacity-60"
-                    disabled={loading}
-                  >
-                    {loading
-                      ? <><Loader size={15} className="animate-spin" /> Signing in…</>
-                      : <>Sign In <ArrowRight size={15} /></>
-                    }
-                  </button>
-                </form>
-
-                <div className="mt-6 pt-5 border-t text-center" style={{ borderColor: "var(--color-border)" }}>
-                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                    Having trouble? Contact{" "}
-                    <a href="mailto:it@christuniversity.in" className="font-semibold" style={{ color: "var(--color-brand-blue)" }}>
-                      it@christuniversity.in
-                    </a>
-                  </p>
-                </div>
-              </>
-            ) : (
-              /* ── Forgot Password ── */
-              <>
-                <button onClick={() => { setMode("login"); setDone(false); }}
-                  className="btn btn-ghost text-xs mb-4 px-0">
-                  ← Back to Sign In
-                </button>
-                <h2 className="text-2xl font-black mb-1" style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)" }}>
-                  Reset Password
-                </h2>
-                <p className="text-sm mb-6" style={{ color: "var(--color-text-muted)" }}>
-                  Enter your university email and we'll send you a reset link.
-                </p>
-
-                {done ? (
-                  <div className="p-5 rounded-xl text-center space-y-3"
-                    style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)" }}>
-                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-                      <Check size={22} className="text-green-600" />
-                    </div>
-                    <p className="font-bold text-green-800">Email Sent!</p>
-                    <p className="text-sm text-green-700">Check your inbox for the password reset link. It expires in 30 minutes.</p>
-                    <button onClick={() => { setMode("login"); setDone(false); }} className="btn btn-outline text-sm mt-2">
-                      Return to Sign In
-                    </button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--color-text-secondary)" }}>
-                        University Email
-                      </label>
-                      <input type="email" className="form-input text-sm" placeholder="you@christuniversity.in" required />
-                    </div>
-                    <button type="submit" className="btn btn-primary w-full py-3 text-sm font-bold" disabled={loading}>
-                      {loading ? <><Loader size={15} className="animate-spin" /> Sending…</> : "Send Reset Link"}
-                    </button>
-                  </form>
-                )}
-              </>
+            {error && (
+              <div className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-semibold">
+                {error}
+              </div>
             )}
+
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-6" style={{ color: "var(--color-text-muted)" }}>
+                <Loader size={20} className="animate-spin" />
+                <span className="text-sm font-semibold">Signing you in…</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                {/* Google Sign-In Button */}
+                <div className="w-full flex justify-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => setError("Google Sign-In failed. Please try again.")}
+                    theme="outline"
+                    size="large"
+                    width="350"
+                    text="signin_with"
+                    shape="rectangular"
+                  />
+                </div>
+
+                <p className="text-xs text-center mt-2" style={{ color: "var(--color-text-muted)" }}>
+                  Use your <strong>@christuniversity.in</strong> email to sign in
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6 pt-5 border-t text-center" style={{ borderColor: "var(--color-border)" }}>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Having trouble? Contact{" "}
+                <a href="mailto:it@christuniversity.in" className="font-semibold" style={{ color: "var(--color-brand-blue)" }}>
+                  it@christuniversity.in
+                </a>
+              </p>
+            </div>
           </div>
 
           {/* SSD info */}
           <p className="text-center text-xs mt-6" style={{ color: "var(--color-text-muted)" }}>
-            Secured with TLS 1.3 · JWT Authentication · RBAC Access Control
+            Secured with TLS 1.3 · Google OAuth 2.0 · Admin Approval
           </p>
         </div>
       </div>
