@@ -7,7 +7,9 @@ and returns a JWT with user status for the approval workflow.
 import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+# pyrefly: ignore [missing-import]
 from google.oauth2 import id_token
+# pyrefly: ignore [missing-import]
 from google.auth.transport import requests as google_requests
 
 from app.database import get_db
@@ -30,10 +32,12 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
     """
     # 1. Verify the Google ID token
     try:
+        client_id = os.getenv("GOOGLE_CLIENT_ID", "")
         idinfo = id_token.verify_oauth2_token(
             body.credential,
             google_requests.Request(),
-            GOOGLE_CLIENT_ID,
+            client_id,
+            clock_skew_in_seconds=10  # Allow up to 10 seconds of clock skew
         )
     except ValueError as e:
         raise HTTPException(
@@ -59,6 +63,13 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
     if user is None:
         # New user — detect role and set as PENDING
         detected_role = detect_role_from_email(email)
+
+        if detected_role == "external":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only @christuniversity.in or valid student domains are allowed.",
+            )
+
         initial_status = (
             UserStatus.APPROVED if detected_role == "admin" else UserStatus.PENDING
         )

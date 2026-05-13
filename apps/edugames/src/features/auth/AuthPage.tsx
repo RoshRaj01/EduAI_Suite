@@ -33,6 +33,13 @@ export const AuthPage: React.FC = () => {
       const data = await res.json();
 
       if (res.ok) {
+        // Enforce app-specific role restrictions
+        if (data.user.role !== "student") {
+          setError("Access Denied: This portal is strictly for Students.");
+          setLoading(false);
+          return;
+        }
+
         googleLogin(
           data.access_token,
           data.user,
