@@ -1,0 +1,108 @@
+"""
+Google OAuth Login Route
+Verifies the Google ID token, creates or retrieves the user,
+and returns a JWT with user status for the approval workflow.
+"""
+
+import os
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+from app.database import get_db
+from app.models.user import User, UserStatus
+from app.schemas.user_schema import GoogleLoginRequest, GoogleToken
+from app.utils.auth import create_access_token
+from app.utils.role_detection import detect_role_from_email
+
+google_auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+
+
+@google_auth_router.post("/google-login", response_model=GoogleToken)
+def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
+    """
+    Accepts a Google ID token from the frontend, verifies it,
+    creates a new user (PENDING) or fetches the existing one,
+    and returns an internal JWT along with the user's approval status.
+    """
+    # 1. Verify the Google ID token
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            body.credential,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Google token: {e}",
+        )
+
+    # 2. Extract profile info
+    google_id = idinfo.get("sub")
+    email = idinfo.get("email", "").lower()
+    name = idinfo.get("name", email.split("@")[0])
+    picture = idinfo.get("picture")
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google account has no email address.",
+        )
+
+    # 3. Find or create the user
+    user = db.query(User).filter(User.email == email).first()
+
+    if user is None:
+        # New user — detect role and set as PENDING
+        detected_role = detect_role_from_email(email)
+        initial_status = (
+            UserStatus.APPROVED if detected_role == "admin" else UserStatus.PENDING
+        )
+
+        user = User(
+            name=name,
+            email=email,
+            google_id=google_id,
+            picture=picture,
+            role=detected_role,
+            status=initial_status,
+            hashed_password=None,  # No password for OAuth users
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        # Existing user — update Google fields if missing
+        changed = False
+        if not user.google_id:
+            user.google_id = google_id
+            changed = True
+        if picture and user.picture != picture:
+            user.picture = picture
+            changed = True
+        if changed:
+            db.commit()
+            db.refresh(user)
+
+    # 4. Issue internal JWT (always issued, but frontend checks status)
+    access_token = create_access_token(
+        data={"sub": user.email, "role": user.role, "name": user.name}
+    )
+
+    return GoogleToken(
+        access_token=access_token,
+        token_type="bearer",
+        status=user.status or "approved",
+        user={
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+            "status": user.status or "approved",
+            "picture": user.picture,
+        },
+    )

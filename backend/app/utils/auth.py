@@ -52,6 +52,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     if user is None:
         print(f"DEBUG AUTH: User not found for email: {email}")
         raise credentials_exception
+
+    # Block users that haven't been approved yet
+    if hasattr(user, "status") and user.status and user.status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account is {user.status}. Please wait for admin approval.",
+        )
     return user
 
 async def get_admin_user(current_user: User = Depends(get_current_user)):

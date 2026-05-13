@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from app.services.groq_service import GroqService
-from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes, analytics_routes, calendar_routes, mail_routes, quiz_routes, omr_routes, wordcloud_routes, report_routes, slido_routes, history_routes, dashboard_routes, trello_routes
+from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes, analytics_routes, calendar_routes, mail_routes, quiz_routes, omr_routes, wordcloud_routes, report_routes, slido_routes, history_routes, dashboard_routes, trello_routes, google_auth_routes, admin_routes
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.models.user import User
@@ -126,6 +126,18 @@ with engine.begin() as connection:
     except Exception as e:
         print(f"Note: quizzes migration skipped: {e}")
 
+    # Users table: add OAuth & approval columns
+    try:
+        user_columns = {column["name"] for column in inspector.get_columns("users")}
+        if "status" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN status VARCHAR DEFAULT 'approved'"))
+        if "google_id" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN google_id VARCHAR"))
+        if "picture" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN picture VARCHAR"))
+    except Exception as e:
+        print(f"Note: users OAuth migration skipped: {e}")
+
 app = FastAPI()
 
 app.add_middleware(
@@ -172,6 +184,8 @@ app.include_router(history_routes.history_router)
 app.include_router(dashboard_routes.dashboard_router)
 app.include_router(trello_routes.trello_router)
 app.include_router(websocket_routes.ws_router)
+app.include_router(google_auth_routes.google_auth_router)
+app.include_router(admin_routes.admin_router)
 
 
 @app.get("/")
