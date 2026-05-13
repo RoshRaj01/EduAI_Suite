@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from app.services.groq_service import GroqService
-from app.routes import auth_routes, course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes, analytics_routes, calendar_routes, mail_routes, quiz_routes, omr_routes, wordcloud_routes, report_routes, slido_routes, history_routes, dashboard_routes, trello_routes, google_auth_routes, admin_routes
+from app.routes import course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes, analytics_routes, calendar_routes, mail_routes, quiz_routes, omr_routes, wordcloud_routes, report_routes, slido_routes, history_routes, dashboard_routes, trello_routes, google_auth_routes, admin_routes
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.models.user import User
@@ -160,7 +160,7 @@ app.mount("/local_uploads", StaticFiles(directory=local_uploads_dir), name="loca
 GroqService.initialize()
 
 
-app.include_router(auth_routes.auth_router)
+
 app.include_router(course_routes.course_router)
 app.include_router(announcement_routes.announcement_router)
 app.include_router(resource_routes.resource_router)

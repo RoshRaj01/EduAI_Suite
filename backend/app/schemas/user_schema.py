@@ -20,12 +20,7 @@ class UserBase(BaseModel):
     employee_id: Optional[str] = None
     registration_number: Optional[str] = None
 
-class UserCreate(UserBase):
-    password: Optional[str] = "EduAI123" # Default password for newly created teachers/students
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
 
 class UserResponse(UserBase):
     id: int
