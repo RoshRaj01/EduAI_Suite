@@ -21,6 +21,7 @@ import {
   Calendar,
   ClipboardList,
   Mail,
+  Shield,
 } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import logo from "../assets/logo (5).png";
@@ -431,6 +432,25 @@ export const DashboardShell: React.FC = () => {
               )}
             </NavLink>
           ))}
+          {user?.role === "admin" && (
+            <NavLink
+              to="/admin/users"
+              end={false}
+              className={({ isActive }) =>
+                `flex items-center gap-4 px-5 py-3.5 rounded-r-full transition-all group mt-4 ${isActive
+                  ? "bg-red-500/10 text-red-600 shadow-sm"
+                  : "hover:bg-red-500/5 text-red-500"
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Shield size={22} className={isActive ? "" : "opacity-70"} />
+                  <span className={`font-medium ${isActive ? "font-semibold" : ""}`}>Access Management</span>
+                </>
+              )}
+            </NavLink>
+          )}
         </nav>
 
         <div className="p-4 border-t" style={{ borderColor: "var(--color-border)" }}>
