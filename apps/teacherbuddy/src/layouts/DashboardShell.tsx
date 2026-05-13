@@ -382,7 +382,7 @@ export const DashboardShell: React.FC = () => {
                 style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)" }}>
                 <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
                   <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "EduAI User"}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{user?.sub || "user@eduai.com"}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{user?.email || "user@eduai.com"}</p>
                 </div>
                 <div className="border-t mt-1" style={{ borderColor: 'var(--color-border)' }}>
                   <button onClick={() => { logout(); navigate("/login"); }}

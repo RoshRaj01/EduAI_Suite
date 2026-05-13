@@ -104,7 +104,7 @@ export const StudentShell: React.FC = () => {
                  <div className="glass-card absolute right-0 top-12 w-52 z-50 overflow-hidden animate-fade-in py-1">
                    <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
                      <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>{user?.name || "Student"}</p>
-                     <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{user?.sub || "student@christuniversity.in"}</p>
+                     <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{user?.email || "student@christuniversity.in"}</p>
                      <span className="badge mt-2" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>Student</span>
                    </div>
                    {["View Profile", "Settings"].map(item => (
