@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
-import { Upload, Plus, CheckSquare, AlertTriangle, FileImage, ArrowLeft, ChevronRight, CheckCircle2, Save, X, Trash2, Edit } from "lucide-react";
+import { Upload, Plus, CheckSquare, AlertTriangle, FileImage, ArrowLeft, ChevronRight, CheckCircle2, Save, X, Trash2, Edit, Download, BarChart3, Files } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
 import { API_ENDPOINTS, API_BASE_URL } from "../../shared/utils/apiConfig";
@@ -13,6 +13,9 @@ export const OMRPage: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectedSub, setSelectedSub] = useState<any>(null);
+  const [batchUploading, setBatchUploading] = useState(false);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Form states
   const [newJobTitle, setNewJobTitle] = useState("");
@@ -22,6 +25,7 @@ export const OMRPage: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keyImageRef = useRef<HTMLInputElement>(null);
+  const batchInputRef = useRef<HTMLInputElement>(null);
   const [uploadStudentId, setUploadStudentId] = useState("");
 
   useEffect(() => {
@@ -165,6 +169,38 @@ export const OMRPage: React.FC = () => {
     }
   };
 
+  const handleBatchUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !selectedJob) return;
+    setBatchUploading(true);
+    const formData = new FormData();
+    formData.append("student_ids", "");
+    Array.from(e.target.files).forEach(f => formData.append("files", f));
+    try {
+      const res = await fetch(`${API_URL}/jobs/${selectedJob.id}/upload-batch`, { method: "POST", body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Batch uploaded: ${data.count} sheets processed`);
+        fetchSubmissions(selectedJob.id);
+      }
+    } catch (err) { console.error(err); }
+    setBatchUploading(false);
+    if (batchInputRef.current) batchInputRef.current.value = '';
+  };
+
+  const downloadExport = (format: 'excel' | 'csv') => {
+    if (!selectedJob) return;
+    const url = `${API_URL}/jobs/${selectedJob.id}/export/${format}`;
+    window.open(url, '_blank');
+  };
+
+  const fetchAnalytics = async () => {
+    if (!selectedJob) return;
+    try {
+      const res = await fetch(`${API_URL}/jobs/${selectedJob.id}/analytics`);
+      if (res.ok) { setAnalytics(await res.json()); setShowAnalytics(true); }
+    } catch (e) { console.error(e); }
+  };
+
   const renderList = () => (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex items-center justify-between">
@@ -302,7 +338,7 @@ export const OMRPage: React.FC = () => {
             <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>Manage answer sheets and verifications.</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 bg-white/50 p-2 rounded-xl border border-white/20 shadow-sm">
+        <div className="flex items-center gap-3 bg-white/50 p-2 rounded-xl border border-white/20 shadow-sm flex-wrap">
           <input
             type="text"
             placeholder="Student ID (Reg No)"
@@ -312,9 +348,22 @@ export const OMRPage: React.FC = () => {
             style={{ borderColor: "var(--color-border)", background: "var(--color-surface-base)", color: "var(--color-text-primary)" }}
           />
           <button onClick={() => fileInputRef.current?.click()} className="btn btn-primary text-sm py-1.5 px-4 shadow flex items-center gap-2">
-            <Upload size={14} /> Upload Sheet Image
+            <Upload size={14} /> Upload Sheet
           </button>
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleUploadSheet} />
+          <button onClick={() => batchInputRef.current?.click()} disabled={batchUploading} className="btn btn-secondary text-sm py-1.5 px-4 shadow flex items-center gap-2">
+            <Files size={14} /> {batchUploading ? 'Uploading...' : 'Batch Upload'}
+          </button>
+          <input type="file" ref={batchInputRef} className="hidden" accept="image/*,application/pdf" multiple onChange={handleBatchUpload} />
+          <button onClick={() => downloadExport('excel')} className="btn btn-secondary text-sm py-1.5 px-3 shadow flex items-center gap-1" title="Download Excel">
+            <Download size={14} /> Excel
+          </button>
+          <button onClick={() => downloadExport('csv')} className="btn btn-secondary text-sm py-1.5 px-3 shadow flex items-center gap-1" title="Download CSV">
+            <Download size={14} /> CSV
+          </button>
+          <button onClick={fetchAnalytics} className="btn btn-secondary text-sm py-1.5 px-3 shadow flex items-center gap-1" title="Question Analytics">
+            <BarChart3 size={14} /> Analytics
+          </button>
         </div>
       </div>
 
@@ -397,8 +446,10 @@ export const OMRPage: React.FC = () => {
                   {Object.entries(selectedJob?.answer_key || {}).map(([qNo, correctAns]: [string, any]) => {
                     const detected = selectedSub.detected_answers?.[qNo] || "-";
                     const isCorrect = detected === correctAns;
+                    const isUncertain = detected === "?" || detected === "-";
+                    const bgClass = isUncertain ? 'bg-yellow-50/50 border-yellow-200' : isCorrect ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100';
                     return (
-                      <div key={qNo} className={`p-3 rounded-xl border flex items-center justify-between ${isCorrect ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
+                      <div key={qNo} className={`p-3 rounded-xl border flex items-center justify-between ${bgClass}`}>
                         <div className="flex items-center gap-4">
                           <span className="font-bold w-6 text-right" style={{ color: "var(--color-text-primary)" }}>Q{qNo}</span>
                           <div className="flex items-center gap-2">
@@ -415,11 +466,12 @@ export const OMRPage: React.FC = () => {
                               }}
                             />
                           </div>
+                          {isUncertain && <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-bold">UNCERTAIN</span>}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-500">Key:</span>
                           <span className="font-bold text-sm w-6 text-center">{correctAns}</span>
-                          {isCorrect ? <CheckCircle2 size={16} className="text-green-500 ml-2" /> : <X size={16} className="text-red-500 ml-2" />}
+                          {isUncertain ? <AlertTriangle size={16} className="text-yellow-500 ml-2" /> : isCorrect ? <CheckCircle2 size={16} className="text-green-500 ml-2" /> : <X size={16} className="text-red-500 ml-2" />}
                         </div>
                       </div>
                     );
@@ -448,6 +500,41 @@ export const OMRPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Analytics Modal */}
+      {showAnalytics && analytics && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowAnalytics(false)}>
+          <GlassCard className="max-w-3xl w-full max-h-[80vh] overflow-y-auto p-6" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>Question Analytics ({analytics.total_students} students)</h2>
+              <button onClick={() => setShowAnalytics(false)} className="p-1 rounded hover:bg-black/10"><X size={20} /></button>
+            </div>
+            <div className="space-y-3">
+              {(analytics.analysis || []).map((q: any) => {
+                const pct = q.correct_percentage;
+                const barColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+                return (
+                  <div key={q.question} className="p-3 rounded-xl border" style={{ borderColor: 'var(--color-border)' }}>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-sm">Q{q.question} (Key: {q.correct_answer})</span>
+                      <span className="text-xs px-2 py-0.5 rounded" style={{ background: barColor + '22', color: barColor }}>{q.difficulty}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2 mb-1">
+                      <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: barColor }} />
+                    </div>
+                    <div className="flex gap-4 text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                      <span className="text-green-600">✓ {q.correct_count}</span>
+                      <span className="text-red-600">✗ {q.wrong_count}</span>
+                      <span className="text-yellow-600">? {q.uncertain_count}</span>
+                      <span>{pct}% correct</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </GlassCard>
+        </div>
+      )}
     </div>
   );
 
