@@ -37,7 +37,7 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
             body.credential,
             google_requests.Request(),
             client_id,
-            clock_skew_in_seconds=10  # Allow up to 10 seconds of clock skew
+            clock_skew_in_seconds=60  # Allow up to 10 seconds of clock skew
         )
     except ValueError as e:
         raise HTTPException(
