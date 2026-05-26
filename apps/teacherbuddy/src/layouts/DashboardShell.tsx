@@ -414,17 +414,17 @@ export const DashboardShell: React.FC = () => {
               key={item.href}
               to={item.href}
               end={item.end}
-              className={({ isActive }) =>
+              className={({ isActive }: { isActive: boolean }) =>
                 `flex items-center gap-4 px-5 py-3.5 rounded-r-full transition-all group ${isActive
                   ? "bg-brand-blue/10 text-brand-blue shadow-sm"
                   : "hover:bg-brand-blue/5"
                 }`
               }
-              style={({ isActive }) => ({
+              style={({ isActive }: { isActive: boolean }) => ({
                 color: isActive ? "" : "var(--color-text-secondary)"
               })}
             >
-              {({ isActive }) => (
+              {({ isActive }: { isActive: boolean }) => (
                 <>
                   <item.icon size={22} className={isActive ? "" : "opacity-70"} />
                   <span className={`font-medium ${isActive ? "font-semibold" : ""}`}>{item.label}</span>
@@ -436,14 +436,14 @@ export const DashboardShell: React.FC = () => {
             <NavLink
               to="/admin/users"
               end={false}
-              className={({ isActive }) =>
+              className={({ isActive }: { isActive: boolean }) =>
                 `flex items-center gap-4 px-5 py-3.5 rounded-r-full transition-all group mt-4 ${isActive
                   ? "bg-red-500/10 text-red-600 shadow-sm"
                   : "hover:bg-red-500/5 text-red-500"
                 }`
               }
             >
-              {({ isActive }) => (
+              {({ isActive }: { isActive: boolean }) => (
                 <>
                   <Shield size={22} className={isActive ? "" : "opacity-70"} />
                   <span className={`font-medium ${isActive ? "font-semibold" : ""}`}>Access Management</span>

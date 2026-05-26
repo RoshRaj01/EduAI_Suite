@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Check, X, ShieldAlert, Loader } from "lucide-react";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
-import { useAuthStore } from "../../store/useAuthStore";
 
 interface PendingUser {
   id: number;
@@ -15,7 +14,6 @@ interface PendingUser {
 export const AdminUsersPage: React.FC = () => {
   const [users, setUsers] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const { token } = useAuthStore(); // if we store token, else get from localStorage
 
   const fetchPendingUsers = async () => {
     setLoading(true);
