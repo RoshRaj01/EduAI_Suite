@@ -24,7 +24,7 @@ class ChainAnswerGame(Base):
     time_per_turn = Column(Integer, default=30)  # seconds
     max_words = Column(Integer, nullable=True)
     # JSON array of suggested words
-    ollama_suggestions = Column(String, nullable=True)
+    ai_suggestions = Column(String, nullable=True)
     penalty_on_invalid = Column(Boolean, default=False)
     # skip_turn, lose_points, elimination
     penalty_type = Column(String, nullable=True)

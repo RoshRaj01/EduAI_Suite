@@ -66,7 +66,7 @@ def create_chain_answer_game(
         max_words=game_data.max_words,
         penalty_on_invalid=game_data.penalty_on_invalid,
         penalty_type=game_data.penalty_type,
-        ollama_suggestions=word_suggestions,
+        ai_suggestions=word_suggestions,
         status="setup"
     )
 

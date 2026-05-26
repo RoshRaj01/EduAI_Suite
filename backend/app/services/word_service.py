@@ -1,8 +1,8 @@
 """
 Word Service — Deterministic, local word generation and validation.
 
-Replaces LLM-based word generation (Groq/Ollama) with a self-contained
-dictionary engine using nltk WordNet and a bundled fallback word bank.
+Self-contained dictionary engine using nltk WordNet and a bundled fallback
+word bank. No external LLM dependency required for word validation.
 
 This service requires nltk to be installed:
     pip install nltk

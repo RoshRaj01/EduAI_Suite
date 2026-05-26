@@ -80,7 +80,7 @@ class ChainAnswerGameResponse(BaseModel):
     status: str
     starting_word: str
     time_per_turn: int
-    ollama_suggestions: Optional[str]
+    ai_suggestions: Optional[str]
     created_at: datetime
     started_at: Optional[datetime]
     ended_at: Optional[datetime]

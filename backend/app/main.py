@@ -70,9 +70,9 @@ with engine.begin() as connection:
         if "subject" not in chain_answer_columns:
             connection.execute(
                 text("ALTER TABLE chain_answer_games ADD COLUMN subject VARCHAR"))
-        if "ollama_suggestions" not in chain_answer_columns:
+        if "ai_suggestions" not in chain_answer_columns:
             connection.execute(
-                text("ALTER TABLE chain_answer_games ADD COLUMN ollama_suggestions VARCHAR"))
+                text("ALTER TABLE chain_answer_games ADD COLUMN ai_suggestions VARCHAR"))
     except Exception as e:
         # Table might not exist yet, SQLAlchemy will create it
         print(f"Note: chain_answer_games migration skipped: {e}")

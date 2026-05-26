@@ -308,4 +308,148 @@ Important: Each section must have real, detailed content below its header. Do no
                 "quiz_questions": ""
             }
 
+    @staticmethod
+    def generate_word_suggestions(
+        subject: str,
+        difficulty: str,
+        count: int = 5,
+        chain_variation: str = "standard",
+        starting_word: str = "apple"
+    ) -> List[str]:
+        """
+        Generate word suggestions using Groq AI for a given subject and difficulty.
+
+        Args:
+            subject: Topic/subject for word generation (e.g., "Science", "Animals")
+            difficulty: easy, medium, hard
+            count: Number of suggestions to generate (default: 5)
+            chain_variation: Type of chain game (standard, category, ladder, etc.)
+            starting_word: Starting word for context
+
+        Returns:
+            List of suggested words, or empty list if generation fails
+        """
+        if not GroqService._client:
+            logger.warning("Groq client not initialized for word suggestions")
+            return []
+
+        try:
+            difficulty_hint = {
+                "easy": "common, simple words",
+                "medium": "moderate difficulty words",
+                "hard": "challenging, uncommon words"
+            }.get(difficulty, "common words")
+
+            prompt = f"""Generate exactly {count} English words related to "{subject}" that are {difficulty_hint}.
+These words will be used in a word chain game starting with "{starting_word}".
+For a {chain_variation} chain game.
+Return ONLY the words, one per line, no numbering, no explanations."""
+
+            try:
+                message = GroqService._client.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model=DEFAULT_MODEL,
+                    temperature=0.7,
+                    max_tokens=200,
+                )
+                generated_text = message.choices[0].message.content
+            except Exception as e:
+                if "decommissioned" in str(e).lower() or "model" in str(e).lower():
+                    for alt_model in AVAILABLE_MODELS[1:]:
+                        try:
+                            message = GroqService._client.chat.completions.create(
+                                messages=[{"role": "user", "content": prompt}],
+                                model=alt_model,
+                                temperature=0.7,
+                                max_tokens=200,
+                            )
+                            generated_text = message.choices[0].message.content
+                            break
+                        except Exception:
+                            continue
+                    else:
+                        logger.error("All models failed for word generation")
+                        return []
+                else:
+                    raise
+
+            # Parse words from response
+            words = [w.strip().lower() for w in generated_text.split('\n') if w.strip()]
+            valid_words = [w for w in words if w.isalpha() and 2 <= len(w) <= 15]
+
+            logger.info(f"Generated {len(valid_words)} suggestions for subject: {subject}")
+            return valid_words[:count]
+
+        except Exception as e:
+            logger.error(f"Error generating words with Groq: {e}")
+            return []
+
+    @staticmethod
+    def validate_word_semantic(
+        word: str,
+        subject: str,
+        previous_word: str,
+        chain_context: List[str]
+    ) -> tuple:
+        """
+        Validate if a word is semantically related to the subject using Groq AI.
+
+        Args:
+            word: Word to validate
+            subject: Subject/topic context
+            previous_word: Previous word in the chain
+            chain_context: List of words already in the chain
+
+        Returns:
+            Tuple of (is_valid: bool, reason: str)
+        """
+        if not GroqService._client:
+            logger.warning("Groq client not initialized for word validation")
+            return False, "Validation service unavailable"
+
+        try:
+            chain_summary = ", ".join(chain_context[-3:]) if chain_context else previous_word
+
+            prompt = f"""Is the word "{word}" semantically related to "{subject}"?
+Context: This is part of a word chain about {subject}, following: {previous_word}
+Chain so far: {chain_summary}
+
+Answer with ONLY "yes" or "no", followed by a brief reason (max 10 words)."""
+
+            try:
+                message = GroqService._client.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model=DEFAULT_MODEL,
+                    temperature=0.3,
+                    max_tokens=50,
+                )
+                generated_text = message.choices[0].message.content.lower().strip()
+            except Exception as e:
+                if "decommissioned" in str(e).lower() or "model" in str(e).lower():
+                    for alt_model in AVAILABLE_MODELS[1:]:
+                        try:
+                            message = GroqService._client.chat.completions.create(
+                                messages=[{"role": "user", "content": prompt}],
+                                model=alt_model,
+                                temperature=0.3,
+                                max_tokens=50,
+                            )
+                            generated_text = message.choices[0].message.content.lower().strip()
+                            break
+                        except Exception:
+                            continue
+                    else:
+                        return False, "All AI models failed for validation"
+                else:
+                    raise
+
+            is_valid = generated_text.startswith("yes")
+            reason = generated_text.split('\n')[0] if '\n' in generated_text else generated_text
+
+            logger.info(f"Word validation for '{word}': {is_valid}")
+            return is_valid, reason
+
+        except Exception as e:
+            logger.error(f"Error validating word with Groq: {e}")
+            return False, f"Validation error: {str(e)}"
 

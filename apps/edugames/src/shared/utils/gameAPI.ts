@@ -28,7 +28,7 @@ export interface GameResponse {
   chain_variation: string;
   difficulty_level: string;
   subject?: string;
-  ollama_suggestions?: string;
+  ai_suggestions?: string;
   word_suggestions?: string;
   status: string;
   starting_word: string;
@@ -40,13 +40,7 @@ export interface GameResponse {
   errorMessage?: string;
 }
 
-export interface OllamaStatus {
-  ollama_available: boolean;
-  endpoint: string;
-  available_models: string[];
-  default_model: string;
-  message: string;
-}
+// OllamaStatus removed — GROQ is the sole LLM provider now
 
 export interface WordEngineStatus {
   groq_available: boolean; // kept for backward compat — always true now

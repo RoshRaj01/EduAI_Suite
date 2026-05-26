@@ -9,7 +9,6 @@ PyPDF2
 python-docx
 python-dotenv
 email-validator
-httpx
 groq
 dotenv
 pandas
