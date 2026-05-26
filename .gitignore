@@ -23,6 +23,7 @@ backend/venv/
 # ========================
 node_modules/
 dist/
+dist-ssr/
 build/
 .next/
 out/
@@ -35,6 +36,7 @@ out/
 .env.*
 !.env.example
 !**/.env.example
+*.local
 
 # ========================
 # 🧠 IDE / Editor
@@ -43,11 +45,22 @@ out/
 .vscode/
 *.swp
 *.swo
+*.sw?
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 
 # ========================
 # 📝 Logs
 # ========================
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # ========================
 # 📦 OS files
@@ -63,6 +76,7 @@ backend/uploads/announcements/
 backend/uploads/courses/
 backend/uploads/submissions/
 backend/uploads/assignments/
+backend/local_uploads/
 # backend/app/utils/
 calendar_replica/
 trello_replica/
