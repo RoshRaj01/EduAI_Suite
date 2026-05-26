@@ -1,23 +1,37 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, JSON
-from app.database import Base
+from beanie import Document
+from pydantic import Field
+from typing import Optional, Dict, Any
 from datetime import datetime
+from app.database import get_next_sequence
 
-class OMRJob(Base):
-    __tablename__ = "omr_jobs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True)
-    answer_key = Column(JSON) # e.g. {"1": "A", "2": "B"}
-    created_at = Column(String, default=lambda: datetime.utcnow().isoformat())
+class OMRJob(Document):
+    int_id: int = 0
+    title: Optional[str] = None
+    answer_key: Optional[Dict[str, str]] = None
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
-class OMRSubmission(Base):
-    __tablename__ = "omr_submissions"
+    class Settings:
+        name = "omr_jobs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(Integer, ForeignKey("omr_jobs.id"))
-    student_id = Column(String, index=True) # E.g., student name or reg_no
-    image_url = Column(String) # Path to uploaded image
-    detected_answers = Column(JSON) # e.g. {"1": "A", "2": "C"}
-    score = Column(Float, default=0)
-    status = Column(String, default="pending") # pending, verified
-    created_at = Column(String, default=lambda: datetime.utcnow().isoformat())
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("omr_jobs")
+
+
+class OMRSubmission(Document):
+    int_id: int = 0
+    job_id: int = 0
+    student_id: Optional[str] = None
+    image_url: Optional[str] = None
+    detected_answers: Optional[Dict[str, str]] = None
+    score: float = 0.0
+    status: str = "pending"
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    class Settings:
+        name = "omr_submissions"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("omr_submissions")

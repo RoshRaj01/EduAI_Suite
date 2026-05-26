@@ -1,21 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from fastapi import APIRouter, HTTPException
 from app.models.trello import TrelloBoard, TrelloColumn, TrelloCard
-from app.models.user import User
 from app.models.student import Student
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
 trello_router = APIRouter(prefix="/trello", tags=["Trello"])
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # Schemas
 class CardSchema(BaseModel):
@@ -53,38 +43,47 @@ class TrelloSyncSchema(BaseModel):
     email: str
 
 @trello_router.post("/sync")
-def sync_trello(data: TrelloSyncSchema, db: Session = Depends(get_db)):
+async def sync_trello(data: TrelloSyncSchema):
     """Synchronize local Trello state with the backend."""
-    # This is a simple implementation that overwrites or merges.
-    # In a real app, we'd handle conflicts, but here we'll use 'last write wins' 
-    # and ensure boards are accessible to the right people.
     
     # 1. Update/Create Boards
     for b in data.boards:
-        db_board = db.query(TrelloBoard).filter(TrelloBoard.id == b.id).first()
+        db_board = await TrelloBoard.find_one(TrelloBoard.id == b.id)
         if not db_board:
-            db_board = TrelloBoard(id=b.id)
-            db.add(db_board)
-        
-        db_board.name = b.name
-        db_board.background = b.background
-        db_board.creator_email = b.creatorEmail
-        db_board.starred = b.starred
-        db_board.members = b.members
-        db_board.join_requests = b.joinRequests
-        # Convert string ISO date to datetime if needed, or store as is
-        try:
-            db_board.created_at = datetime.fromisoformat(b.createdAt.replace('Z', '+00:00'))
-        except:
-            pass
+            db_board = TrelloBoard(
+                id=b.id,
+                name=b.name,
+                background=b.background,
+                creator_email=b.creatorEmail,
+                starred=b.starred,
+                members=b.members,
+                join_requests=b.joinRequests
+            )
+            try:
+                db_board.created_at = datetime.fromisoformat(b.createdAt.replace('Z', '+00:00'))
+            except:
+                db_board.created_at = datetime.utcnow()
+            await db_board.insert()
+        else:
+            db_board.name = b.name
+            db_board.background = b.background
+            db_board.creator_email = b.creatorEmail
+            db_board.starred = b.starred
+            db_board.members = b.members
+            db_board.join_requests = b.joinRequests
+            try:
+                db_board.created_at = datetime.fromisoformat(b.createdAt.replace('Z', '+00:00'))
+            except:
+                pass
+            await db_board.save()
 
     # 2. Update/Create Columns
-    # For simplicity, we'll clear and recreate columns/cards for synced boards
     board_ids = [b.id for b in data.boards]
     if board_ids:
-        db.query(TrelloColumn).filter(TrelloColumn.board_id.in_(board_ids)).delete(synchronize_session=False)
-        db.query(TrelloCard).filter(TrelloCard.board_id.in_(board_ids)).delete(synchronize_session=False)
+        await TrelloColumn.find({"board_id": {"$in": board_ids}}).delete()
+        await TrelloCard.find({"board_id": {"$in": board_ids}}).delete()
 
+    cols_to_insert = []
     for col in data.columns:
         db_col = TrelloColumn(
             id=col.id,
@@ -92,8 +91,12 @@ def sync_trello(data: TrelloSyncSchema, db: Session = Depends(get_db)):
             title=col.title,
             sequence=col.sequence
         )
-        db.add(db_col)
+        cols_to_insert.append(db_col)
+        
+    if cols_to_insert:
+        await TrelloColumn.insert_many(cols_to_insert)
 
+    cards_to_insert = []
     for card in data.cards:
         db_card = TrelloCard(
             id=card.id,
@@ -107,14 +110,15 @@ def sync_trello(data: TrelloSyncSchema, db: Session = Depends(get_db)):
             checklist=card.checklist,
             created_at=datetime.fromisoformat(card.createdAt.replace('Z', '+00:00')) if card.createdAt else datetime.utcnow()
         )
-        db.add(db_card)
-
-    db.commit()
+        cards_to_insert.append(db_card)
+        
+    if cards_to_insert:
+        await TrelloCard.insert_many(cards_to_insert)
 
 @trello_router.get("/sync")
-def pull_trello(email: str, db: Session = Depends(get_db)):
+async def pull_trello(email: str):
     """Fetch the latest Trello state from the backend without modifying it."""
-    all_boards = db.query(TrelloBoard).all()
+    all_boards = await TrelloBoard.find_all().to_list()
     accessible_boards = [
         b for b in all_boards
         if b.creator_email == email or (b.members and email in b.members)
@@ -122,8 +126,8 @@ def pull_trello(email: str, db: Session = Depends(get_db)):
     
     accessible_ids = [b.id for b in accessible_boards]
     
-    all_columns = db.query(TrelloColumn).filter(TrelloColumn.board_id.in_(accessible_ids)).all()
-    all_cards = db.query(TrelloCard).filter(TrelloCard.board_id.in_(accessible_ids)).all()
+    all_columns = await TrelloColumn.find({"board_id": {"$in": accessible_ids}}).to_list() if accessible_ids else []
+    all_cards = await TrelloCard.find({"board_id": {"$in": accessible_ids}}).to_list() if accessible_ids else []
 
     return {
         "boards": [
@@ -164,38 +168,28 @@ def pull_trello(email: str, db: Session = Depends(get_db)):
 
 
 @trello_router.get("/suggested-members")
-def get_suggested_members(email: str, role: str, db: Session = Depends(get_db)):
+async def get_suggested_members(email: str, role: str):
     """Get suggested members for a board based on the user's role and context."""
     suggestions = []
     
     if role == "student":
-        # Suggest teachers from courses this student is enrolled in
-        student_records = db.query(Student).filter(Student.email == email).all()
+        student_records = await Student.find(Student.email == email).to_list()
         course_ids = [s.course_id for s in student_records]
         if course_ids:
-            # We can find teachers of these courses. 
-            # Currently courses have teacher_name, but not teacher_email? 
-            # Let's check models again. 
-            # In useAuthStore, teacher is teacher@eduai.com
             suggestions.append({"name": "Lead Teacher", "email": "teacher@eduai.com", "role": "teacher"})
             
-            # Also find other students in the same courses
-            peers = db.query(Student).filter(
-                Student.course_id.in_(course_ids),
-                Student.email != email
-            ).limit(10).all()
+            peers = await Student.find(
+                {"course_id": {"$in": course_ids}, "email": {"$ne": email}}
+            ).limit(10).to_list()
+            
             for p in peers:
                 suggestions.append({"name": p.name, "email": p.email, "role": "student"})
     
     elif role == "teacher":
-        # Always suggest the mock student first for easier testing
         suggestions.append({"name": "Test Student", "email": "student@eduai.com", "role": "student"})
         added_emails = {"student@eduai.com"}
         
-        # Suggest all students in their courses
-        # We can find courses where teacher_name matches or just all students for now
-        # For simplicity in this mock-like environment, we'll return a few students
-        students = db.query(Student).limit(20).all()
+        students = await Student.find_all().limit(20).to_list()
         for s in students:
             if s.email not in added_emails:
                 suggestions.append({"name": s.name, "email": s.email, "role": "student"})
@@ -204,9 +198,9 @@ def get_suggested_members(email: str, role: str, db: Session = Depends(get_db)):
     return suggestions
 
 @trello_router.get("/board/{board_id}")
-def get_board_by_id(board_id: str, db: Session = Depends(get_db)):
+async def get_board_by_id(board_id: str):
     """Look up a board by ID — enables cross-app board discovery."""
-    board = db.query(TrelloBoard).filter(TrelloBoard.id == board_id).first()
+    board = await TrelloBoard.find_one(TrelloBoard.id == board_id)
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
     return {
@@ -221,9 +215,9 @@ class JoinRequestSchema(BaseModel):
     email: str
 
 @trello_router.post("/board/{board_id}/join")
-def request_join_board(board_id: str, data: JoinRequestSchema, db: Session = Depends(get_db)):
+async def request_join_board(board_id: str, data: JoinRequestSchema):
     """Submit a join request to a board — works across apps."""
-    board = db.query(TrelloBoard).filter(TrelloBoard.id == board_id).first()
+    board = await TrelloBoard.find_one(TrelloBoard.id == board_id)
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
     
@@ -240,17 +234,14 @@ def request_join_board(board_id: str, data: JoinRequestSchema, db: Session = Dep
     
     join_requests.append(data.email)
     board.join_requests = join_requests
-    # Force SQLAlchemy to detect the change on JSON column
-    from sqlalchemy.orm.attributes import flag_modified
-    flag_modified(board, "join_requests")
-    db.commit()
+    await board.save()
     
     return {"status": "requested", "message": "Join request submitted successfully"}
 
 @trello_router.post("/board/{board_id}/approve")
-def approve_join_request(board_id: str, data: JoinRequestSchema, db: Session = Depends(get_db)):
+async def approve_join_request(board_id: str, data: JoinRequestSchema):
     """Approve a join request — moves user from joinRequests to members."""
-    board = db.query(TrelloBoard).filter(TrelloBoard.id == board_id).first()
+    board = await TrelloBoard.find_one(TrelloBoard.id == board_id)
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
     
@@ -258,27 +249,22 @@ def approve_join_request(board_id: str, data: JoinRequestSchema, db: Session = D
     if data.email not in join_requests:
         raise HTTPException(status_code=400, detail="No pending request for this email")
     
-    # Remove from requests
     join_requests = [email for email in join_requests if email != data.email]
     board.join_requests = join_requests
     
-    # Add to members
     members = board.members or []
     if data.email not in members:
         members.append(data.email)
         board.members = members
     
-    from sqlalchemy.orm.attributes import flag_modified
-    flag_modified(board, "join_requests")
-    flag_modified(board, "members")
-    db.commit()
+    await board.save()
     
     return {"status": "approved", "members": board.members}
 
 @trello_router.post("/board/{board_id}/reject")
-def reject_join_request(board_id: str, data: JoinRequestSchema, db: Session = Depends(get_db)):
+async def reject_join_request(board_id: str, data: JoinRequestSchema):
     """Reject a join request — removes user from joinRequests."""
-    board = db.query(TrelloBoard).filter(TrelloBoard.id == board_id).first()
+    board = await TrelloBoard.find_one(TrelloBoard.id == board_id)
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
     
@@ -286,20 +272,17 @@ def reject_join_request(board_id: str, data: JoinRequestSchema, db: Session = De
     if data.email not in join_requests:
         raise HTTPException(status_code=400, detail="No pending request for this email")
     
-    # Remove from requests
     join_requests = [email for email in join_requests if email != data.email]
     board.join_requests = join_requests
     
-    from sqlalchemy.orm.attributes import flag_modified
-    flag_modified(board, "join_requests")
-    db.commit()
+    await board.save()
     
     return {"status": "rejected", "joinRequests": board.join_requests}
 
 @trello_router.post("/board/{board_id}/add-member")
-def add_member(board_id: str, data: JoinRequestSchema, db: Session = Depends(get_db)):
+async def add_member(board_id: str, data: JoinRequestSchema):
     """Add a member directly to a board (invitation)."""
-    board = db.query(TrelloBoard).filter(TrelloBoard.id == board_id).first()
+    board = await TrelloBoard.find_one(TrelloBoard.id == board_id)
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
     
@@ -310,24 +293,19 @@ def add_member(board_id: str, data: JoinRequestSchema, db: Session = Depends(get
     members.append(data.email)
     board.members = members
     
-    # Also remove from join requests if present
     join_requests = board.join_requests or []
     if data.email in join_requests:
         join_requests = [e for e in join_requests if e != data.email]
         board.join_requests = join_requests
-        from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(board, "join_requests")
 
-    from sqlalchemy.orm.attributes import flag_modified
-    flag_modified(board, "members")
-    db.commit()
+    await board.save()
     
     return {"status": "added", "members": board.members}
 
 @trello_router.post("/board/{board_id}/remove-member")
-def remove_member(board_id: str, data: JoinRequestSchema, db: Session = Depends(get_db)):
+async def remove_member(board_id: str, data: JoinRequestSchema):
     """Remove a member from a board."""
-    board = db.query(TrelloBoard).filter(TrelloBoard.id == board_id).first()
+    board = await TrelloBoard.find_one(TrelloBoard.id == board_id)
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
     
@@ -338,24 +316,20 @@ def remove_member(board_id: str, data: JoinRequestSchema, db: Session = Depends(
     members = [e for e in members if e != data.email]
     board.members = members
     
-    from sqlalchemy.orm.attributes import flag_modified
-    flag_modified(board, "members")
-    db.commit()
+    await board.save()
     
     return {"status": "removed", "members": board.members}
 
 @trello_router.delete("/board/{board_id}")
-def delete_board(board_id: str, db: Session = Depends(get_db)):
+async def delete_board(board_id: str):
     """Delete a board and its associated columns and cards."""
-    board = db.query(TrelloBoard).filter(TrelloBoard.id == board_id).first()
+    board = await TrelloBoard.find_one(TrelloBoard.id == board_id)
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
     
-    # Delete columns and cards first (cascading normally, but explicit is fine)
-    db.query(TrelloColumn).filter(TrelloColumn.board_id == board_id).delete(synchronize_session=False)
-    db.query(TrelloCard).filter(TrelloCard.board_id == board_id).delete(synchronize_session=False)
+    await TrelloColumn.find(TrelloColumn.board_id == board_id).delete()
+    await TrelloCard.find(TrelloCard.board_id == board_id).delete()
     
-    db.delete(board)
-    db.commit()
+    await board.delete()
     
     return {"status": "deleted", "board_id": board_id}

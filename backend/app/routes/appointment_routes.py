@@ -1,10 +1,7 @@
 from datetime import datetime
-# pyrefly: ignore [missing-import]
-from fastapi import APIRouter, Depends, HTTPException, status
-# pyrefly: ignore [missing-import]
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, status
+from typing import Optional
 
-from app.database import SessionLocal
 from app.models.appointment import Appointment
 from app.models.history import ActionHistory
 from app.schemas.appointment import AppointmentCreate, AppointmentResponse, AppointmentStatusUpdate
@@ -12,47 +9,38 @@ from app.schemas.appointment import AppointmentCreate, AppointmentResponse, Appo
 appointment_router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def _base_query(db: Session):
-    return db.query(Appointment)
-
-
 @appointment_router.get("/", response_model=list[AppointmentResponse])
-def get_appointments(
-    teacher_name: str | None = None,
-    student_name: str | None = None,
-    status: str | None = None,
-    db: Session = Depends(get_db),
+async def get_appointments(
+    teacher_name: Optional[str] = None,
+    student_name: Optional[str] = None,
+    status_filter: Optional[str] = None
 ):
-    query = _base_query(db)
+    query = Appointment.find_all()
     if teacher_name:
-        query = query.filter(Appointment.teacher_name == teacher_name)
+        query = query.find(Appointment.teacher_name == teacher_name)
     if student_name:
-        query = query.filter(Appointment.student_name == student_name)
-    if status:
-        query = query.filter(Appointment.status == status)
-    return query.order_by(Appointment.id.desc()).all()
+        query = query.find(Appointment.student_name == student_name)
+    if status_filter:
+        query = query.find(Appointment.status == status_filter)
+        
+    appointments = await query.sort("-int_id").to_list()
+    return [AppointmentResponse(**a.model_dump(), id=a.int_id) for a in appointments]
 
 
 @appointment_router.get("/teacher/{teacher_name}", response_model=list[AppointmentResponse])
-def get_teacher_appointments(teacher_name: str, db: Session = Depends(get_db)):
-    return _base_query(db).filter(Appointment.teacher_name == teacher_name).order_by(Appointment.id.desc()).all()
+async def get_teacher_appointments(teacher_name: str):
+    appointments = await Appointment.find(Appointment.teacher_name == teacher_name).sort("-int_id").to_list()
+    return [AppointmentResponse(**a.model_dump(), id=a.int_id) for a in appointments]
 
 
 @appointment_router.get("/student/{student_name}", response_model=list[AppointmentResponse])
-def get_student_appointments(student_name: str, db: Session = Depends(get_db)):
-    return _base_query(db).filter(Appointment.student_name == student_name).order_by(Appointment.id.desc()).all()
+async def get_student_appointments(student_name: str):
+    appointments = await Appointment.find(Appointment.student_name == student_name).sort("-int_id").to_list()
+    return [AppointmentResponse(**a.model_dump(), id=a.int_id) for a in appointments]
 
 
 @appointment_router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
-def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)):
+async def create_appointment(payload: AppointmentCreate):
     appointment = Appointment(
         student_name=payload.student_name,
         student_email=payload.student_email,
@@ -65,7 +53,8 @@ def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)
         status="pending",
         requested_at=datetime.utcnow().isoformat(timespec="minutes"),
     )
-    db.add(appointment)
+    await appointment.assign_id()
+    await appointment.insert()
     
     # Log to ActionHistory for notifications
     history = ActionHistory(
@@ -81,20 +70,18 @@ def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)
             "time_slot": appointment.time_slot
         }
     )
-    db.add(history)
+    await history.assign_id()
+    await history.insert()
     
-    db.commit()
-    db.refresh(appointment)
-    return appointment
+    return AppointmentResponse(**appointment.model_dump(), id=appointment.int_id)
 
 
 @appointment_router.patch("/{appointment_id}/status", response_model=AppointmentResponse)
-def update_appointment_status(
+async def update_appointment_status(
     appointment_id: int,
-    payload: AppointmentStatusUpdate,
-    db: Session = Depends(get_db),
+    payload: AppointmentStatusUpdate
 ):
-    appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    appointment = await Appointment.find_one(Appointment.int_id == appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
 
@@ -112,14 +99,14 @@ def update_appointment_status(
         result=payload.status,
         timestamp=datetime.now(),
         metadata_json={
-            "appointment_id": appointment.id,
+            "appointment_id": appointment.int_id,
             "student_name": appointment.student_name,
             "status": payload.status,
             "rejection_reason": payload.rejection_reason
         }
     )
-    db.add(history)
+    await history.assign_id()
+    await history.insert()
     
-    db.commit()
-    db.refresh(appointment)
-    return appointment
+    await appointment.save()
+    return AppointmentResponse(**appointment.model_dump(), id=appointment.int_id)

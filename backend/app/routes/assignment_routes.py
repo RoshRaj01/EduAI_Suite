@@ -1,6 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from app.models.assignment import Assignment
 from app.models.course import Course
 from app.models.announcement import Announcement
@@ -11,31 +9,23 @@ from app.utils.file_uploads import save_optional_upload
 
 assignment_router = APIRouter(prefix="/assignments", tags=["Assignments"])
 
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 @assignment_router.get("/{course_id}", response_model=list[AssignmentResponse])
-def get_assignments(course_id: int, db: Session = Depends(get_db)):
-    return db.query(Assignment).filter(Assignment.course_id == course_id).all()
-
+async def get_assignments(course_id: int):
+    assignments = await Assignment.find(Assignment.course_id == course_id).to_list()
+    return [
+        AssignmentResponse(**a.model_dump(), id=a.int_id) for a in assignments
+    ]
 
 @assignment_router.post("/{course_id}", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
-def create_assignment(
+async def create_assignment(
     course_id: int,
     title: str = Form(...),
     description: str = Form(""),
     due_date: str = Form(...),
     max_points: int = Form(100),
-    file: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db)
+    file: Optional[UploadFile] = File(None)
 ):
-    course = db.query(Course).filter(Course.id == course_id).first()
+    course = await Course.find_one(Course.int_id == course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -49,33 +39,33 @@ def create_assignment(
         max_points=max_points,
         media_path=media_path
     )
-
-    db.add(new_assignment)
-    db.commit()
-    db.refresh(new_assignment)
+    await new_assignment.assign_id()
+    await new_assignment.insert()
 
     # Auto Announcement
     now_str = datetime.now().strftime("%I:%M %p, %b %d")
-    an = Announcement(course_id=course_id, title=f"New Assignment: {title}",
-                      body=f"Assignment '{title}' has been scheduled for {due_date.replace('T', ' at ')}.", time=now_str, pinned=False)
-    db.add(an)
-    db.commit()
+    an = Announcement(
+        course_id=course_id, 
+        title=f"New Assignment: {title}",
+        body=f"Assignment '{title}' has been scheduled for {due_date.replace('T', ' at ')}.", 
+        time=now_str, 
+        pinned=False
+    )
+    await an.assign_id()
+    await an.insert()
 
-    return new_assignment
-
+    return AssignmentResponse(**new_assignment.model_dump(), id=new_assignment.int_id)
 
 @assignment_router.put("/{assignment_id}", response_model=AssignmentResponse)
-def update_assignment(
+async def update_assignment(
     assignment_id: int,
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     due_date: Optional[str] = Form(None),
     max_points: Optional[int] = Form(None),
-    file: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db),
+    file: Optional[UploadFile] = File(None)
 ):
-    assignment = db.query(Assignment).filter(
-        Assignment.id == assignment_id).first()
+    assignment = await Assignment.find_one(Assignment.int_id == assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
@@ -91,27 +81,35 @@ def update_assignment(
         assignment.media_path = save_optional_upload(file, "assignments")
 
     now_str = datetime.now().strftime("%I:%M %p, %b %d")
-    an = Announcement(course_id=assignment.course_id, title=f"Assignment Updated: {assignment.title}",
-                      body=f"Details or attachments for assignment '{assignment.title}' have been modified.", time=now_str, pinned=False)
-    db.add(an)
+    an = Announcement(
+        course_id=assignment.course_id, 
+        title=f"Assignment Updated: {assignment.title}",
+        body=f"Details or attachments for assignment '{assignment.title}' have been modified.", 
+        time=now_str, 
+        pinned=False
+    )
+    await an.assign_id()
+    await an.insert()
 
-    db.commit()
-    db.refresh(assignment)
-    return assignment
-
+    await assignment.save()
+    return AssignmentResponse(**assignment.model_dump(), id=assignment.int_id)
 
 @assignment_router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_assignment(assignment_id: int, db: Session = Depends(get_db)):
-    assignment = db.query(Assignment).filter(
-        Assignment.id == assignment_id).first()
+async def delete_assignment(assignment_id: int):
+    assignment = await Assignment.find_one(Assignment.int_id == assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     now_str = datetime.now().strftime("%I:%M %p, %b %d")
-    an = Announcement(course_id=assignment.course_id, title=f"Assignment Cancelled",
-                      body=f"Assignment '{assignment.title}' has been removed.", time=now_str, pinned=False)
-    db.add(an)
+    an = Announcement(
+        course_id=assignment.course_id, 
+        title=f"Assignment Cancelled",
+        body=f"Assignment '{assignment.title}' has been removed.", 
+        time=now_str, 
+        pinned=False
+    )
+    await an.assign_id()
+    await an.insert()
 
-    db.delete(assignment)
-    db.commit()
+    await assignment.delete()
     return None

@@ -1,13 +1,19 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
-from app.database import Base
+from beanie import Document
+from typing import Optional
+from app.database import get_next_sequence
 
-class Assignment(Base):
-    __tablename__ = "assignments"
 
-    id = Column(Integer, primary_key=True, index=True)
-    course_id = Column(Integer, ForeignKey("courses.id", ondelete="CASCADE"))
-    title = Column(String, index=True)
-    description = Column(String)
-    due_date = Column(String)
-    max_points = Column(Integer, default=100)
-    media_path = Column(String, nullable=True)
+class Assignment(Document):
+    int_id: int = 0
+    course_id: int = 0
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    max_score: float = 100.0
+
+    class Settings:
+        name = "assignments"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("assignments")

@@ -1,15 +1,23 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON
+from beanie import Document
+from pydantic import Field
+from typing import Optional, Any
 from datetime import datetime
-from app.database import Base
+from app.database import get_next_sequence
 
-class ActionHistory(Base):
-    __tablename__ = "action_history"
 
-    id = Column(Integer, primary_key=True, index=True)
-    feature = Column(String, index=True)  # e.g., "mail", "appointment", "calendar"
-    action = Column(String)               # e.g., "send_bulk_mail", "reject_appointment"
-    reaction = Column(String, nullable=True) # e.g., "rejection reason provided"
-    result = Column(String, nullable=True)   # e.g., "success", "failed"
-    timestamp = Column(DateTime, default=datetime.now)
-    user_id = Column(String, nullable=True)
-    metadata_json = Column(JSON, nullable=True) # Renamed to avoid confusion with SQLAlchemy metadata
+class ActionHistory(Document):
+    int_id: int = 0
+    feature: Optional[str] = None
+    action: Optional[str] = None
+    reaction: Optional[str] = None
+    result: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.now)
+    user_id: Optional[str] = None
+    metadata_json: Optional[dict] = None
+
+    class Settings:
+        name = "action_history"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("action_history")

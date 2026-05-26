@@ -1,8 +1,4 @@
-# pyrefly: ignore [missing-import]
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-# pyrefly: ignore [missing-import]
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from fastapi import APIRouter, HTTPException, status, UploadFile, File
 from app.models.student import Student
 from app.models.course import Course
 from app.schemas.student import StudentCreate, StudentResponse
@@ -12,28 +8,24 @@ import random
 
 student_router = APIRouter(prefix="/students", tags=["Students"])
 
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 @student_router.get("/", response_model=list[StudentResponse])
-def get_all_students(db: Session = Depends(get_db)):
-    return db.query(Student).all()
-
+async def get_all_students():
+    students = await Student.find_all().to_list()
+    # Map int_id to id for response
+    return [
+        StudentResponse(**s.model_dump(), id=s.int_id) for s in students
+    ]
 
 @student_router.get("/{course_id}", response_model=list[StudentResponse])
-def get_students(course_id: int, db: Session = Depends(get_db)):
-    return db.query(Student).filter(Student.course_id == course_id).all()
-
+async def get_students(course_id: int):
+    students = await Student.find(Student.course_id == course_id).to_list()
+    return [
+        StudentResponse(**s.model_dump(), id=s.int_id) for s in students
+    ]
 
 @student_router.post("/{course_id}", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
-def manual_enroll(course_id: int, student: StudentCreate, db: Session = Depends(get_db)):
-    course = db.query(Course).filter(Course.id == course_id).first()
+async def manual_enroll(course_id: int, student: StudentCreate):
+    course = await Course.find_one(Course.int_id == course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -44,16 +36,17 @@ def manual_enroll(course_id: int, student: StudentCreate, db: Session = Depends(
         attendance=random.randint(60, 98),
         avg_score=random.randint(55, 95)
     )
-    course.students = (course.students or 0) + 1
-    db.add(new_student)
-    db.commit()
-    db.refresh(new_student)
-    return new_student
+    await new_student.assign_id()
+    await new_student.insert()
 
+    course.students = (course.students or 0) + 1
+    await course.save()
+    
+    return StudentResponse(**new_student.model_dump(), id=new_student.int_id)
 
 @student_router.post("/bulk_upload/{course_id}", status_code=status.HTTP_201_CREATED)
-async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    course = db.query(Course).filter(Course.id == course_id).first()
+async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
+    course = await Course.find_one(Course.int_id == course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -123,74 +116,76 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...), db: Session 
             student_class = csv_match.group(4).replace('"', '').strip()
             dept = csv_match.group(5).replace('"', '').strip()
 
-        students_to_add.append(
-            Student(
-                course_id=course_id,
-                registration_number=reg_num[:20],
-                name=name[:50],
-                email=email[:50],
-                student_class=student_class[:50],
-                department=dept[:50],
-                attendance=random.randint(60, 98),
-                avg_score=random.randint(55, 95)
-            )
+        new_student = Student(
+            course_id=course_id,
+            registration_number=reg_num[:20],
+            name=name[:50],
+            email=email[:50],
+            student_class=student_class[:50],
+            department=dept[:50],
+            attendance=random.randint(60, 98),
+            avg_score=random.randint(55, 95)
         )
+        await new_student.assign_id()
+        students_to_add.append(new_student)
 
     if not students_to_add:
         raise HTTPException(status_code=400, detail="Could not extract student details using regex.")
 
-    db.bulk_save_objects(students_to_add)
+    await Student.insert_many(students_to_add)
     course.students = (course.students or 0) + len(students_to_add)
-    db.commit()
+    await course.save()
+    
     return {"message": f"Successfully enrolled {len(students_to_add)} students"}
 
-
 @student_router.post("/enroll/code", status_code=status.HTTP_201_CREATED)
-def enroll_via_code(enrollment_code: str, student: StudentCreate, db: Session = Depends(get_db)):
-    course = db.query(Course).filter(
-        Course.enrollment_code == enrollment_code).first()
+async def enroll_via_code(enrollment_code: str, student: StudentCreate):
+    course = await Course.find_one(Course.enrollment_code == enrollment_code)
     if not course:
         raise HTTPException(status_code=404, detail="Invalid enrollment code")
 
     import random
     new_student = Student(
         **student.model_dump(), 
-        course_id=course.id,
+        course_id=course.int_id,
         attendance=random.randint(60, 98),
         avg_score=random.randint(55, 95)
     )
-    course.students = (course.students or 0) + 1
-    db.add(new_student)
-    db.commit()
-    db.refresh(new_student)
-    return new_student
+    await new_student.assign_id()
+    await new_student.insert()
 
+    course.students = (course.students or 0) + 1
+    await course.save()
+    
+    return StudentResponse(**new_student.model_dump(), id=new_student.int_id)
 
 @student_router.get("/{course_id}/active", response_model=list[StudentResponse])
-def get_active_students(course_id: int, db: Session = Depends(get_db)):
+async def get_active_students(course_id: int):
     """Get all active students enrolled in a course (for games/activities)"""
-    course = db.query(Course).filter(Course.id == course_id).first()
+    course = await Course.find_one(Course.int_id == course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
     # Return students with decent attendance/engagement (active status)
-    students = db.query(Student).filter(
+    students = await Student.find(
         Student.course_id == course_id,
-        Student.attendance > 0  # Filter for active students
-    ).all()
-    return students
-
+        Student.attendance > 0
+    ).to_list()
+    
+    return [
+        StudentResponse(**s.model_dump(), id=s.int_id) for s in students
+    ]
 
 @student_router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_student(student_id: int, db: Session = Depends(get_db)):
-    student = db.query(Student).filter(Student.id == student_id).first()
+async def delete_student(student_id: int):
+    student = await Student.find_one(Student.int_id == student_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    course = db.query(Course).filter(Course.id == student.course_id).first()
+    course = await Course.find_one(Course.int_id == student.course_id)
     if course and course.students and course.students > 0:
         course.students -= 1
+        await course.save()
 
-    db.delete(student)
-    db.commit()
+    await student.delete()
     return None

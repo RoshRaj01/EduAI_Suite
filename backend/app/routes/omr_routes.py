@@ -3,10 +3,8 @@ OMR Routes — Computational grading endpoints.
 
 All grading uses OpenCV + NumPy (OMRService).  No AI / LLM calls.
 """
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from app.database import get_db
 from app.models.omr import OMRJob, OMRSubmission
 from app.services.omr_service import OMRService
 from typing import List, Optional
@@ -70,8 +68,7 @@ def _score_answers(detected: dict, answer_key: dict) -> float:
 async def create_omr_job(
     title: str = Form(...),
     answer_key: str = Form(None),
-    file: UploadFile = File(None),
-    db: Session = Depends(get_db),
+    file: UploadFile = File(None)
 ):
     if not answer_key and not file:
         raise HTTPException(400, "Must provide either answer_key JSON or an image file")
@@ -95,33 +92,43 @@ async def create_omr_job(
             raise HTTPException(400, "Invalid answer key JSON")
 
     job = OMRJob(title=title, answer_key=key_json)
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    return job
+    await job.assign_id()
+    await job.insert()
+    
+    res = job.model_dump()
+    res["id"] = job.int_id
+    return res
 
 
 @omr_router.get("/jobs")
-def get_omr_jobs(db: Session = Depends(get_db)):
-    return db.query(OMRJob).order_by(OMRJob.id.desc()).all()
+async def get_omr_jobs():
+    jobs = await OMRJob.find_all().sort("-int_id").to_list()
+    res = []
+    for j in jobs:
+        d = j.model_dump()
+        d["id"] = j.int_id
+        res.append(d)
+    return res
 
 
 @omr_router.get("/jobs/{job_id}")
-def get_omr_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
+async def get_omr_job(job_id: int):
+    job = await OMRJob.find_one(OMRJob.int_id == job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    return job
+        
+    res = job.model_dump()
+    res["id"] = job.int_id
+    return res
 
 
 @omr_router.delete("/jobs/{job_id}")
-def delete_omr_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
+async def delete_omr_job(job_id: int):
+    job = await OMRJob.find_one(OMRJob.int_id == job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    db.query(OMRSubmission).filter(OMRSubmission.job_id == job_id).delete()
-    db.delete(job)
-    db.commit()
+    await OMRSubmission.find(OMRSubmission.job_id == job_id).delete()
+    await job.delete()
     return {"message": "Job deleted successfully"}
 
 
@@ -130,10 +137,9 @@ async def update_omr_job(
     job_id: int,
     title: str = Form(...),
     answer_key: str = Form(None),
-    file: UploadFile = File(None),
-    db: Session = Depends(get_db),
+    file: UploadFile = File(None)
 ):
-    job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
+    job = await OMRJob.find_one(OMRJob.int_id == job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 
@@ -156,9 +162,11 @@ async def update_omr_job(
         except json.JSONDecodeError:
             raise HTTPException(400, "Invalid answer key JSON")
 
-    db.commit()
-    db.refresh(job)
-    return job
+    await job.save()
+    
+    res = job.model_dump()
+    res["id"] = job.int_id
+    return res
 
 
 # ── Single-sheet upload (existing) ──────────────────────────────────────
@@ -167,10 +175,9 @@ async def update_omr_job(
 async def upload_omr_sheet(
     job_id: int,
     student_id: str = Form(...),
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+    file: UploadFile = File(...)
 ):
-    job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
+    job = await OMRJob.find_one(OMRJob.int_id == job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 
@@ -203,25 +210,32 @@ async def upload_omr_sheet(
         score=final_score,
         status="pending",
     )
-    db.add(submission)
-    db.commit()
-    db.refresh(submission)
-    return submission
+    await submission.assign_id()
+    await submission.insert()
+    
+    res = submission.model_dump()
+    res["id"] = submission.int_id
+    return res
 
 
 @omr_router.get("/jobs/{job_id}/submissions")
-def get_omr_submissions(job_id: int, db: Session = Depends(get_db)):
-    return db.query(OMRSubmission).filter(OMRSubmission.job_id == job_id).all()
+async def get_omr_submissions(job_id: int):
+    subs = await OMRSubmission.find(OMRSubmission.job_id == job_id).to_list()
+    res = []
+    for s in subs:
+        d = s.model_dump()
+        d["id"] = s.int_id
+        res.append(d)
+    return res
 
 
 @omr_router.put("/submissions/{sub_id}")
-def update_submission(
+async def update_submission(
     sub_id: int,
     score: float = Form(...),
-    detected_answers: str = Form(...),
-    db: Session = Depends(get_db),
+    detected_answers: str = Form(...)
 ):
-    sub = db.query(OMRSubmission).filter(OMRSubmission.id == sub_id).first()
+    sub = await OMRSubmission.find_one(OMRSubmission.int_id == sub_id)
     if not sub:
         raise HTTPException(404, "Submission not found")
 
@@ -231,9 +245,11 @@ def update_submission(
     except json.JSONDecodeError:
         pass
     sub.status = "verified"
-    db.commit()
-    db.refresh(sub)
-    return sub
+    await sub.save()
+    
+    res = sub.model_dump()
+    res["id"] = sub.int_id
+    return res
 
 
 # ── Batch upload (NEW — Phase 3) ───────────────────────────────────────
@@ -242,8 +258,7 @@ def update_submission(
 async def upload_batch(
     job_id: int,
     student_ids: str = Form(""),
-    files: List[UploadFile] = File(...),
-    db: Session = Depends(get_db),
+    files: List[UploadFile] = File(...)
 ):
     """
     Upload multiple answer-sheet images (or a single PDF) at once.
@@ -251,7 +266,7 @@ async def upload_batch(
     student_ids: comma-separated IDs matching each file, or empty
                  (auto-generates Sheet_1, Sheet_2, …).
     """
-    job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
+    job = await OMRJob.find_one(OMRJob.int_id == job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 
@@ -263,6 +278,7 @@ async def upload_batch(
 
     # If single PDF, extract pages as images
     if len(files) == 1 and files[0].content_type == "application/pdf":
+        import cv2
         pdf_bytes = await files[0].read()
         page_images = OMRService.extract_pages_from_pdf(pdf_bytes)
         for idx, img in enumerate(page_images):
@@ -301,11 +317,10 @@ async def upload_batch(
             score=final_score,
             status="pending",
         )
-        db.add(sub)
-        db.commit()
-        db.refresh(sub)
+        await sub.assign_id()
+        await sub.insert()
         results.append({
-            "id": sub.id,
+            "id": sub.int_id,
             "student_id": sid,
             "score": final_score,
             "detected_answers": detected,
@@ -321,10 +336,10 @@ import cv2
 # ── Uncertainties (NEW — Phase 3) ──────────────────────────────────────
 
 @omr_router.get("/jobs/{job_id}/uncertainties")
-def get_uncertainties(job_id: int, db: Session = Depends(get_db)):
+async def get_uncertainties(job_id: int):
     """List all uncertain answers across submissions for a job."""
-    subs = db.query(OMRSubmission).filter(OMRSubmission.job_id == job_id).all()
-    job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
+    subs = await OMRSubmission.find(OMRSubmission.job_id == job_id).to_list()
+    job = await OMRJob.find_one(OMRJob.int_id == job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 
@@ -334,7 +349,7 @@ def get_uncertainties(job_id: int, db: Session = Depends(get_db)):
         for q_num, ans in answers.items():
             if ans in ("?", "-"):
                 uncertain_items.append({
-                    "submission_id": sub.id,
+                    "submission_id": sub.int_id,
                     "student_id": sub.student_id,
                     "question": q_num,
                     "detected": ans,
@@ -347,7 +362,7 @@ def get_uncertainties(job_id: int, db: Session = Depends(get_db)):
 # ── Export: Excel (NEW — Phase 3) ──────────────────────────────────────
 
 @omr_router.get("/jobs/{job_id}/export/excel")
-def export_excel(job_id: int, db: Session = Depends(get_db)):
+async def export_excel(job_id: int):
     """Download color-coded Excel with all submissions."""
     try:
         from openpyxl import Workbook
@@ -355,11 +370,11 @@ def export_excel(job_id: int, db: Session = Depends(get_db)):
     except ImportError:
         raise HTTPException(500, "openpyxl not installed")
 
-    job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
+    job = await OMRJob.find_one(OMRJob.int_id == job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 
-    subs = db.query(OMRSubmission).filter(OMRSubmission.job_id == job_id).all()
+    subs = await OMRSubmission.find(OMRSubmission.job_id == job_id).to_list()
     if not subs:
         raise HTTPException(404, "No submissions found")
 
@@ -420,15 +435,15 @@ def export_excel(job_id: int, db: Session = Depends(get_db)):
 # ── Export: CSV (NEW — Phase 3) ────────────────────────────────────────
 
 @omr_router.get("/jobs/{job_id}/export/csv")
-def export_csv(job_id: int, db: Session = Depends(get_db)):
+async def export_csv(job_id: int):
     """Download CSV of all submissions."""
     import csv as csv_mod
 
-    job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
+    job = await OMRJob.find_one(OMRJob.int_id == job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 
-    subs = db.query(OMRSubmission).filter(OMRSubmission.job_id == job_id).all()
+    subs = await OMRSubmission.find(OMRSubmission.job_id == job_id).to_list()
     if not subs:
         raise HTTPException(404, "No submissions found")
 
@@ -473,13 +488,13 @@ def export_csv(job_id: int, db: Session = Depends(get_db)):
 # ── Question Analytics (NEW — Phase 3) ─────────────────────────────────
 
 @omr_router.get("/jobs/{job_id}/analytics")
-def question_analytics(job_id: int, db: Session = Depends(get_db)):
+async def question_analytics(job_id: int):
     """Per-question performance breakdown."""
-    job = db.query(OMRJob).filter(OMRJob.id == job_id).first()
+    job = await OMRJob.find_one(OMRJob.int_id == job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 
-    subs = db.query(OMRSubmission).filter(OMRSubmission.job_id == job_id).all()
+    subs = await OMRSubmission.find(OMRSubmission.job_id == job_id).to_list()
     if not subs:
         return {"success": True, "total_students": 0, "analysis": []}
 

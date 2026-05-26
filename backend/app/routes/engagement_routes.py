@@ -1,28 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from app.database import SessionLocal
+from fastapi import APIRouter, HTTPException
 from app.models.student import Student
 from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.exam import Exam, ExamAttempt
-from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer, ChainAnswerGameWord
+from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer
 from app.models.course import Course
-from datetime import datetime
 import logging
 import random
 
 logger = logging.getLogger(__name__)
 
 engagement_router = APIRouter(prefix="/engagement", tags=["Engagement"])
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def _compute_engagement_level(score: float) -> str:
@@ -38,11 +26,7 @@ def _compute_engagement_level(score: float) -> str:
 
 
 def _generate_engagement_summary(student_name: str, engagement_data: dict) -> str:
-    """Generate a deterministic engagement summary using rule-based heuristics.
-
-    This is a mechanical, zero-dependency method — no LLM calls involved.
-    Grammatical variety is achieved through randomized introductory phrase pools.
-    """
+    """Generate a deterministic engagement summary using rule-based heuristics."""
 
     attendance = engagement_data.get("attendance", 0)
     eng_score = engagement_data.get("engagement_score", 0)
@@ -140,10 +124,9 @@ def _generate_engagement_summary(student_name: str, engagement_data: dict) -> st
     return " ".join(parts)
 
 
-def _get_student_engagement(student, db: Session, assignments: list):
+async def _get_student_engagement(student: Student, assignments: list):
     """Compute engagement data for a single student within a course."""
-
-    student_id_str = str(student.id)
+    student_id_str = str(student.int_id)
 
     # ── Assignment / Submission data ──────────────────────────
     total_assignments = len(assignments)
@@ -153,14 +136,14 @@ def _get_student_engagement(student, db: Session, assignments: list):
     graded_count = 0
 
     for a in assignments:
-        sub = db.query(Submission).filter(
-            Submission.assignment_id == a.id,
+        sub = await Submission.find_one(
+            Submission.assignment_id == a.int_id,
             Submission.student_name == student.name
-        ).first()
+        )
         if sub:
             submitted_count += 1
             submissions.append({
-                "assignment_id": a.id,
+                "assignment_id": a.int_id,
                 "assignment_title": a.title,
                 "due_date": a.due_date,
                 "status": "submitted",
@@ -173,7 +156,7 @@ def _get_student_engagement(student, db: Session, assignments: list):
                 graded_count += 1
         else:
             submissions.append({
-                "assignment_id": a.id,
+                "assignment_id": a.int_id,
                 "assignment_title": a.title,
                 "due_date": a.due_date,
                 "status": "missing",
@@ -186,21 +169,19 @@ def _get_student_engagement(student, db: Session, assignments: list):
     avg_grade = (total_grade / graded_count) if graded_count > 0 else None
 
     # ── Exam data ─────────────────────────────────────────────
-    # Exams use users table for student_id. Try matching by name.
     exam_attempts_raw = []
     try:
-        # Try direct student_id match first (if student was also a user)
-        exam_attempts_raw = db.query(ExamAttempt).filter(
-            ExamAttempt.student_id == student.id,
+        exam_attempts_raw = await ExamAttempt.find(
+            ExamAttempt.student_id == student.int_id,
             ExamAttempt.status == "submitted"
-        ).all()
+        ).to_list()
     except Exception:
         pass
 
     exams_data = []
     total_exam_score = 0.0
     for attempt in exam_attempts_raw:
-        exam = db.query(Exam).filter(Exam.id == attempt.exam_id).first()
+        exam = await Exam.find_one(Exam.int_id == attempt.exam_id)
         exam_title = exam.title if exam else "Unknown Exam"
         exams_data.append({
             "exam_id": attempt.exam_id,
@@ -216,9 +197,9 @@ def _get_student_engagement(student, db: Session, assignments: list):
     avg_exam_score = (total_exam_score / len(exam_attempts_raw)) if exam_attempts_raw else None
 
     # ── Game data ─────────────────────────────────────────────
-    game_players = db.query(ChainAnswerGamePlayer).filter(
+    game_players = await ChainAnswerGamePlayer.find(
         ChainAnswerGamePlayer.student_id == student_id_str
-    ).all()
+    ).to_list()
 
     games_data = []
     total_game_score = 0.0
@@ -226,9 +207,7 @@ def _get_student_engagement(student, db: Session, assignments: list):
     total_words_valid = 0
 
     for gp in game_players:
-        game = db.query(ChainAnswerGame).filter(
-            ChainAnswerGame.id == gp.game_id
-        ).first()
+        game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == gp.game_id)
         game_name = game.name if game else "Unknown Game"
         game_status = game.status if game else "unknown"
         games_data.append({
@@ -245,11 +224,10 @@ def _get_student_engagement(student, db: Session, assignments: list):
         total_words_valid += (gp.words_valid or 0)
 
     # ── Engagement Score ──────────────────────────────────────
-    # Weighted composite: attendance 25%, assignment 35%, exams 25%, games 15%
     attendance_pct = min(student.attendance or 0, 100)
     assignment_score_pct = assignment_completion
-    exam_pct = min(avg_exam_score or 0, 100) if avg_exam_score is not None else attendance_pct  # fallback
-    game_pct = min(total_game_score, 100) if game_players else attendance_pct  # fallback
+    exam_pct = min(avg_exam_score or 0, 100) if avg_exam_score is not None else attendance_pct
+    game_pct = min(total_game_score, 100) if game_players else attendance_pct
 
     engagement_score = round(
         attendance_pct * 0.25 +
@@ -292,11 +270,10 @@ def _get_student_engagement(student, db: Session, assignments: list):
             "icon": "gamepad-2"
         })
 
-    # Sort timeline by timestamp (most recent first), put None-timestamps at end
     timeline.sort(key=lambda x: x["timestamp"] or "", reverse=True)
 
     result = {
-        "student_id": student.id,
+        "student_id": student.int_id,
         "name": student.name,
         "email": student.email,
         "registration_number": student.registration_number,
@@ -328,25 +305,23 @@ def _get_student_engagement(student, db: Session, assignments: list):
             "details": games_data,
         },
 
-        "timeline": timeline[:20],  # Cap at 20 most recent
+        "timeline": timeline[:20],
     }
 
-    # Generate engagement insight summary
     result["engagement_summary"] = _generate_engagement_summary(student.name, result)
 
     return result
 
 
 @engagement_router.get("/{course_id}/summary")
-def get_course_engagement_summary(course_id: int, db: Session = Depends(get_db)):
+async def get_course_engagement_summary(course_id: int):
     """Get engagement summary for all students in a course."""
-
-    course = db.query(Course).filter(Course.id == course_id).first()
+    course = await Course.find_one(Course.int_id == course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    students = db.query(Student).filter(Student.course_id == course_id).all()
-    assignments = db.query(Assignment).filter(Assignment.course_id == course_id).all()
+    students = await Student.find(Student.course_id == course_id).to_list()
+    assignments = await Assignment.find(Assignment.course_id == course_id).to_list()
 
     if not students:
         return {
@@ -362,10 +337,9 @@ def get_course_engagement_summary(course_id: int, db: Session = Depends(get_db))
 
     all_engagement = []
     for s in students:
-        eng = _get_student_engagement(s, db, assignments)
+        eng = await _get_student_engagement(s, assignments)
         all_engagement.append(eng)
 
-    # Class-level aggregations
     total = len(all_engagement)
     avg_engagement = round(sum(e["engagement_score"] for e in all_engagement) / total, 1)
     avg_attendance = round(sum(e["attendance"] for e in all_engagement) / total, 1)
@@ -373,7 +347,6 @@ def get_course_engagement_summary(course_id: int, db: Session = Depends(get_db))
     at_risk = sum(1 for e in all_engagement if e["engagement_level"] == "at_risk")
     needs_attention = sum(1 for e in all_engagement if e["engagement_level"] == "needs_attention")
 
-    # Sort by engagement score descending
     all_engagement.sort(key=lambda x: x["engagement_score"], reverse=True)
 
     return {
@@ -390,15 +363,12 @@ def get_course_engagement_summary(course_id: int, db: Session = Depends(get_db))
 
 
 @engagement_router.get("/student/{student_id}")
-def get_student_engagement(student_id: int, db: Session = Depends(get_db)):
+async def get_student_engagement(student_id: int):
     """Get detailed engagement profile for a single student."""
-
-    student = db.query(Student).filter(Student.id == student_id).first()
+    student = await Student.find_one(Student.int_id == student_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    assignments = db.query(Assignment).filter(
-        Assignment.course_id == student.course_id
-    ).all()
+    assignments = await Assignment.find(Assignment.course_id == student.course_id).to_list()
 
-    return _get_student_engagement(student, db, assignments)
+    return await _get_student_engagement(student, assignments)

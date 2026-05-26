@@ -1,6 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from app.models.report import Report
 from app.models.student import Student
 from app.models.course import Course
@@ -15,13 +13,6 @@ import uuid
 import datetime
 
 report_router = APIRouter(prefix="/reports", tags=["Reports"])
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 class GenerateReportRequest(BaseModel):
     type: str # 'Class Report', 'Student Report', 'Analytics Export'
@@ -39,8 +30,8 @@ class ReportResponse(BaseModel):
     content: Optional[str]
 
 @report_router.get("", response_model=List[ReportResponse])
-def get_reports(db: Session = Depends(get_db)):
-    reports = db.query(Report).order_by(Report.generated_at.desc()).all()
+async def get_reports():
+    reports = await Report.find_all().sort("-generated_at").to_list()
     result = []
     for r in reports:
         result.append({
@@ -53,33 +44,33 @@ def get_reports(db: Session = Depends(get_db)):
         })
     return result
 
-def generate_report_background(report_db_id: int, type: str, target_id: int, db: Session):
-    report = db.query(Report).filter(Report.id == report_db_id).first()
+async def generate_report_background(report_db_id: int, type: str, target_id: int):
+    report = await Report.find_one(Report.int_id == report_db_id)
     if not report:
         return
     
     try:
         if type == 'Student Report':
-            student = db.query(Student).filter(Student.id == target_id).first()
+            student = await Student.find_one(Student.int_id == target_id)
             if not student:
                 report.status = "failed"
                 report.content = "Student not found"
-                db.commit()
+                await report.save()
                 return
 
             # Get grades and performance data
-            submissions = db.query(Submission).filter(Submission.student_name == student.name).all()
-            attempts = db.query(ExamAttempt).filter(ExamAttempt.student_id == student.id).all()
+            submissions = await Submission.find(Submission.student_name == student.name).to_list()
+            attempts = await ExamAttempt.find(ExamAttempt.student_id == student.int_id).to_list()
             
             sub_details = []
             for s in submissions:
-                assignment = db.query(Assignment).filter(Assignment.id == s.assignment_id).first()
+                assignment = await Assignment.find_one(Assignment.int_id == s.assignment_id)
                 title = assignment.title if assignment else "Unknown Assignment"
                 sub_details.append(f"- {title}: {s.grade}%")
 
             exam_details = []
             for a in attempts:
-                exam = db.query(Exam).filter(Exam.id == a.exam_id).first()
+                exam = await Exam.find_one(Exam.int_id == a.exam_id)
                 title = exam.title if exam else "Unknown Exam"
                 exam_details.append(f"- {title}: {a.score}%")
 
@@ -126,18 +117,18 @@ def generate_report_background(report_db_id: int, type: str, target_id: int, db:
             )
             report.content = message.choices[0].message.content
             report.status = "ready"
-            db.commit()
+            await report.save()
 
         elif type == 'Class Report':
-            course = db.query(Course).filter(Course.id == target_id).first()
+            course = await Course.find_one(Course.int_id == target_id)
             if not course:
                 report.status = "failed"
                 report.content = "Course not found"
-                db.commit()
+                await report.save()
                 return
             
             # Fetch class stats
-            students = db.query(Student).filter(Student.course_id == course.id).all()
+            students = await Student.find(Student.course_id == course.int_id).to_list()
             total_students = len(students)
             avg_attendance = sum([s.attendance for s in students])/total_students if total_students > 0 else 0
             
@@ -165,30 +156,30 @@ def generate_report_background(report_db_id: int, type: str, target_id: int, db:
             )
             report.content = message.choices[0].message.content
             report.status = "ready"
-            db.commit()
+            await report.save()
             
         else:
             report.status = "ready"
             report.content = "Analytics export data generated."
-            db.commit()
+            await report.save()
             
     except Exception as e:
         report.status = "failed"
         report.content = str(e)
-        db.commit()
+        await report.save()
 
 @report_router.post("/generate")
-def generate_report(req: GenerateReportRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def generate_report(req: GenerateReportRequest, background_tasks: BackgroundTasks):
     prefix = "RC" if req.type == 'Class Report' else "RS" if req.type == 'Student Report' else "RX"
     report_id = f"{prefix}-{str(uuid.uuid4())[:6].upper()}"
     
     name = f"Generated {req.type}"
     if req.type == 'Student Report':
-        student = db.query(Student).filter(Student.id == req.target_id).first()
+        student = await Student.find_one(Student.int_id == req.target_id)
         if student:
             name = f"Parent-Ready Report: {student.name}"
     elif req.type == 'Class Report':
-        course = db.query(Course).filter(Course.id == req.target_id).first()
+        course = await Course.find_one(Course.int_id == req.target_id)
         if course:
             name = f"Class Report - {course.name}"
             
@@ -199,17 +190,16 @@ def generate_report(req: GenerateReportRequest, background_tasks: BackgroundTask
         status="generating",
         target_id=req.target_id
     )
-    db.add(new_report)
-    db.commit()
-    db.refresh(new_report)
+    await new_report.assign_id()
+    await new_report.insert()
     
-    background_tasks.add_task(generate_report_background, new_report.id, req.type, req.target_id, db)
+    background_tasks.add_task(generate_report_background, new_report.int_id, req.type, req.target_id)
     
     return {"message": "Report generation started", "report_id": report_id}
 
 @report_router.post("/{report_id}/send")
-def send_report(report_id: str, req: SendReportRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    report = db.query(Report).filter(Report.report_id == report_id).first()
+async def send_report(report_id: str, req: SendReportRequest, background_tasks: BackgroundTasks):
+    report = await Report.find_one(Report.report_id == report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
         
@@ -218,7 +208,7 @@ def send_report(report_id: str, req: SendReportRequest, background_tasks: Backgr
         
     student_name = "Student"
     if report.type == 'Student Report' and report.target_id:
-        student = db.query(Student).filter(Student.id == report.target_id).first()
+        student = await Student.find_one(Student.int_id == report.target_id)
         if student:
             student_name = student.name
 

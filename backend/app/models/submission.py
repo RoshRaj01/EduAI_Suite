@@ -1,12 +1,19 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
-from app.database import Base
+from beanie import Document
+from typing import Optional
+from app.database import get_next_sequence
 
-class Submission(Base):
-    __tablename__ = "submissions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    assignment_id = Column(Integer, ForeignKey("assignments.id", ondelete="CASCADE"))
-    student_name = Column(String)
-    file_path = Column(String, nullable=True)
-    submitted_at = Column(String)
-    grade = Column(Float, nullable=True)
+class Submission(Document):
+    int_id: int = 0
+    assignment_id: int = 0
+    student_name: Optional[str] = None
+    file_path: Optional[str] = None
+    grade: Optional[float] = None
+    submitted_at: Optional[str] = None
+
+    class Settings:
+        name = "submissions"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("submissions")

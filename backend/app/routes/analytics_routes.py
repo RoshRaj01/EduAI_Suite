@@ -1,49 +1,38 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from app.models.exam import ExamAttempt, Exam
 from app.models.submission import Submission
-from app.models.course import Course
 from app.models.assignment import Assignment
 from app.models.student import Student
-from app.models.user import User
 from typing import List, Optional
 import pandas as pd
 import io
-import json
 import numpy as np
 from datetime import datetime
 
 analytics_router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
 @analytics_router.get("/course/{course_id}")
-def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
+async def get_course_analytics(course_id: int):
     # Get all exams for the course
-    exams = db.query(Exam).filter(Exam.course_id == course_id).all()
-    exam_ids = [e.id for e in exams]
+    exams = await Exam.find(Exam.course_id == course_id).to_list()
+    exam_ids = [e.int_id for e in exams]
     
     # Get all attempts for these exams
-    attempts = db.query(ExamAttempt).filter(ExamAttempt.exam_id.in_(exam_ids), ExamAttempt.status == "submitted").all()
+    attempts = await ExamAttempt.find({"exam_id": {"$in": exam_ids}, "status": "submitted"}).to_list()
     
     # Get all assignments for the course
-    assignments = db.query(Assignment).filter(Assignment.course_id == course_id).all()
-    assignment_ids = [a.id for a in assignments]
+    assignments = await Assignment.find(Assignment.course_id == course_id).to_list()
+    assignment_ids = [a.int_id for a in assignments]
     
     # Get all submissions for these assignments
-    submissions = db.query(Submission).filter(Submission.assignment_id.in_(assignment_ids)).all()
+    submissions = await Submission.find({"assignment_id": {"$in": assignment_ids}}).to_list()
     
     all_data = []
     for a in attempts:
+        student = await Student.find_one(Student.int_id == a.student_id)
         all_data.append({
             "student_id": a.student_id,
-            "student_name": a.student.name if a.student else "Unknown",
+            "student_name": student.name if student else "Unknown",
             "score": a.score,
             "type": "exam",
             "item_id": a.exam_id,
@@ -91,7 +80,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
     student_avgs = df.groupby('student_name')['score'].mean()
     
     # Calculate actual attendance average for the course
-    all_students = db.query(Student).filter(Student.course_id == course_id).all()
+    all_students = await Student.find(Student.course_id == course_id).to_list()
     if all_students:
         avg_attendance = sum(s.attendance or 0 for s in all_students) / len(all_students)
     else:
@@ -116,7 +105,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
         if is_risk:
             at_risk_count += 1
             risk_list.append({
-                "id": s.registration_number or f"ST-{s.id}",
+                "id": s.registration_number or f"ST-{s.int_id}",
                 "name": s.name,
                 "attendance": s_att,
                 "avgScore": float(s_avg),
@@ -125,11 +114,6 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
                 "level": "high" if (s_avg < 40 or s_att < 50) else "moderate"
             })
     
-    # If no activity data, fallback to just student list risk
-    if not all_data:
-        # (This block was already handled above, but let's ensure consistency)
-        pass
-
     df['date'] = pd.to_datetime(df['date'])
     df['month'] = df['date'].dt.strftime('%b')
     month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -138,7 +122,7 @@ def get_course_analytics(course_id: int, db: Session = Depends(get_db)):
 
     subject_stats = []
     for e in exams:
-        exam_scores = df[(df['type'] == 'exam') & (df['item_id'] == e.id)]['score']
+        exam_scores = df[(df['type'] == 'exam') & (df['item_id'] == e.int_id)]['score']
         if not exam_scores.empty:
             subject_stats.append({
                 "subject": e.title,

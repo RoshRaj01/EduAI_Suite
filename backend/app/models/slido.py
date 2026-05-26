@@ -1,183 +1,166 @@
-from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, Enum, JSON
-from sqlalchemy.orm import relationship
-from app.database import Base
+from beanie import Document
+from pydantic import BaseModel, Field
+from typing import Optional, List, Any
 from datetime import datetime
-import enum
+from app.database import get_next_sequence
 
 
-class PresentationAssignment(Base):
-    """Manages presentation assignments (similar to Google Classroom)"""
-    __tablename__ = "presentation_assignments"
+class SubmissionInteraction(Document):
+    """Stores an interaction block authored by a student for a specific slide."""
+    int_id: int = 0
+    submission_id: int = 0
+    slide_number: int = 0
+    interaction_type: Optional[str] = None
+    config: Optional[dict] = None
+    order_index: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(Integer, primary_key=True, index=True)
-    teacher_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), index=True)
-    course_id = Column(Integer, ForeignKey(
-        "courses.id", ondelete="CASCADE"), nullable=True)
-    title = Column(String, index=True)
-    description = Column(Text, nullable=True)
-    deadline = Column(DateTime, nullable=True)
-    status = Column(String, default="active")  # active, closed, archived
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    class Settings:
+        name = "submission_interactions"
 
-    submissions = relationship(
-        "PresentationSubmission", back_populates="assignment", cascade="all, delete-orphan")
-    sessions = relationship("SlidoSession", back_populates="assignment")
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("submission_interactions")
 
 
-class PresentationSubmission(Base):
-    """Tracks student submissions for presentation assignments"""
-    __tablename__ = "presentation_submissions"
+class PresentationSubmission(Document):
+    """Tracks student submissions for presentation assignments."""
+    int_id: int = 0
+    assignment_id: int = 0
+    student_id: int = 0
+    file_url: Optional[str] = None
+    file_name: Optional[str] = None
+    status: str = "draft"
+    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    is_late: bool = False
+    grade: Optional[float] = None
+    teacher_feedback: Optional[str] = None
+    graded_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(Integer, primary_key=True, index=True)
-    assignment_id = Column(Integer, ForeignKey(
-        "presentation_assignments.id", ondelete="CASCADE"), index=True)
-    student_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), index=True)
-    file_url = Column(String)  # S3/MinIO pre-signed URL
-    file_name = Column(String)
-    status = Column(String, default="draft")  # draft, submitted, graded
-    submitted_at = Column(DateTime, default=datetime.utcnow)
-    is_late = Column(Boolean, default=False)
-    grade = Column(Float, nullable=True)
-    teacher_feedback = Column(Text, nullable=True)
-    graded_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    class Settings:
+        name = "presentation_submissions"
 
-    assignment = relationship("PresentationAssignment",
-                              back_populates="submissions")
-    interactions = relationship(
-        "SubmissionInteraction", back_populates="submission", cascade="all, delete-orphan")
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("presentation_submissions")
 
 
-class SlidoSession(Base):
-    """Represents an active live presentation session"""
-    __tablename__ = "slido_sessions"
+class PresentationAssignment(Document):
+    """Manages presentation assignments."""
+    int_id: int = 0
+    teacher_id: int = 0
+    course_id: Optional[int] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    deadline: Optional[datetime] = None
+    status: str = "active"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(Integer, primary_key=True, index=True)
-    teacher_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), index=True)
-    assignment_id = Column(Integer, ForeignKey(
-        "presentation_assignments.id", ondelete="SET NULL"), nullable=True)
-    submission_id = Column(Integer, ForeignKey(
-        "presentation_submissions.id", ondelete="SET NULL"), nullable=True)
-    pin = Column(String, unique=True, index=True)  # Session PIN for joining
-    status = Column(String, default="active")  # active, paused, ended
-    # presentation, poll, qna
-    active_view = Column(String, default="presentation")
-    current_slide = Column(Integer, default=1)
-    started_at = Column(DateTime, default=datetime.utcnow)
-    ended_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    class Settings:
+        name = "presentation_assignments"
 
-    assignment = relationship("PresentationAssignment",
-                              back_populates="sessions")
-    polls = relationship("SlidoPoll", back_populates="session",
-                         cascade="all, delete-orphan")
-    qna_questions = relationship(
-        "SlidoQnA", back_populates="session", cascade="all, delete-orphan")
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("presentation_assignments")
 
 
-class SlidoPoll(Base):
-    """Represents a live poll in a presentation session"""
-    __tablename__ = "slido_polls"
+class QnAUpvote(Document):
+    """Tracks which students have upvoted a Q&A question."""
+    int_id: int = 0
+    question_id: int = 0
+    student_id: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey(
-        "slido_sessions.id", ondelete="CASCADE"), index=True)
-    teacher_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), index=True)
-    question = Column(Text)
-    # multiple_choice, rating, open_ended
-    poll_type = Column(String, default="multiple_choice")
-    is_active = Column(Boolean, default=True)
-    total_responses = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    class Settings:
+        name = "qna_upvotes"
 
-    session = relationship("SlidoSession", back_populates="polls")
-    responses = relationship(
-        "PollResponse", back_populates="poll", cascade="all, delete-orphan")
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("qna_upvotes")
 
 
-class PollResponse(Base):
-    """Represents a student's response to a poll"""
-    __tablename__ = "poll_responses"
+class SlidoQnA(Document):
+    """Represents a Q&A question in the session."""
+    int_id: int = 0
+    session_id: int = 0
+    student_id: int = 0
+    question_text: Optional[str] = None
+    is_anonymous: bool = False
+    upvotes: int = 0
+    is_answered: bool = False
+    teacher_answer: Optional[str] = None
+    answered_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(Integer, primary_key=True, index=True)
-    poll_id = Column(Integer, ForeignKey(
-        "slido_polls.id", ondelete="CASCADE"), index=True)
-    student_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), index=True)
-    # For multiple choice, this is the selected option
-    option_text = Column(String)
-    response_text = Column(Text, nullable=True)  # For open-ended questions
-    response_value = Column(Integer, nullable=True)  # For rating (1-5)
-    responded_at = Column(DateTime, default=datetime.utcnow)
+    class Settings:
+        name = "slido_qna"
 
-    poll = relationship("SlidoPoll", back_populates="responses")
-
-
-class SlidoQnA(Base):
-    """Represents a Q&A question in the session"""
-    __tablename__ = "slido_qna"
-
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey(
-        "slido_sessions.id", ondelete="CASCADE"), index=True)
-    student_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), index=True)
-    question_text = Column(Text)
-    is_anonymous = Column(Boolean, default=False)
-    upvotes = Column(Integer, default=0)
-    is_answered = Column(Boolean, default=False)
-    teacher_answer = Column(Text, nullable=True)
-    answered_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
-
-    session = relationship("SlidoSession", back_populates="qna_questions")
-    upvote_records = relationship(
-        "QnAUpvote", back_populates="question", cascade="all, delete-orphan")
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("slido_qna")
 
 
-class QnAUpvote(Base):
-    """Tracks which students have upvoted a Q&A question"""
-    __tablename__ = "qna_upvotes"
+class PollResponse(Document):
+    """Represents a student's response to a poll."""
+    int_id: int = 0
+    poll_id: int = 0
+    student_id: int = 0
+    option_text: Optional[str] = None
+    response_text: Optional[str] = None
+    response_value: Optional[int] = None
+    responded_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(Integer, primary_key=True, index=True)
-    question_id = Column(Integer, ForeignKey(
-        "slido_qna.id", ondelete="CASCADE"), index=True)
-    student_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    class Settings:
+        name = "poll_responses"
 
-    question = relationship("SlidoQnA", back_populates="upvote_records")
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("poll_responses")
 
 
-class SubmissionInteraction(Base):
-    """Stores an interaction block authored by a student for a specific slide.
-    Created during the authoring phase (before final submission).
-    Used during the live session to hydrate polls/Q&A prompts."""
-    __tablename__ = "submission_interactions"
+class SlidoPoll(Document):
+    """Represents a live poll in a presentation session."""
+    int_id: int = 0
+    session_id: int = 0
+    teacher_id: int = 0
+    question: Optional[str] = None
+    poll_type: str = "multiple_choice"
+    is_active: bool = True
+    total_responses: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(Integer, primary_key=True, index=True)
-    submission_id = Column(Integer, ForeignKey(
-        "presentation_submissions.id", ondelete="CASCADE"), index=True)
-    slide_number = Column(Integer)  # After which slide this interaction fires
-    interaction_type = Column(String)  # poll_multiple_choice, poll_open_text, poll_word_cloud, qna_prompt, poll_rating
-    config = Column(JSON)  # {"question": "...", "options": [...], "settings": {...}}
-    order_index = Column(Integer, default=0)  # Ordering when multiple interactions on same slide
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    class Settings:
+        name = "slido_polls"
 
-    submission = relationship("PresentationSubmission", back_populates="interactions")
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("slido_polls")
+
+
+class SlidoSession(Document):
+    """Represents an active live presentation session."""
+    int_id: int = 0
+    teacher_id: int = 0
+    assignment_id: Optional[int] = None
+    submission_id: Optional[int] = None
+    pin: Optional[str] = None
+    status: str = "active"
+    active_view: str = "presentation"
+    current_slide: int = 1
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    ended_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "slido_sessions"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("slido_sessions")

@@ -1,23 +1,27 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from beanie import Document
+from typing import Optional
 from datetime import datetime
-from app.database import Base
+from app.database import get_next_sequence
 
 
-class Lesson(Base):
-    __tablename__ = "lessons"
+class Lesson(Document):
+    int_id: int = 0
+    course_id: int = 0
+    title: Optional[str] = None
+    topic: str = ""
+    syllabus_context: Optional[str] = None
+    lecture_flow: Optional[str] = None
+    examples: Optional[str] = None
+    activities: Optional[str] = None
+    quiz_questions: Optional[str] = None
+    created_by: int = 0
+    posted_at: Optional[datetime] = None
+    created_at: datetime = datetime.utcnow()
+    updated_at: datetime = datetime.utcnow()
 
-    id = Column(Integer, primary_key=True, index=True)
-    course_id = Column(Integer, ForeignKey(
-        "courses.id"), nullable=False, index=True)
-    title = Column(String, nullable=True)
-    topic = Column(String, nullable=False)
-    syllabus_context = Column(Text, nullable=True)
-    lecture_flow = Column(Text, nullable=True)
-    examples = Column(Text, nullable=True)
-    activities = Column(Text, nullable=True)
-    quiz_questions = Column(Text, nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    posted_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    class Settings:
+        name = "lessons"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("lessons")

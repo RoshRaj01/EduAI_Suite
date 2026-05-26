@@ -5,30 +5,10 @@ and custom teacher events into a unified calendar feed.
 
 from datetime import datetime, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
-from app.database import Base, get_db
 
-# ── Custom Calendar Event model ──────────────────────────────
-class CalendarEvent(Base):
-    __tablename__ = "calendar_events"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
-    event_type = Column(String, default="custom")  # custom, class, meeting, reminder, deadline
-    color = Column(String, default="#264796")
-    location = Column(String, nullable=True)
-    is_all_day = Column(Boolean, default=False)
-    recurrence = Column(String, nullable=True)  # none, daily, weekly, monthly
-    teacher_name = Column(String, nullable=True)
-    course_id = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
+from app.models.calendar import CalendarEvent
 
 # ── Pydantic Schemas ─────────────────────────────────────────
 class CalendarEventCreate(BaseModel):
@@ -85,11 +65,10 @@ def _parse_date_safe(value: str) -> Optional[datetime]:
 
 
 @calendar_router.get("/events")
-def get_calendar_events(
+async def get_calendar_events(
     start: Optional[str] = None,
     end: Optional[str] = None,
     teacher_name: Optional[str] = None,
-    db: Session = Depends(get_db),
 ):
     """
     Return all calendar events (custom + aggregated from other tables)
@@ -107,18 +86,19 @@ def get_calendar_events(
     events: List[dict] = []
 
     # ── Custom events ────────────────────────────────────────
-    custom_query = db.query(CalendarEvent)
+    custom_query = CalendarEvent.find_all()
     if range_start:
-        custom_query = custom_query.filter(CalendarEvent.start_time >= range_start)
+        custom_query = custom_query.find(CalendarEvent.start_time >= range_start)
     if range_end:
-        custom_query = custom_query.filter(CalendarEvent.start_time <= range_end)
+        custom_query = custom_query.find(CalendarEvent.start_time <= range_end)
     if teacher_name:
-        custom_query = custom_query.filter(CalendarEvent.teacher_name == teacher_name)
+        custom_query = custom_query.find(CalendarEvent.teacher_name == teacher_name)
 
-    for ev in custom_query.all():
+    custom_events = await custom_query.to_list()
+    for ev in custom_events:
         events.append({
-            "id": f"custom-{ev.id}",
-            "raw_id": ev.id,
+            "id": f"custom-{ev.int_id}",
+            "raw_id": ev.int_id,
             "title": ev.title,
             "description": ev.description or "",
             "start": ev.start_time.isoformat(),
@@ -132,11 +112,11 @@ def get_calendar_events(
         })
 
     # ── Assignment deadlines ─────────────────────────────────
-    courses_map = {}
-    for course in db.query(Course).all():
-        courses_map[course.id] = course
+    courses = await Course.find_all().to_list()
+    courses_map = {c.int_id: c for c in courses}
 
-    for assg in db.query(Assignment).all():
+    assignments = await Assignment.find_all().to_list()
+    for assg in assignments:
         dt = _parse_date_safe(assg.due_date) if assg.due_date else None
         if not dt:
             continue
@@ -148,8 +128,8 @@ def get_calendar_events(
         if teacher_name and course and course.teacher_name != teacher_name:
             continue
         events.append({
-            "id": f"assignment-{assg.id}",
-            "raw_id": assg.id,
+            "id": f"assignment-{assg.int_id}",
+            "raw_id": assg.int_id,
             "title": f"📝 Due: {assg.title}",
             "description": assg.description or "",
             "start": dt.isoformat(),
@@ -163,7 +143,8 @@ def get_calendar_events(
         })
 
     # ── Exams ────────────────────────────────────────────────
-    for exam in db.query(Exam).all():
+    exams = await Exam.find_all().to_list()
+    for exam in exams:
         dt = exam.created_at
         if not dt:
             continue
@@ -175,8 +156,8 @@ def get_calendar_events(
         if teacher_name and course and course.teacher_name != teacher_name:
             continue
         events.append({
-            "id": f"exam-{exam.id}",
-            "raw_id": exam.id,
+            "id": f"exam-{exam.int_id}",
+            "raw_id": exam.int_id,
             "title": f"📋 Exam: {exam.title}",
             "description": exam.description or "",
             "start": dt.isoformat(),
@@ -190,7 +171,8 @@ def get_calendar_events(
         })
 
     # ── Appointments ─────────────────────────────────────────
-    for appt in db.query(Appointment).all():
+    appointments = await Appointment.find_all().to_list()
+    for appt in appointments:
         dt = _parse_date_safe(appt.time_slot) if appt.time_slot else None
         if not dt:
             dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
@@ -206,8 +188,8 @@ def get_calendar_events(
             continue
         status_colors = {"pending": "#d97706", "approved": "#16a34a", "rejected": "#dc2626"}
         events.append({
-            "id": f"appointment-{appt.id}",
-            "raw_id": appt.id,
+            "id": f"appointment-{appt.int_id}",
+            "raw_id": appt.int_id,
             "title": f"👤 {appt.student_name}: {appt.agenda}",
             "description": f"Mode: {appt.meeting_mode} | Booked for: {appt.time_slot}",
             "start": dt.isoformat(),
@@ -222,7 +204,8 @@ def get_calendar_events(
         })
 
     # ── Lessons ──────────────────────────────────────────────
-    for lesson in db.query(Lesson).all():
+    lessons = await Lesson.find_all().to_list()
+    for lesson in lessons:
         dt = lesson.posted_at or lesson.created_at
         if not dt:
             continue
@@ -234,8 +217,8 @@ def get_calendar_events(
         if teacher_name and course and course.teacher_name != teacher_name:
             continue
         events.append({
-            "id": f"lesson-{lesson.id}",
-            "raw_id": lesson.id,
+            "id": f"lesson-{lesson.int_id}",
+            "raw_id": lesson.int_id,
             "title": f"📖 {lesson.title or lesson.topic}",
             "description": lesson.topic,
             "start": dt.isoformat(),
@@ -254,7 +237,7 @@ def get_calendar_events(
 
 
 @calendar_router.post("/events")
-def create_calendar_event(payload: CalendarEventCreate, db: Session = Depends(get_db)):
+async def create_calendar_event(payload: CalendarEventCreate):
     """Create a new custom calendar event."""
     start_dt = _parse_date_safe(payload.start_time)
     end_dt = _parse_date_safe(payload.end_time)
@@ -274,12 +257,12 @@ def create_calendar_event(payload: CalendarEventCreate, db: Session = Depends(ge
         teacher_name=payload.teacher_name,
         course_id=payload.course_id,
     )
-    db.add(event)
-    db.commit()
-    db.refresh(event)
+    await event.assign_id()
+    await event.insert()
+
     return {
-        "id": f"custom-{event.id}",
-        "raw_id": event.id,
+        "id": f"custom-{event.int_id}",
+        "raw_id": event.int_id,
         "title": event.title,
         "start": event.start_time.isoformat(),
         "end": event.end_time.isoformat(),
@@ -291,9 +274,9 @@ def create_calendar_event(payload: CalendarEventCreate, db: Session = Depends(ge
 
 
 @calendar_router.put("/events/{event_id}")
-def update_calendar_event(event_id: int, payload: CalendarEventUpdate, db: Session = Depends(get_db)):
+async def update_calendar_event(event_id: int, payload: CalendarEventUpdate):
     """Update a custom calendar event."""
-    event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
+    event = await CalendarEvent.find_one(CalendarEvent.int_id == event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
@@ -324,11 +307,10 @@ def update_calendar_event(event_id: int, payload: CalendarEventUpdate, db: Sessi
     if payload.course_id is not None:
         event.course_id = payload.course_id
 
-    db.commit()
-    db.refresh(event)
+    await event.save()
     return {
-        "id": f"custom-{event.id}",
-        "raw_id": event.id,
+        "id": f"custom-{event.int_id}",
+        "raw_id": event.int_id,
         "title": event.title,
         "start": event.start_time.isoformat(),
         "end": event.end_time.isoformat(),
@@ -340,18 +322,17 @@ def update_calendar_event(event_id: int, payload: CalendarEventUpdate, db: Sessi
 
 
 @calendar_router.delete("/events/{event_id}")
-def delete_calendar_event(event_id: int, db: Session = Depends(get_db)):
+async def delete_calendar_event(event_id: int):
     """Delete a custom calendar event."""
-    event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
+    event = await CalendarEvent.find_one(CalendarEvent.int_id == event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    db.delete(event)
-    db.commit()
+    await event.delete()
     return {"deleted": True, "id": event_id}
 
 
 @calendar_router.get("/notifications")
-def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session = Depends(get_db)):
+async def get_calendar_notifications(teacher_name: Optional[str] = None):
     """
     Return events happening tomorrow (24h window) for in-app reminders.
     Aggregates from all sources just like /events.
@@ -369,16 +350,17 @@ def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session =
     notifications: List[dict] = []
 
     # Custom events tomorrow
-    custom_query = db.query(CalendarEvent).filter(
+    custom_query = CalendarEvent.find(
         CalendarEvent.start_time >= tomorrow_start,
         CalendarEvent.start_time < tomorrow_end,
     )
     if teacher_name:
-        custom_query = custom_query.filter(CalendarEvent.teacher_name == teacher_name)
+        custom_query = custom_query.find(CalendarEvent.teacher_name == teacher_name)
         
-    for ev in custom_query.all():
+    custom_events = await custom_query.to_list()
+    for ev in custom_events:
         notifications.append({
-            "id": f"custom-{ev.id}",
+            "id": f"custom-{ev.int_id}",
             "title": ev.title,
             "start": ev.start_time.isoformat(),
             "type": ev.event_type,
@@ -388,15 +370,18 @@ def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session =
         })
 
     # Assignment deadlines tomorrow
-    courses_map = {c.id: c for c in db.query(Course).all()}
-    for assg in db.query(Assignment).all():
+    courses = await Course.find_all().to_list()
+    courses_map = {c.int_id: c for c in courses}
+    
+    assignments = await Assignment.find_all().to_list()
+    for assg in assignments:
         dt = _parse_date_safe(assg.due_date) if assg.due_date else None
         if dt and tomorrow_start <= dt < tomorrow_end:
             course = courses_map.get(assg.course_id)
             if teacher_name and course and course.teacher_name != teacher_name:
                 continue
             notifications.append({
-                "id": f"assignment-{assg.id}",
+                "id": f"assignment-{assg.int_id}",
                 "title": f"📝 Due: {assg.title}",
                 "start": dt.isoformat(),
                 "type": "deadline",
@@ -406,14 +391,15 @@ def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session =
             })
 
     # Exams tomorrow
-    for exam in db.query(Exam).all():
+    exams = await Exam.find_all().to_list()
+    for exam in exams:
         dt = exam.created_at
         if dt and tomorrow_start <= dt < tomorrow_end:
             course = courses_map.get(exam.course_id)
             if teacher_name and course and course.teacher_name != teacher_name:
                 continue
             notifications.append({
-                "id": f"exam-{exam.id}",
+                "id": f"exam-{exam.int_id}",
                 "title": f"📋 Exam: {exam.title}",
                 "start": dt.isoformat(),
                 "type": "exam",
@@ -423,7 +409,8 @@ def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session =
             })
 
     # Appointments tomorrow
-    for appt in db.query(Appointment).all():
+    appointments = await Appointment.find_all().to_list()
+    for appt in appointments:
         dt = _parse_date_safe(appt.time_slot) if appt.time_slot else None
         if not dt:
             dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
@@ -432,7 +419,7 @@ def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session =
             if teacher_name and appt.teacher_name != teacher_name:
                 continue
             notifications.append({
-                "id": f"appointment-{appt.id}",
+                "id": f"appointment-{appt.int_id}",
                 "title": f"👤 {appt.student_name}: {appt.agenda}",
                 "start": dt.isoformat(),
                 "type": "appointment",
@@ -442,14 +429,15 @@ def get_calendar_notifications(teacher_name: Optional[str] = None, db: Session =
             })
 
     # Lessons tomorrow
-    for lesson in db.query(Lesson).all():
+    lessons = await Lesson.find_all().to_list()
+    for lesson in lessons:
         dt = lesson.posted_at or lesson.created_at
         if dt and tomorrow_start <= dt < tomorrow_end:
             course = courses_map.get(lesson.course_id)
             if teacher_name and course and course.teacher_name != teacher_name:
                 continue
             notifications.append({
-                "id": f"lesson-{lesson.id}",
+                "id": f"lesson-{lesson.int_id}",
                 "title": f"📖 {lesson.title or lesson.topic}",
                 "start": dt.isoformat(),
                 "type": "class",

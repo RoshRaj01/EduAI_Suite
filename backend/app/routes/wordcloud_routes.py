@@ -1,11 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.database import get_db
+from fastapi import APIRouter, HTTPException
 from app.models.game import WordCloudSession
 import random
 import string
 from pydantic import BaseModel
-from typing import Optional
 
 wordcloud_router = APIRouter(prefix="/wordcloud", tags=["Word Cloud"])
 
@@ -13,12 +10,12 @@ class WordCloudCreateRequest(BaseModel):
     prompt: str
 
 @wordcloud_router.post("/create")
-def create_wordcloud_session(request: WordCloudCreateRequest, db: Session = Depends(get_db)):
+async def create_wordcloud_session(request: WordCloudCreateRequest):
     # Generate 6-digit random pin
     pin = ''.join(random.choices(string.digits, k=6))
     
     # Ensure pin is unique
-    while db.query(WordCloudSession).filter(WordCloudSession.pin == pin).first() is not None:
+    while await WordCloudSession.find_one(WordCloudSession.pin == pin) is not None:
         pin = ''.join(random.choices(string.digits, k=6))
         
     session = WordCloudSession(
@@ -26,31 +23,29 @@ def create_wordcloud_session(request: WordCloudCreateRequest, db: Session = Depe
         prompt=request.prompt,
         status="active"
     )
-    db.add(session)
-    db.commit()
-    db.refresh(session)
+    await session.assign_id()
+    await session.insert()
     
-    return {"pin": pin, "prompt": session.prompt, "session_id": session.id}
+    return {"pin": pin, "prompt": session.prompt, "session_id": session.int_id}
 
 @wordcloud_router.get("/{pin}")
-def get_wordcloud_session(pin: str, db: Session = Depends(get_db)):
-    session = db.query(WordCloudSession).filter(WordCloudSession.pin == pin).first()
+async def get_wordcloud_session(pin: str):
+    session = await WordCloudSession.find_one(WordCloudSession.pin == pin)
     if not session:
         raise HTTPException(status_code=404, detail="Word Cloud session not found")
         
-    return {"prompt": session.prompt, "status": session.status, "session_id": session.id}
+    return {"prompt": session.prompt, "status": session.status, "session_id": session.int_id}
 
 @wordcloud_router.get("/")
-def get_all_wordcloud_sessions(db: Session = Depends(get_db)):
-    sessions = db.query(WordCloudSession).order_by(WordCloudSession.id.desc()).all()
-    return [{"pin": s.pin, "prompt": s.prompt, "status": s.status, "session_id": s.id, "created_at": getattr(s, 'created_at', None)} for s in sessions]
+async def get_all_wordcloud_sessions():
+    sessions = await WordCloudSession.find_all().sort("-int_id").to_list()
+    return [{"pin": s.pin, "prompt": s.prompt, "status": s.status, "session_id": s.int_id, "created_at": getattr(s, 'created_at', None)} for s in sessions]
 
 @wordcloud_router.delete("/{pin}")
-def delete_wordcloud_session(pin: str, db: Session = Depends(get_db)):
-    session = db.query(WordCloudSession).filter(WordCloudSession.pin == pin).first()
+async def delete_wordcloud_session(pin: str):
+    session = await WordCloudSession.find_one(WordCloudSession.pin == pin)
     if not session:
         raise HTTPException(status_code=404, detail="Word Cloud session not found")
         
-    db.delete(session)
-    db.commit()
+    await session.delete()
     return {"status": "success", "message": "Deleted successfully"}

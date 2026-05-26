@@ -1,6 +1,10 @@
-from sqlalchemy import Column, Integer, String, Enum
-from app.database import Base
+from beanie import Document
+from pydantic import Field
+from typing import Optional
+from datetime import datetime
+from app.database import get_next_sequence
 import enum
+
 
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
@@ -12,17 +16,22 @@ class UserStatus(str, enum.Enum):
     APPROVED = "approved"
     DENIED = "denied"
 
-class User(Base):
-    __tablename__ = "users"
+class User(Document):
+    int_id: int = 0
+    name: Optional[str] = None
+    email: str
+    hashed_password: Optional[str] = None  # Nullable for Google OAuth users
+    role: Optional[str] = None  # Storing as string for simplicity
+    status: str = UserStatus.APPROVED  # Default APPROVED for backward compat
+    google_id: Optional[str] = None
+    picture: Optional[str] = None  # Profile picture URL from Google
+    employee_id: Optional[str] = None
+    registration_number: Optional[str] = None
+    department: Optional[str] = None
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String, nullable=True)  # Nullable for Google OAuth users
-    role = Column(String) # Storing as string for simplicity, or use Enum(UserRole)
-    status = Column(String, default=UserStatus.APPROVED)  # Default APPROVED for backward compat
-    google_id = Column(String, unique=True, index=True, nullable=True)
-    picture = Column(String, nullable=True)  # Profile picture URL from Google
-    employee_id = Column(String, unique=True, nullable=True)
-    registration_number = Column(String, unique=True, nullable=True)
-    department = Column(String, nullable=True)
+    class Settings:
+        name = "users"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("users")

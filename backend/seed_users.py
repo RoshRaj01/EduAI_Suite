@@ -1,4 +1,5 @@
-from app.database import SessionLocal, Base, engine
+import asyncio
+from app.database import init_db
 from app.models.user import User
 from app.utils.auth import get_password_hash
 
@@ -40,38 +41,30 @@ USERS_TO_SEED = [
     }
 ]
 
-def seed_users():
-    # Ensure tables exist (self-healing if DB is deleted)
-    Base.metadata.create_all(bind=engine)
-    
-    db = SessionLocal()
+async def seed_users():
+    await init_db()
     print("--- Starting User Seeding Process ---")
     
     for user_data in USERS_TO_SEED:
         email = user_data["email"]
-        db_user = db.query(User).filter(User.email == email).first()
         
         # Truncate password to 72 chars to avoid bcrypt limit
         raw_password = user_data.pop("password")[:72]
         user_data["hashed_password"] = get_password_hash(raw_password)
         
-        if db_admin := db.query(User).filter(User.email == email).first():
+        db_user = await User.find_one(User.email == email)
+        if db_user:
             print(f"Updating existing user: {email}")
             for key, value in user_data.items():
-                setattr(db_admin, key, value)
+                setattr(db_user, key, value)
+            await db_user.save()
         else:
             print(f"Creating new user: {email}")
             new_user = User(**user_data)
-            db.add(new_user)
+            await new_user.assign_id()
+            await new_user.insert()
             
-    try:
-        db.commit()
-        print("--- Seeding Completed Successfully! ---")
-    except Exception as e:
-        db.rollback()
-        print(f"Error during seeding: {e}")
-    finally:
-        db.close()
+    print("--- Seeding Completed Successfully! ---")
 
 if __name__ == "__main__":
-    seed_users()
+    asyncio.run(seed_users())

@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session
 from typing import List, Optional
-from app.database import SessionLocal
 from app.models.exam import Exam, ExamQuestion, ExamChoice, ExamAttempt, ExamAnswer
 from app.schemas.exam import ExamCreate, ExamResponse, ExamAttemptCreate, ExamAttemptResponse, ExamAttemptSubmit, ExamAttemptDetailResponse, ExamReviewResponse
 from app.utils.auth import get_current_user
@@ -16,26 +14,31 @@ from datetime import datetime
 
 exam_router = APIRouter(prefix="/exams", tags=["Exams"])
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @exam_router.get("/stats")
-def get_exam_stats(db: Session = Depends(get_db)):
-    total_exams = db.query(Exam).count()
+async def get_exam_stats():
+    total_exams = await Exam.find_all().count()
     
     # Submissions today
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    submissions_today = db.query(ExamAttempt).filter(
-        ExamAttempt.status == "submitted",
-        ExamAttempt.end_time >= today
-    ).count()
+    
+    # Need to query within the nested attempts array
+    # Since attempts are embedded, we count how many exams have a submitted attempt today
+    # (A true count of all attempts across all exams is trickier with simple count, so we use aggregation if needed,
+    # but for now let's just do a simpler heuristic or find all and count in python)
+    exams = await Exam.find_all().to_list()
+    
+    submissions_today = 0
+    total_attempts = 0
+    
+    for exam in exams:
+        for attempt in exam.attempts:
+            if attempt.status == "submitted":
+                total_attempts += 1
+                if attempt.end_time and attempt.end_time >= today:
+                    submissions_today += 1
     
     # Simple average completion (this is a heuristic)
-    total_attempts = db.query(ExamAttempt).filter(ExamAttempt.status == "submitted").count()
     avg_completion = f"{min(100, (total_attempts / (total_exams * 10 or 1)) * 100):.1f}%" if total_exams > 0 else "0%"
     
     return {
@@ -46,26 +49,29 @@ def get_exam_stats(db: Session = Depends(get_db)):
     }
 
 @exam_router.get("/", response_model=List[ExamResponse])
-def get_all_exams(course_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def get_all_exams(course_id: Optional[int] = None, current_user: User = Depends(get_current_user)):
     if current_user.role == "student":
         # Find the student record to get the course_id
-        student = db.query(Student).filter(Student.email == current_user.email).first()
+        student = await Student.find_one(Student.email == current_user.email)
         if not student:
             return []
         # Students only see published exams for their course
-        return db.query(Exam).filter(
+        exams = await Exam.find(
             Exam.course_id == student.course_id,
             Exam.status == "published"
-        ).all()
+        ).to_list()
+        return [ExamResponse(**e.model_dump(), id=e.int_id) for e in exams]
     
     # Teachers/Admins can see all or filter by course_id
-    query = db.query(Exam)
+    query = Exam.find_all()
     if course_id:
-        query = query.filter(Exam.course_id == course_id)
-    return query.all()
+        query = query.find(Exam.course_id == course_id)
+        
+    exams = await query.to_list()
+    return [ExamResponse(**e.model_dump(), id=e.int_id) for e in exams]
 
 @exam_router.post("/", response_model=ExamResponse)
-def create_exam(exam_data: ExamCreate, db: Session = Depends(get_db)):
+async def create_exam(exam_data: ExamCreate):
     new_exam = Exam(
         course_id=exam_data.course_id,
         title=exam_data.title,
@@ -75,113 +81,131 @@ def create_exam(exam_data: ExamCreate, db: Session = Depends(get_db)):
         randomize_questions=exam_data.randomize_questions,
         status=exam_data.status
     )
-    db.add(new_exam)
-    db.commit()
-    db.refresh(new_exam)
+    await new_exam.assign_id()
 
+    question_id_counter = 1
+    choice_id_counter = 1
+    
     for i, q_data in enumerate(exam_data.questions):
         new_question = ExamQuestion(
-            exam_id=new_exam.id,
+            int_id=question_id_counter,
             question_text=q_data.question_text,
             question_type=q_data.question_type,
             points=q_data.points,
             order=q_data.order or i
         )
-        db.add(new_question)
-        db.flush() # Ensures the question ID is generated for the choices
+        question_id_counter += 1
 
         for choice_data in q_data.choices:
             new_choice = ExamChoice(
-                question_id=new_question.id,
+                int_id=choice_id_counter,
                 choice_text=choice_data.choice_text,
                 is_correct=choice_data.is_correct
             )
-            db.add(new_choice)
+            choice_id_counter += 1
+            new_question.choices.append(new_choice)
+            
+        new_exam.questions.append(new_question)
     
-    db.commit()
-    db.refresh(new_exam)
-    return new_exam
+    await new_exam.insert()
+    return ExamResponse(**new_exam.model_dump(), id=new_exam.int_id)
 
 @exam_router.get("/course/{course_id}", response_model=List[ExamResponse])
-def get_course_exams(course_id: int, db: Session = Depends(get_db)):
-    return db.query(Exam).filter(Exam.course_id == course_id).all()
+async def get_course_exams(course_id: int):
+    exams = await Exam.find(Exam.course_id == course_id).to_list()
+    return [ExamResponse(**e.model_dump(), id=e.int_id) for e in exams]
 
 @exam_router.get("/{exam_id}", response_model=ExamResponse)
-def get_exam(exam_id: int, db: Session = Depends(get_db)):
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+async def get_exam(exam_id: int):
+    exam = await Exam.find_one(Exam.int_id == exam_id)
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-    return exam
+    return ExamResponse(**exam.model_dump(), id=exam.int_id)
 
 @exam_router.post("/{exam_id}/start", response_model=ExamAttemptResponse)
-def start_exam_attempt(exam_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+async def start_exam_attempt(exam_id: int, current_user: User = Depends(get_current_user)):
+    exam = await Exam.find_one(Exam.int_id == exam_id)
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
     # Check for existing in-progress attempt to allow resuming
-    existing_attempt = db.query(ExamAttempt).filter(
-        ExamAttempt.exam_id == exam_id,
-        ExamAttempt.student_id == current_user.id,
-        ExamAttempt.status == "in_progress"
-    ).first()
+    existing_attempt = next((a for a in exam.attempts if a.student_id == current_user.int_id and a.status == "in_progress"), None)
     
     if existing_attempt:
-        return existing_attempt
+        res = existing_attempt.model_dump()
+        res["id"] = existing_attempt.int_id
+        res["exam_id"] = exam.int_id
+        return res
     
     # Check completed attempts
-    completed_attempts = db.query(ExamAttempt).filter(
-        ExamAttempt.exam_id == exam_id, 
-        ExamAttempt.student_id == current_user.id,
-        ExamAttempt.status != "in_progress"
-    ).count()
+    completed_attempts = sum(1 for a in exam.attempts if a.student_id == current_user.int_id and a.status != "in_progress")
     
     if completed_attempts >= exam.attempts_allowed:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Maximum attempts reached")
 
+    attempt_id = max([a.int_id for a in exam.attempts] + [0]) + 1
+    
     new_attempt = ExamAttempt(
-        exam_id=exam_id,
-        student_id=current_user.id,
+        int_id=attempt_id,
+        student_id=current_user.int_id,
         status="in_progress"
     )
-    db.add(new_attempt)
-    db.commit()
-    db.refresh(new_attempt)
-    return new_attempt
+    
+    exam.attempts.append(new_attempt)
+    await exam.save()
+    
+    res = new_attempt.model_dump()
+    res["id"] = new_attempt.int_id
+    res["exam_id"] = exam.int_id
+    return res
 
 @exam_router.post("/attempts/{attempt_id}/submit", response_model=ExamAttemptResponse)
-def submit_exam_attempt(attempt_id: int, submission: ExamAttemptSubmit, db: Session = Depends(get_db)):
-    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == attempt_id).first()
-    if not attempt:
+async def submit_exam_attempt(attempt_id: int, submission: ExamAttemptSubmit):
+    # Find the exam containing this attempt
+    exam = await Exam.find_one({"attempts.int_id": attempt_id})
+    if not exam:
         raise HTTPException(status_code=404, detail="Attempt not found")
+        
+    attempt_idx = next((i for i, a in enumerate(exam.attempts) if a.int_id == attempt_id), -1)
+    if attempt_idx == -1:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+        
+    attempt = exam.attempts[attempt_idx]
     
     if attempt.status != "in_progress":
         raise HTTPException(status_code=400, detail="Attempt already submitted or invalid")
 
     total_score = 0.0
+    answer_id_counter = max([ans.int_id for ans in attempt.answers] + [0]) + 1
     
     for ans in submission.answers:
         new_answer = ExamAnswer(
-            attempt_id=attempt_id,
-            question_id=ans.question_id,
+            int_id=answer_id_counter,
+            attempt_int_id=attempt_id,
+            question_int_id=ans.question_id,
             selected_choice_id=ans.selected_choice_id
         )
-        db.add(new_answer)
+        answer_id_counter += 1
+        attempt.answers.append(new_answer)
         
         # Grading
         if ans.selected_choice_id:
-            choice = db.query(ExamChoice).filter(ExamChoice.id == ans.selected_choice_id).first()
-            if choice and choice.is_correct:
-                question = db.query(ExamQuestion).filter(ExamQuestion.id == ans.question_id).first()
-                if question:
+            question = next((q for q in exam.questions if q.int_id == ans.question_id), None)
+            if question:
+                choice = next((c for c in question.choices if c.int_id == ans.selected_choice_id), None)
+                if choice and choice.is_correct:
                     total_score += (question.points or 0.0)
 
     attempt.score = total_score
     attempt.status = "submitted"
     attempt.end_time = datetime.utcnow()
-    db.commit()
-    db.refresh(attempt)
-    return attempt
+    
+    await exam.save()
+    
+    res = attempt.model_dump()
+    res["id"] = attempt.int_id
+    res["exam_id"] = exam.int_id
+    return res
 
 @exam_router.post("/extract")
 async def extract_exam_questions(file: UploadFile = File(...)):
@@ -292,20 +316,17 @@ async def extract_exam_answers(file: UploadFile = File(...)):
     return answers
 
 @exam_router.delete("/{exam_id}")
-def delete_exam(exam_id: int, db: Session = Depends(get_db)):
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+async def delete_exam(exam_id: int):
+    exam = await Exam.find_one(Exam.int_id == exam_id)
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
-    # Cascade delete is usually handled by models, but we'll be explicit if needed
-    # ExamAttempt and related answers will be orphaned or deleted based on FK config.
-    db.delete(exam)
-    db.commit()
+    await exam.delete()
     return {"message": "Exam deleted successfully"}
 
 @exam_router.put("/{exam_id}", response_model=ExamResponse)
-def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_db)):
-    db_exam = db.query(Exam).filter(Exam.id == exam_id).first()
+async def update_exam(exam_id: int, exam_data: ExamCreate):
+    db_exam = await Exam.find_one(Exam.int_id == exam_id)
     if not db_exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     
@@ -318,65 +339,70 @@ def update_exam(exam_id: int, exam_data: ExamCreate, db: Session = Depends(get_d
     db_exam.status = exam_data.status
     db_exam.course_id = exam_data.course_id
     
-    # Clear existing questions (cascade="all, delete-orphan" handles the record deletion)
     db_exam.questions = []
 
-    # Re-add new ones
+    question_id_counter = 1
+    choice_id_counter = 1
+    
     for i, q_data in enumerate(exam_data.questions):
         new_question = ExamQuestion(
-            exam_id=db_exam.id,
+            int_id=question_id_counter,
             question_text=q_data.question_text,
             question_type=q_data.question_type,
             points=q_data.points,
             order=q_data.order or i
         )
-        db_exam.questions.append(new_question)
-        db.flush()
+        question_id_counter += 1
 
         for choice_data in q_data.choices:
             new_choice = ExamChoice(
-                question_id=new_question.id,
+                int_id=choice_id_counter,
                 choice_text=choice_data.choice_text,
                 is_correct=choice_data.is_correct
             )
-            db.add(new_choice)
+            choice_id_counter += 1
+            new_question.choices.append(new_choice)
+            
+        db_exam.questions.append(new_question)
     
-    db.commit()
-    db.refresh(db_exam)
-    return db_exam
+    await db_exam.save()
+    return ExamResponse(**db_exam.model_dump(), id=db_exam.int_id)
 
 @exam_router.get("/{exam_id}/attempts", response_model=List[ExamAttemptResponse])
-def get_exam_attempts(exam_id: int, db: Session = Depends(get_db)):
-    attempts = db.query(ExamAttempt).filter(ExamAttempt.exam_id == exam_id).all()
-    
-    # Manually populate student info for the response
+async def get_exam_attempts(exam_id: int):
+    exam = await Exam.find_one(Exam.int_id == exam_id)
+    if not exam:
+        return []
+        
     res = []
-    for a in attempts:
-        res.append({
-            "id": a.id,
-            "exam_id": a.exam_id,
-            "student_id": a.student_id,
-            "student_name": a.student.name if a.student else "Unknown",
-            "student_email": a.student.email if a.student else "Unknown",
-            "score": a.score,
-            "status": a.status,
-            "start_time": a.start_time,
-            "end_time": a.end_time
-        })
+    for a in exam.attempts:
+        student = await Student.find_one(Student.int_id == a.student_id)
+        
+        attempt_res = a.model_dump()
+        attempt_res["id"] = a.int_id
+        attempt_res["exam_id"] = exam.int_id
+        attempt_res["student_name"] = student.name if student else "Unknown"
+        attempt_res["student_email"] = student.email if student else "Unknown"
+        res.append(attempt_res)
+        
     return res
 
 @exam_router.get("/attempts/{attempt_id}", response_model=ExamAttemptDetailResponse)
-def get_attempt_details(attempt_id: int, db: Session = Depends(get_db)):
-    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == attempt_id).first()
+async def get_attempt_details(attempt_id: int):
+    exam = await Exam.find_one({"attempts.int_id": attempt_id})
+    if not exam:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+        
+    attempt = next((a for a in exam.attempts if a.int_id == attempt_id), None)
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
     
-    # We need to manually match the student info like in the list view if needed, 
-    # but ExamAttemptDetailResponse inherits from ExamAttemptResponse which has these fields.
-    # sqlalchemy objects can handle nested relationships if they are defined.
+    student = await Student.find_one(Student.int_id == attempt.student_id)
     
-    # Ensuring student info is in the top level if needed by the schema
-    attempt.student_name = attempt.student.name if attempt.student else "Unknown"
-    attempt.student_email = attempt.student.email if attempt.student else "Unknown"
+    res = attempt.model_dump()
+    res["id"] = attempt.int_id
+    res["exam_id"] = exam.int_id
+    res["student_name"] = student.name if student else "Unknown"
+    res["student_email"] = student.email if student else "Unknown"
     
-    return attempt
+    return res

@@ -1,76 +1,63 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Text
-from sqlalchemy.orm import relationship
-from app.database import Base
+from beanie import Document
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from datetime import datetime
+from app.database import get_next_sequence
 
-class Exam(Base):
-    __tablename__ = "exams"
 
-    id = Column(Integer, primary_key=True, index=True)
-    course_id = Column(Integer, ForeignKey("courses.id"))
-    title = Column(String)
-    description = Column(Text, nullable=True)
-    time_limit = Column(Integer, default=60)  # in minutes
-    attempts_allowed = Column(Integer, default=1)
-    randomize_questions = Column(Boolean, default=False)
-    status = Column(String, default="draft")  # draft, published, archived
-    created_at = Column(DateTime, default=datetime.utcnow)
+class ExamChoice(BaseModel):
+    """Embedded sub-document for exam choices."""
+    int_id: int = 0
+    choice_text: Optional[str] = None
+    is_correct: bool = False
 
-    # Relationships
-    course = relationship("app.models.course.Course")
-    questions = relationship("ExamQuestion", back_populates="exam", cascade="all, delete-orphan")
-    attempts = relationship("ExamAttempt", back_populates="exam", cascade="all, delete-orphan")
 
-class ExamQuestion(Base):
-    __tablename__ = "exam_questions"
+class ExamAnswer(BaseModel):
+    """Embedded sub-document for exam answers."""
+    int_id: int = 0
+    attempt_int_id: int = 0
+    question_int_id: int = 0
+    selected_choice_id: Optional[int] = None
 
-    id = Column(Integer, primary_key=True, index=True)
-    exam_id = Column(Integer, ForeignKey("exams.id"))
-    question_text = Column(Text)
-    question_type = Column(String, default="mcq")  # mcq
-    points = Column(Float, default=1.0)
-    order = Column(Integer, default=0)
 
-    # Relationships
-    exam = relationship("Exam", back_populates="questions")
-    choices = relationship("ExamChoice", back_populates="question", cascade="all, delete-orphan")
-    answers = relationship("ExamAnswer", back_populates="question", cascade="all, delete-orphan")
+class ExamQuestion(BaseModel):
+    """Embedded sub-document for exam questions."""
+    int_id: int = 0
+    question_text: Optional[str] = None
+    question_type: str = "mcq"
+    points: float = 1.0
+    order: int = 0
+    choices: List[ExamChoice] = []
+    answers: List[ExamAnswer] = []
 
-class ExamChoice(Base):
-    __tablename__ = "exam_choices"
 
-    id = Column(Integer, primary_key=True, index=True)
-    question_id = Column(Integer, ForeignKey("exam_questions.id"))
-    choice_text = Column(Text)
-    is_correct = Column(Boolean, default=False)
+class ExamAttempt(BaseModel):
+    """Embedded sub-document for exam attempts."""
+    int_id: int = 0
+    student_id: int = 0
+    score: Optional[float] = None
+    status: str = "in_progress"
+    start_time: datetime = Field(default_factory=datetime.utcnow)
+    end_time: Optional[datetime] = None
+    answers: List[ExamAnswer] = []
 
-    # Relationships
-    question = relationship("ExamQuestion", back_populates="choices")
 
-class ExamAttempt(Base):
-    __tablename__ = "exam_attempts"
+class Exam(Document):
+    int_id: int = 0
+    course_id: int = 0
+    title: Optional[str] = None
+    description: Optional[str] = None
+    time_limit: int = 60
+    attempts_allowed: int = 1
+    randomize_questions: bool = False
+    status: str = "draft"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    questions: List[ExamQuestion] = []
+    attempts: List[ExamAttempt] = []
 
-    id = Column(Integer, primary_key=True, index=True)
-    exam_id = Column(Integer, ForeignKey("exams.id"))
-    student_id = Column(Integer, ForeignKey("users.id"))
-    score = Column(Float, nullable=True)
-    status = Column(String, default="in_progress")  # in_progress, submitted, time_up
-    start_time = Column(DateTime, default=datetime.utcnow)
-    end_time = Column(DateTime, nullable=True)
+    class Settings:
+        name = "exams"
 
-    # Relationships
-    exam = relationship("Exam", back_populates="attempts")
-    student = relationship("app.models.user.User")
-    answers = relationship("ExamAnswer", back_populates="attempt", cascade="all, delete-orphan")
-
-class ExamAnswer(Base):
-    __tablename__ = "exam_answers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    attempt_id = Column(Integer, ForeignKey("exam_attempts.id"))
-    question_id = Column(Integer, ForeignKey("exam_questions.id"))
-    selected_choice_id = Column(Integer, ForeignKey("exam_choices.id"), nullable=True)
-
-    # Relationships
-    attempt = relationship("ExamAttempt", back_populates="answers")
-    question = relationship("ExamQuestion", back_populates="answers")
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("exams")

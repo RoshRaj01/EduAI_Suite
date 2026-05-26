@@ -1,6 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from fastapi import APIRouter, HTTPException, status
 from app.models.quiz import Quiz, QuizQuestion, QuizOption, QuizSession
 from pydantic import BaseModel
 from typing import List, Optional
@@ -8,13 +6,6 @@ import random
 import string
 
 quiz_router = APIRouter(prefix="/quizzes", tags=["Quizzes"])
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # Pydantic Schemas
 class OptionSchema(BaseModel):
@@ -37,11 +28,11 @@ class QuizCreate(BaseModel):
     questions: List[QuestionSchema]
 
 @quiz_router.get("/")
-def get_quizzes(db: Session = Depends(get_db)):
-    quizzes = db.query(Quiz).all()
+async def get_quizzes():
+    quizzes = await Quiz.find_all().to_list()
     return [
         {
-            "id": q.id,
+            "id": q.int_id,
             "title": q.title,
             "description": q.description,
             "is_draft": q.is_draft,
@@ -52,19 +43,20 @@ def get_quizzes(db: Session = Depends(get_db)):
     ]
 
 @quiz_router.post("/")
-def create_quiz(quiz_data: QuizCreate, db: Session = Depends(get_db)):
+async def create_quiz(quiz_data: QuizCreate):
     new_quiz = Quiz(
         title=quiz_data.title,
         description=quiz_data.description,
         is_draft=quiz_data.is_draft
     )
-    db.add(new_quiz)
-    db.commit()
-    db.refresh(new_quiz)
+    await new_quiz.assign_id()
+    
+    question_id_counter = 1
+    option_id_counter = 1
     
     for i, q in enumerate(quiz_data.questions):
         question = QuizQuestion(
-            quiz_id=new_quiz.id,
+            int_id=question_id_counter,
             question_text=q.question_text,
             question_type=q.question_type,
             time_limit=q.time_limit,
@@ -72,26 +64,26 @@ def create_quiz(quiz_data: QuizCreate, db: Session = Depends(get_db)):
             image_url=q.image_url,
             order=i
         )
-        db.add(question)
-        db.commit()
-        db.refresh(question)
+        question_id_counter += 1
         
         for opt in q.options:
             option = QuizOption(
-                question_id=question.id,
+                int_id=option_id_counter,
                 option_text=opt.option_text,
                 is_correct=opt.is_correct,
                 color=opt.color
             )
-            db.add(option)
+            option_id_counter += 1
+            question.options.append(option)
+            
+        new_quiz.questions.append(question)
     
-    db.commit()
-    db.refresh(new_quiz)
-    return {"id": new_quiz.id, "title": new_quiz.title, "is_draft": new_quiz.is_draft}
+    await new_quiz.insert()
+    return {"id": new_quiz.int_id, "title": new_quiz.title, "is_draft": new_quiz.is_draft}
 
 @quiz_router.put("/{quiz_id}")
-def update_quiz(quiz_id: int, quiz_data: QuizCreate, db: Session = Depends(get_db)):
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+async def update_quiz(quiz_id: int, quiz_data: QuizCreate):
+    quiz = await Quiz.find_one(Quiz.int_id == quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     
@@ -99,14 +91,13 @@ def update_quiz(quiz_id: int, quiz_data: QuizCreate, db: Session = Depends(get_d
     quiz.description = quiz_data.description
     quiz.is_draft = quiz_data.is_draft
     
-    # Delete old questions and options (cascaded)
-    for q in quiz.questions:
-        db.delete(q)
+    quiz.questions = []
+    question_id_counter = 1
+    option_id_counter = 1
     
-    # Add new questions
     for i, q in enumerate(quiz_data.questions):
         question = QuizQuestion(
-            quiz_id=quiz.id,
+            int_id=question_id_counter,
             question_text=q.question_text,
             question_type=q.question_type,
             time_limit=q.time_limit,
@@ -114,32 +105,31 @@ def update_quiz(quiz_id: int, quiz_data: QuizCreate, db: Session = Depends(get_d
             image_url=q.image_url,
             order=i
         )
-        db.add(question)
-        db.commit()
-        db.refresh(question)
+        question_id_counter += 1
         
         for opt in q.options:
             option = QuizOption(
-                question_id=question.id,
+                int_id=option_id_counter,
                 option_text=opt.option_text,
                 is_correct=opt.is_correct,
                 color=opt.color
             )
-            db.add(option)
+            option_id_counter += 1
+            question.options.append(option)
             
-    db.commit()
-    db.refresh(quiz)
-    return {"id": quiz.id, "title": quiz.title, "is_draft": quiz.is_draft}
+        quiz.questions.append(question)
+            
+    await quiz.save()
+    return {"id": quiz.int_id, "title": quiz.title, "is_draft": quiz.is_draft}
 
 @quiz_router.get("/{quiz_id}")
-def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+async def get_quiz(quiz_id: int):
+    quiz = await Quiz.find_one(Quiz.int_id == quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     
-    # Include questions and options
     result = {
-        "id": quiz.id,
+        "id": quiz.int_id,
         "title": quiz.title,
         "description": quiz.description,
         "is_draft": quiz.is_draft,
@@ -148,27 +138,27 @@ def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
     
     for q in quiz.questions:
         question_data = {
-            "id": q.id,
+            "id": q.int_id,
             "text": q.question_text,
             "type": q.question_type,
             "time_limit": q.time_limit,
             "points": q.points,
             "image_url": q.image_url,
-            "options": [{"id": o.id, "text": o.option_text, "is_correct": o.is_correct, "color": o.color} for o in q.options]
+            "options": [{"id": o.int_id, "text": o.option_text, "is_correct": o.is_correct, "color": o.color} for o in q.options]
         }
         result["questions"].append(question_data)
         
     return result
 
 @quiz_router.post("/{quiz_id}/session")
-def create_session(quiz_id: int, db: Session = Depends(get_db)):
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+async def create_session(quiz_id: int):
+    quiz = await Quiz.find_one(Quiz.int_id == quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     
     # Generate unique 6-digit PIN
     pin = "".join(random.choices(string.digits, k=6))
-    while db.query(QuizSession).filter(QuizSession.pin == pin).first():
+    while await QuizSession.find_one(QuizSession.pin == pin):
         pin = "".join(random.choices(string.digits, k=6))
         
     session = QuizSession(
@@ -176,35 +166,40 @@ def create_session(quiz_id: int, db: Session = Depends(get_db)):
         pin=pin,
         status="lobby"
     )
-    db.add(session)
-    db.commit()
-    db.refresh(session)
+    await session.assign_id()
+    await session.insert()
     
-    return session
+    res = session.model_dump()
+    res["id"] = session.int_id
+    return res
 
 @quiz_router.get("/sessions")
-def get_all_sessions(db: Session = Depends(get_db)):
-    sessions = db.query(QuizSession).order_by(QuizSession.id.desc()).all()
-    return [
-        {
-            "id": session.id,
-            "quiz_title": session.quiz.title if session.quiz else "Unknown Quiz",
+async def get_all_sessions():
+    sessions = await QuizSession.find_all().sort("-int_id").to_list()
+    
+    result = []
+    for session in sessions:
+        quiz = await Quiz.find_one(Quiz.int_id == session.quiz_id)
+        result.append({
+            "id": session.int_id,
+            "quiz_title": quiz.title if quiz else "Unknown Quiz",
             "status": session.status,
             "pin": session.pin,
             "current_question": session.current_question_index
-        }
-        for session in sessions
-    ]
+        })
+    return result
 
 @quiz_router.get("/sessions/{pin}")
-def get_session(pin: str, db: Session = Depends(get_db)):
-    session = db.query(QuizSession).filter(QuizSession.pin == pin).first()
+async def get_session(pin: str):
+    session = await QuizSession.find_one(QuizSession.pin == pin)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
+    quiz = await Quiz.find_one(Quiz.int_id == session.quiz_id)
+    
     return {
-        "id": session.id,
-        "quiz_title": session.quiz.title,
+        "id": session.int_id,
+        "quiz_title": quiz.title if quiz else "Unknown Quiz",
         "status": session.status,
         "pin": session.pin,
         "current_question": session.current_question_index
@@ -212,26 +207,20 @@ def get_session(pin: str, db: Session = Depends(get_db)):
 
 
 @quiz_router.delete("/{quiz_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_quiz(quiz_id: int, db: Session = Depends(get_db)):
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+async def delete_quiz(quiz_id: int):
+    quiz = await Quiz.find_one(Quiz.int_id == quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     
-    # Explicitly delete sessions to ensure all players/answers are cleaned up first
-    # This prevents FOREIGN KEY constraint errors in some SQLite environments
-    for session in quiz.sessions:
-        db.delete(session)
-    
-    db.delete(quiz)
-    db.commit()
+    await QuizSession.find(QuizSession.quiz_id == quiz_id).delete()
+    await quiz.delete()
     return None
 
 @quiz_router.delete("/sessions/{pin}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_session(pin: str, db: Session = Depends(get_db)):
-    session = db.query(QuizSession).filter(QuizSession.pin == pin).first()
+async def delete_session(pin: str):
+    session = await QuizSession.find_one(QuizSession.pin == pin)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    db.delete(session)
-    db.commit()
+    await session.delete()
     return None

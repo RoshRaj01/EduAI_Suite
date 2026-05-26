@@ -1,6 +1,8 @@
 fastapi
 uvicorn[standard]
-sqlalchemy
+motor>=3.3.0
+beanie>=1.25.0
+pymongo>=4.6.0
 pydantic
 python-multipart
 python-jose[cryptography]

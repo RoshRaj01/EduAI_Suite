@@ -1,10 +1,4 @@
-# pyrefly: ignore [missing-import]
-from fastapi import APIRouter, Depends
-# pyrefly: ignore [missing-import]
-from sqlalchemy.orm import Session
-# pyrefly: ignore [missing-import]
-from sqlalchemy import func
-from app.database import get_db
+from fastapi import APIRouter
 from app.models.student import Student
 from app.models.course import Course
 from app.models.history import ActionHistory
@@ -14,7 +8,7 @@ from app.models.omr import OMRSubmission
 from app.models.submission import Submission
 from app.models.lesson import Lesson
 from app.models.assignment import Assignment
-from app.routes.calendar_routes import CalendarEvent
+from app.models.calendar import CalendarEvent
 from datetime import datetime, date, timedelta
 from typing import Optional
 
@@ -41,60 +35,61 @@ def _parse_date_safe(value: str) -> Optional[datetime]:
     return None
 
 @dashboard_router.get("/summary")
-def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depends(get_db)):
+async def get_dashboard_summary(teacher_name: Optional[str] = None):
     # 1. Stats
-    student_query = db.query(Student)
-    teacher_courses = []
+    student_query = Student.find_all()
     teacher_course_ids = []
     if teacher_name:
-        teacher_courses = db.query(Course).filter(Course.teacher_name == teacher_name).all()
-        teacher_course_ids = [c.id for c in teacher_courses]
-        student_query = student_query.filter(Student.course_id.in_(teacher_course_ids))
+        teacher_courses = await Course.find(Course.teacher_name == teacher_name).to_list()
+        teacher_course_ids = [c.int_id for c in teacher_courses]
+        student_query = student_query.find({"course_id": {"$in": teacher_course_ids}})
     
-    total_students = student_query.count()
-    students = student_query.all()
+    total_students = await student_query.count()
+    students = await student_query.to_list()
     
     # AI Evaluations Done: Count OMR submissions
-    omr_evals = db.query(OMRSubmission).filter(OMRSubmission.status == "verified").count()
-    ai_evaluations = omr_evals
+    omr_evals = await OMRSubmission.find(OMRSubmission.status == "verified").count()
     
     # Deltas (last 7 days)
-    seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
-    new_evals = db.query(OMRSubmission).filter(OMRSubmission.created_at >= seven_days_ago).count()
-    eval_delta = f"+{new_evals}" if new_evals > 0 else "0"
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    # Beanie query using ISO formatted date if stored as string, or datetime if stored as datetime
+    new_evals = await OMRSubmission.find({"created_at": {"$gte": seven_days_ago}}).count()
     
-    # Student Delta (look at recent history for student creation)
-    new_student_actions = db.query(ActionHistory).filter(
+    new_student_actions = await ActionHistory.find(
         ActionHistory.feature == "student",
         ActionHistory.action == "create",
-        ActionHistory.timestamp >= (datetime.now() - timedelta(days=7))
+        {"timestamp": {"$gte": seven_days_ago}}
     ).count()
+
     student_delta = f"+{new_student_actions}" if new_student_actions > 0 else "0%"
 
     real_risk_alerts = []
-    # students is already defined above and filtered if teacher_name was provided
     for s in students:
         att = s.attendance or 0
         avg = s.avg_score or 0
         if 0 < att < 50:
-            real_risk_alerts.append({"id": f"S{s.id}", "name": s.name or "Unknown", "level": "high", "reason": f"Attendance dropped to {att}%", "score": avg})
+            real_risk_alerts.append({"id": f"S{s.int_id}", "name": s.name or "Unknown", "level": "high", "reason": f"Attendance dropped to {att}%", "score": avg})
         elif 0 < avg < 40:
-            real_risk_alerts.append({"id": f"S{s.id}", "name": s.name or "Unknown", "level": "high", "reason": f"Average score is critically low ({avg}%)", "score": avg})
+            real_risk_alerts.append({"id": f"S{s.int_id}", "name": s.name or "Unknown", "level": "high", "reason": f"Average score is critically low ({avg}%)", "score": avg})
         elif 0 < att < 75:
-            real_risk_alerts.append({"id": f"S{s.id}", "name": s.name or "Unknown", "level": "moderate", "reason": f"Low attendance ({att}%)", "score": avg})
+            real_risk_alerts.append({"id": f"S{s.int_id}", "name": s.name or "Unknown", "level": "moderate", "reason": f"Low attendance ({att}%)", "score": avg})
         elif 0 < avg < 60:
-            real_risk_alerts.append({"id": f"S{s.id}", "name": s.name or "Unknown", "level": "moderate", "reason": f"Below average score ({avg}%)", "score": avg})
+            real_risk_alerts.append({"id": f"S{s.int_id}", "name": s.name or "Unknown", "level": "moderate", "reason": f"Below average score ({avg}%)", "score": avg})
             
     risk_alerts_count = len(real_risk_alerts)
     
     # Avg. Score Improvement calculation
-    all_omr_scores = [sub.score for sub in db.query(OMRSubmission).filter(OMRSubmission.status == "verified").all()]
-    all_submission_grades = [sub.grade for sub in db.query(Submission).filter(Submission.grade != None).all()]
+    omr_subs = await OMRSubmission.find(OMRSubmission.status == "verified").to_list()
+    all_omr_scores = [sub.score for sub in omr_subs]
+    
+    subs = await Submission.find(Submission.grade != None).to_list()
+    all_submission_grades = [sub.grade for sub in subs if sub.grade is not None]
+    
     total_scores = all_omr_scores + all_submission_grades
     
     if total_scores:
         current_avg = sum(total_scores) / len(total_scores)
-        baseline_avg = sum(s.avg_score for s in students) / len(students) if students else 0
+        baseline_avg = sum(s.avg_score or 0 for s in students) / len(students) if students else 0
         if baseline_avg > 0:
             improvement = ((current_avg - baseline_avg) / baseline_avg) * 100
             avg_improvement = f"{improvement:+.1f}%"
@@ -134,15 +129,14 @@ def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depe
     ]
 
     # 2. Ongoing Classrooms
-    courses_query = db.query(Course)
+    courses_query = Course.find_all()
     if teacher_name:
-        courses_query = courses_query.filter(Course.teacher_name == teacher_name)
+        courses_query = courses_query.find(Course.teacher_name == teacher_name)
     
-    courses_list = courses_query.limit(4).all()
+    courses_list = await courses_query.limit(4).to_list()
     classrooms = []
     for i, c in enumerate(courses_list):
-        # Try to find a lesson to get a real time, otherwise stagger them
-        latest_lesson = db.query(Lesson).filter(Lesson.course_id == c.id).order_by(Lesson.posted_at.desc()).first()
+        latest_lesson = await Lesson.find(Lesson.course_id == c.int_id).sort("-posted_at").first_or_none()
         time_str = "09:00 AM"
         if latest_lesson and latest_lesson.posted_at:
             time_str = latest_lesson.posted_at.strftime("%I:%M %p")
@@ -150,11 +144,10 @@ def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depe
             times = ["09:00 AM", "11:30 AM", "02:00 PM", "04:30 PM"]
             time_str = times[i % len(times)]
 
-        # Actual student count from the DB
-        real_count = db.query(Student).filter(Student.course_id == c.id).count()
+        real_count = await Student.find(Student.course_id == c.int_id).count()
 
         classrooms.append({
-            "id": c.id,
+            "id": c.int_id,
             "code": c.code,
             "name": c.name,
             "batch": c.batch,
@@ -164,12 +157,11 @@ def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depe
             "teacher": c.teacher_name or "Not Assigned"
         })
 
-    # 3. Risk Alerts (Already sorted and capped)
     real_risk_alerts.sort(key=lambda x: (0 if x["level"] == "high" else 1, x["score"]))
     risk_alerts = real_risk_alerts[:4]
     
     # 4. Recent Activity
-    history_records = db.query(ActionHistory).order_by(ActionHistory.timestamp.desc()).limit(4).all()
+    history_records = await ActionHistory.find_all().sort("-timestamp").limit(4).to_list()
     recent_activity = []
     
     color_map = {
@@ -203,11 +195,11 @@ def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depe
     schedule_items = []
 
     # 5a. Appointments
-    appt_query = db.query(Appointment)
+    appt_query = Appointment.find_all()
     if teacher_name:
-        appt_query = appt_query.filter(Appointment.teacher_name == teacher_name)
+        appt_query = appt_query.find(Appointment.teacher_name == teacher_name)
     
-    for appt in appt_query.all():
+    for appt in await appt_query.to_list():
         dt = _parse_date_safe(appt.time_slot)
         if not dt:
             dt = _parse_date_safe(appt.requested_at)
@@ -223,21 +215,20 @@ def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depe
             })
 
     # 5b. Lessons & Courses
-    courses_query = db.query(Course)
+    courses_query = Course.find_all()
     if teacher_name:
-        courses_query = courses_query.filter(Course.teacher_name == teacher_name)
-    teacher_courses = courses_query.all()
-    teacher_course_ids = [c.id for c in teacher_courses]
-    courses_map = {c.id: c for c in teacher_courses}
+        courses_query = courses_query.find(Course.teacher_name == teacher_name)
+    teacher_courses = await courses_query.to_list()
+    teacher_course_ids = [c.int_id for c in teacher_courses]
+    courses_map = {c.int_id: c for c in teacher_courses}
 
-    lesson_query = db.query(Lesson)
+    lesson_query = Lesson.find_all()
     if teacher_name:
-        lesson_query = lesson_query.filter(Lesson.course_id.in_(teacher_course_ids))
+        lesson_query = lesson_query.find({"course_id": {"$in": teacher_course_ids}})
     
-    today_lessons = lesson_query.filter(
-        Lesson.posted_at >= today_start,
-        Lesson.posted_at < today_end
-    ).all()
+    today_lessons = await lesson_query.find(
+        {"posted_at": {"$gte": today_start, "$lt": today_end}}
+    ).to_list()
     
     for lesson in today_lessons:
         course = courses_map.get(lesson.course_id)
@@ -252,14 +243,13 @@ def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depe
 
     # 5c. Calendar Events
     try:
-        ce_query = db.query(CalendarEvent).filter(
-            CalendarEvent.start_time >= today_start,
-            CalendarEvent.start_time < today_end
+        ce_query = CalendarEvent.find(
+            {"start_time": {"$gte": today_start, "$lt": today_end}}
         )
         if teacher_name:
-            ce_query = ce_query.filter(CalendarEvent.teacher_name == teacher_name)
+            ce_query = ce_query.find(CalendarEvent.teacher_name == teacher_name)
             
-        today_events = ce_query.all()
+        today_events = await ce_query.to_list()
         for ev in today_events:
             schedule_items.append({
                 "name": ev.title,
@@ -272,11 +262,11 @@ def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depe
         pass
 
     # 5d. Assignments Due Today
-    assg_query = db.query(Assignment)
+    assg_query = Assignment.find_all()
     if teacher_name:
-        assg_query = assg_query.filter(Assignment.course_id.in_(teacher_course_ids))
+        assg_query = assg_query.find({"course_id": {"$in": teacher_course_ids}})
     
-    for assg in assg_query.all():
+    for assg in await assg_query.to_list():
         dt = _parse_date_safe(assg.due_date)
         if dt and today_start <= dt < today_end:
             course = courses_map.get(assg.course_id)
@@ -289,10 +279,10 @@ def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depe
             })
 
     # 5e. Exams Today
-    for exam in db.query(Exam).all():
+    for exam in await Exam.find_all().to_list():
         if teacher_name and exam.course_id not in teacher_course_ids:
             continue
-        dt = exam.created_at # Assuming created_at is the schedule for now as per previous logic
+        dt = exam.created_at
         if dt and today_start <= dt < today_end:
             course = courses_map.get(exam.course_id)
             schedule_items.append({
@@ -326,10 +316,9 @@ def get_dashboard_summary(teacher_name: Optional[str] = None, db: Session = Depe
     }
 
 @dashboard_router.get("/student-summary")
-def get_student_dashboard_summary(student_name: str = "Aarav Gupta", db: Session = Depends(get_db)):
+async def get_student_dashboard_summary(student_name: str = "Aarav Gupta"):
     # 1. Student Info & Stats
-    # Find all enrollment records for this student
-    student_records = db.query(Student).filter(Student.name == student_name).all()
+    student_records = await Student.find(Student.name == student_name).to_list()
     course_ids = [s.course_id for s in student_records]
     
     avg_score = 0
@@ -341,17 +330,11 @@ def get_student_dashboard_summary(student_name: str = "Aarav Gupta", db: Session
     level = int(avg_score / 10) + 5 if avg_score > 0 else 12
     
     # 2. Enrolled Courses
-    courses = db.query(Course).filter(Course.id.in_(course_ids)).all() if course_ids else []
+    courses = await Course.find({"int_id": {"$in": course_ids}}).to_list() if course_ids else []
     
     # 3. Pending Assignments & Deadlines
-    from app.models.assignment import Assignment
+    all_assignments = await Assignment.find({"course_id": {"$in": course_ids}}).to_list() if course_ids else []
     
-    # Get all assignments for these courses
-    all_assignments = db.query(Assignment).filter(Assignment.course_id.in_(course_ids)).all() if course_ids else []
-    
-    # Get submissions by this student
-    # Note: current Submission model might not have student_name, let's check
-    # For now, let's assume we want to show all upcoming assignments as deadlines
     upcoming_deadlines = []
     pending_count = 0
     
@@ -359,10 +342,11 @@ def get_student_dashboard_summary(student_name: str = "Aarav Gupta", db: Session
     for assign in all_assignments:
         due_dt = _parse_date_safe(assign.due_date)
         if due_dt and due_dt > today:
+            c = await Course.find_one(Course.int_id == assign.course_id)
             upcoming_deadlines.append({
-                "id": assign.id,
+                "id": assign.int_id,
                 "title": assign.title,
-                "course_code": db.query(Course).filter(Course.id == assign.course_id).first().code,
+                "course_code": c.code if c else "UNK",
                 "due_date": assign.due_date,
                 "is_urgent": (due_dt - today).days < 2
             })
@@ -371,7 +355,7 @@ def get_student_dashboard_summary(student_name: str = "Aarav Gupta", db: Session
     # 4. Live Games
     from app.models.game import ChainAnswerGame
     from app.models.user import User
-    live_games = db.query(ChainAnswerGame).filter(ChainAnswerGame.status == "active").all()
+    live_games = await ChainAnswerGame.find(ChainAnswerGame.status == "active").to_list()
     
     live_game_info = {
         "title": "Interactive Learning Session",
@@ -383,7 +367,7 @@ def get_student_dashboard_summary(student_name: str = "Aarav Gupta", db: Session
         game = live_games[0]
         teacher_name = "Prof. Alan Turing"
         if game.teacher_id:
-            teacher = db.query(User).filter(User.id == game.teacher_id).first()
+            teacher = await User.find_one(User.int_id == game.teacher_id)
             if teacher:
                 teacher_name = teacher.full_name or teacher.username
         
@@ -403,7 +387,7 @@ def get_student_dashboard_summary(student_name: str = "Aarav Gupta", db: Session
         },
         "courses": [
             {
-                "id": c.id,
+                "id": c.int_id,
                 "code": c.code,
                 "name": c.name,
                 "teacher_name": c.teacher_name,
@@ -417,6 +401,15 @@ def get_student_dashboard_summary(student_name: str = "Aarav Gupta", db: Session
     }
 
 def format_relative_time(dt):
+    if not dt:
+        return "Unknown"
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+            dt = dt.replace(tzinfo=None) # remove tz for comparison
+        except:
+            return dt
+            
     now = datetime.now()
     diff = now - dt
     if diff.days > 0:

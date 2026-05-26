@@ -1,13 +1,20 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
-from app.database import Base
+from beanie import Document
+from typing import Optional
+from app.database import get_next_sequence
 
-class Announcement(Base):
-    __tablename__ = "announcements"
 
-    id = Column(Integer, primary_key=True)
-    course_id = Column(Integer, ForeignKey("courses.id", ondelete="CASCADE"))
-    title = Column(String)
-    body = Column(String)
-    time = Column(String)
-    pinned = Column(Boolean, default=False)
-    attachment_path = Column(String, nullable=True)
+class Announcement(Document):
+    int_id: int = 0
+    course_id: int = 0
+    title: Optional[str] = None
+    body: Optional[str] = None
+    time: Optional[str] = None
+    pinned: bool = False
+    attachment_path: Optional[str] = None
+
+    class Settings:
+        name = "announcements"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("announcements")

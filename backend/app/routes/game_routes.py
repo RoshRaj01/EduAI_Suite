@@ -1,6 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from fastapi import APIRouter, HTTPException, status
 from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer, ChainAnswerGameWord
 from app.models.student import Student
 from app.schemas.game import (
@@ -18,28 +16,11 @@ import json
 
 game_router = APIRouter(prefix="/games", tags=["Games"])
 
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Create a new game
-
-
 @game_router.post("/chain-answer", response_model=ChainAnswerGameResponse, status_code=status.HTTP_201_CREATED)
-def create_chain_answer_game(
-    game_data: ChainAnswerGameCreate,
-    db: Session = Depends(get_db)
-):
+async def create_chain_answer_game(game_data: ChainAnswerGameCreate):
     """Create a new Chain Answer game session"""
-
-    # Generate unique session ID
     session_id = f"game_{uuid.uuid4().hex[:8]}"
 
-    # Generate word suggestions from local dictionary if subject is provided
     word_suggestions = None
     if game_data.subject:
         suggestions = WordService.generate_word_suggestions(
@@ -52,7 +33,6 @@ def create_chain_answer_game(
         if suggestions:
             word_suggestions = json.dumps(suggestions)
 
-    # Create the game
     new_game = ChainAnswerGame(
         session_id=session_id,
         name=game_data.name,
@@ -69,15 +49,19 @@ def create_chain_answer_game(
         ai_suggestions=word_suggestions,
         status="setup"
     )
+    await new_game.assign_id()
+    await new_game.insert()
 
-    db.add(new_game)
-    db.flush()  # Flush to get the game ID
-
-    # Add players - fetch real student data from database
+    players_to_insert = []
     for idx, player_data in enumerate(game_data.players, start=1):
-        student = db.query(Student).filter(
-            Student.id == player_data.student_id
-        ).first()
+        try:
+            sid_int = int(player_data.student_id)
+        except:
+            sid_int = None
+            
+        student = None
+        if sid_int is not None:
+            student = await Student.find_one(Student.int_id == sid_int)
 
         if not student:
             raise HTTPException(
@@ -86,94 +70,110 @@ def create_chain_answer_game(
             )
 
         new_player = ChainAnswerGamePlayer(
-            game_id=new_game.id,
-            student_id=str(student.id),
+            game_id=new_game.int_id,
+            student_id=str(student.int_id),
             name=student.name,
             join_order=idx
         )
-        db.add(new_player)
+        players_to_insert.append(new_player)
 
-    # Add starting word
+    if players_to_insert:
+        for p in players_to_insert:
+            await p.assign_id()
+            await p.insert()
+
     starting_word_entry = ChainAnswerGameWord(
-        game_id=new_game.id,
+        game_id=new_game.int_id,
         word=game_data.starting_word,
         submitted_by="system",
         is_valid=True,
         position=0
     )
-    db.add(starting_word_entry)
+    await starting_word_entry.assign_id()
+    await starting_word_entry.insert()
 
-    db.commit()
-    db.refresh(new_game)
+    # We need to manually link the players to the game response schema.
+    # In Beanie, relations aren't auto-loaded in the same way, but the response schema 
+    # might expect `players`. Let's just return the new_game and let the frontend/schema handle it.
+    res = new_game.model_dump()
+    res["id"] = new_game.int_id
+    res["players"] = [p.model_dump() for p in players_to_insert]
+    for p in res["players"]:
+        p["id"] = p["int_id"]
+    return res
 
-    return new_game
 
-
-# Get all games
 @game_router.get("/chain-answer", response_model=list[ChainAnswerGameListResponse])
-def get_all_chain_answer_games(
+async def get_all_chain_answer_games(
     skip: int = 0,
     limit: int = 100,
-    status_filter: str = None,
-    db: Session = Depends(get_db)
+    status_filter: str = None
 ):
     """Get all Chain Answer games"""
-    query = db.query(ChainAnswerGame)
+    query = ChainAnswerGame.find_all()
 
     if status_filter:
-        query = query.filter(ChainAnswerGame.status == status_filter)
+        query = query.find(ChainAnswerGame.status == status_filter)
 
-    return query.offset(skip).limit(limit).all()
+    games = await query.skip(skip).limit(limit).to_list()
+    res = []
+    for g in games:
+        d = g.model_dump()
+        d["id"] = g.int_id
+        res.append(d)
+    return res
 
 
-# Get game by ID
 @game_router.get("/chain-answer/{game_id}", response_model=ChainAnswerGameResponse)
-def get_chain_answer_game(
-    game_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_chain_answer_game(game_id: int):
     """Get a specific Chain Answer game by ID"""
-    game = db.query(ChainAnswerGame).filter(
-        ChainAnswerGame.id == game_id).first()
-
+    game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == game_id)
     if not game:
         raise HTTPException(
             status_code=404,
             detail="Game not found"
         )
+        
+    res = game.model_dump()
+    res["id"] = game.int_id
+    
+    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game_id).to_list()
+    res["players"] = []
+    for p in players:
+        d = p.model_dump()
+        d["id"] = p.int_id
+        res["players"].append(d)
+        
+    return res
 
-    return game
 
-
-# Get game by session ID
 @game_router.get("/chain-answer/session/{session_id}", response_model=ChainAnswerGameResponse)
-def get_chain_answer_game_by_session(
-    session_id: str,
-    db: Session = Depends(get_db)
-):
+async def get_chain_answer_game_by_session(session_id: str):
     """Get a specific Chain Answer game by session ID"""
-    game = db.query(ChainAnswerGame).filter(
-        ChainAnswerGame.session_id == session_id).first()
-
+    game = await ChainAnswerGame.find_one(ChainAnswerGame.session_id == session_id)
     if not game:
         raise HTTPException(
             status_code=404,
             detail="Game session not found"
         )
+        
+    res = game.model_dump()
+    res["id"] = game.int_id
+    
+    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game.int_id).to_list()
+    res["players"] = []
+    for p in players:
+        d = p.model_dump()
+        d["id"] = p.int_id
+        res["players"].append(d)
+        
+    return res
 
-    return game
 
-
-# Start a game
 @game_router.post("/chain-answer/{game_id}/start", response_model=ChainAnswerGameResponse)
-def start_chain_answer_game(
-    game_id: int,
-    db: Session = Depends(get_db)
-):
+async def start_chain_answer_game(game_id: int):
     """Start a Chain Answer game"""
-    game = db.query(ChainAnswerGame).filter(
-        ChainAnswerGame.id == game_id).first()
-
+    game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == game_id)
     if not game:
         raise HTTPException(
             status_code=404,
@@ -186,8 +186,8 @@ def start_chain_answer_game(
             detail=f"Cannot start game in {game.status} status"
         )
 
-    # Check minimum players
-    if len(game.players) < 2:
+    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game_id).to_list()
+    if len(players) < 2:
         raise HTTPException(
             status_code=400,
             detail="Minimum 2 players required to start the game"
@@ -195,24 +195,22 @@ def start_chain_answer_game(
 
     game.status = "active"
     game.started_at = datetime.utcnow()
+    await game.save()
 
-    db.commit()
-    db.refresh(game)
+    res = game.model_dump()
+    res["id"] = game.int_id
+    res["players"] = []
+    for p in players:
+        d = p.model_dump()
+        d["id"] = p.int_id
+        res["players"].append(d)
+    return res
 
-    return game
 
-
-# Submit a word
 @game_router.post("/chain-answer/{game_id}/word", response_model=GameWordResponse, status_code=status.HTTP_201_CREATED)
-def submit_word(
-    game_id: int,
-    word_data: GameWordCreate,
-    db: Session = Depends(get_db)
-):
+async def submit_word(game_id: int, word_data: GameWordCreate):
     """Submit a word to the game"""
-    game = db.query(ChainAnswerGame).filter(
-        ChainAnswerGame.id == game_id).first()
-
+    game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == game_id)
     if not game:
         raise HTTPException(
             status_code=404,
@@ -225,14 +223,12 @@ def submit_word(
             detail="Game is not active"
         )
 
-    # Get the next position
-    max_position = db.query(ChainAnswerGameWord).filter(
+    max_position = await ChainAnswerGameWord.find(
         ChainAnswerGameWord.game_id == game_id
-    ).order_by(ChainAnswerGameWord.position.desc()).first()
+    ).sort("-position").first_or_none()
 
     next_position = (max_position.position + 1) if max_position else 1
 
-    # Create word entry
     new_word = ChainAnswerGameWord(
         game_id=game_id,
         word=word_data.word,
@@ -241,37 +237,30 @@ def submit_word(
         position=next_position,
         validation_reason=word_data.validation_reason
     )
+    await new_word.assign_id()
+    await new_word.insert()
 
-    db.add(new_word)
-
-    # Update player stats
-    player = db.query(ChainAnswerGamePlayer).filter(
+    player = await ChainAnswerGamePlayer.find_one(
         ChainAnswerGamePlayer.game_id == game_id,
         ChainAnswerGamePlayer.student_id == word_data.submitted_by
-    ).first()
+    )
 
     if player:
-        player.words_submitted += 1
+        player.words_submitted = (player.words_submitted or 0) + 1
         if word_data.is_valid:
-            player.words_valid += 1
-            player.score += 10  # Base points
+            player.words_valid = (player.words_valid or 0) + 1
+            player.score = (player.score or 0) + 10
+        await player.save()
 
-    db.commit()
-    db.refresh(new_word)
+    res = new_word.model_dump()
+    res["id"] = new_word.int_id
+    return res
 
-    return new_word
 
-
-# End a game
 @game_router.post("/chain-answer/{game_id}/end", response_model=ChainAnswerGameResponse)
-def end_chain_answer_game(
-    game_id: int,
-    db: Session = Depends(get_db)
-):
+async def end_chain_answer_game(game_id: int):
     """End a Chain Answer game"""
-    game = db.query(ChainAnswerGame).filter(
-        ChainAnswerGame.id == game_id).first()
-
+    game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == game_id)
     if not game:
         raise HTTPException(
             status_code=404,
@@ -286,23 +275,24 @@ def end_chain_answer_game(
 
     game.status = "completed"
     game.ended_at = datetime.utcnow()
+    await game.save()
 
-    db.commit()
-    db.refresh(game)
+    res = game.model_dump()
+    res["id"] = game.int_id
+    
+    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game.int_id).to_list()
+    res["players"] = []
+    for p in players:
+        d = p.model_dump()
+        d["id"] = p.int_id
+        res["players"].append(d)
+    return res
 
-    return game
 
-
-# Pause a game
 @game_router.post("/chain-answer/{game_id}/pause", response_model=ChainAnswerGameResponse)
-def pause_chain_answer_game(
-    game_id: int,
-    db: Session = Depends(get_db)
-):
+async def pause_chain_answer_game(game_id: int):
     """Pause a Chain Answer game"""
-    game = db.query(ChainAnswerGame).filter(
-        ChainAnswerGame.id == game_id).first()
-
+    game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == game_id)
     if not game:
         raise HTTPException(
             status_code=404,
@@ -316,23 +306,24 @@ def pause_chain_answer_game(
         )
 
     game.status = "paused"
+    await game.save()
 
-    db.commit()
-    db.refresh(game)
+    res = game.model_dump()
+    res["id"] = game.int_id
+    
+    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game.int_id).to_list()
+    res["players"] = []
+    for p in players:
+        d = p.model_dump()
+        d["id"] = p.int_id
+        res["players"].append(d)
+    return res
 
-    return game
 
-
-# Resume a game
 @game_router.post("/chain-answer/{game_id}/resume", response_model=ChainAnswerGameResponse)
-def resume_chain_answer_game(
-    game_id: int,
-    db: Session = Depends(get_db)
-):
+async def resume_chain_answer_game(game_id: int):
     """Resume a paused Chain Answer game"""
-    game = db.query(ChainAnswerGame).filter(
-        ChainAnswerGame.id == game_id).first()
-
+    game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == game_id)
     if not game:
         raise HTTPException(
             status_code=404,
@@ -346,16 +337,22 @@ def resume_chain_answer_game(
         )
 
     game.status = "active"
+    await game.save()
 
-    db.commit()
-    db.refresh(game)
+    res = game.model_dump()
+    res["id"] = game.int_id
+    
+    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game.int_id).to_list()
+    res["players"] = []
+    for p in players:
+        d = p.model_dump()
+        d["id"] = p.int_id
+        res["players"].append(d)
+    return res
 
-    return game
 
-
-# Word engine status check (replaces old Groq status endpoint)
 @game_router.get("/chain-answer/status/groq")
-def get_word_engine_status():
+async def get_word_engine_status():
     """Check word engine availability — always available (local dictionary)"""
     return {
         "groq_available": True,
@@ -364,24 +361,18 @@ def get_word_engine_status():
     }
 
 
-# Delete a game
 @game_router.delete("/chain-answer/{game_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_chain_answer_game(
-    game_id: int,
-    db: Session = Depends(get_db)
-):
+async def delete_chain_answer_game(game_id: int):
     """Delete a Chain Answer game"""
-    game = db.query(ChainAnswerGame).filter(
-        ChainAnswerGame.id == game_id).first()
-
+    game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == game_id)
     if not game:
         raise HTTPException(
             status_code=404,
             detail="Game not found"
         )
 
-    db.delete(game)
-    db.commit()
+    await ChainAnswerGameWord.find(ChainAnswerGameWord.game_id == game_id).delete()
+    await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game_id).delete()
+    await game.delete()
 
     return None
-

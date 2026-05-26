@@ -1,15 +1,22 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from app.database import Base
+from beanie import Document
+from typing import Optional
 from datetime import datetime
+from app.database import get_next_sequence
 
-class Report(Base):
-    __tablename__ = "reports"
 
-    id = Column(Integer, primary_key=True, index=True)
-    report_id = Column(String, unique=True, index=True)
-    name = Column(String)
-    type = Column(String) 
-    generated_at = Column(DateTime, default=datetime.utcnow)
-    status = Column(String, default="ready") 
-    content = Column(String, nullable=True)
-    target_id = Column(Integer, nullable=True)
+class Report(Document):
+    int_id: int = 0
+    report_id: Optional[str] = None
+    name: Optional[str] = None
+    type: Optional[str] = None
+    generated_at: datetime = datetime.utcnow()
+    status: str = "ready"
+    content: Optional[str] = None
+    target_id: Optional[int] = None
+
+    class Settings:
+        name = "reports"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("reports")

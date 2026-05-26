@@ -1,39 +1,46 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, DateTime, JSON
-from sqlalchemy.orm import relationship
-from app.database import Base
+from beanie import Document
+from pydantic import Field
+from typing import Optional, List, Any
 from datetime import datetime
+from app.database import get_next_sequence
 
-class TrelloBoard(Base):
-    __tablename__ = "trello_boards"
 
-    id = Column(String, primary_key=True, index=True)
-    name = Column(String, index=True)
-    background = Column(String)
-    creator_email = Column(String, index=True)
-    starred = Column(Boolean, default=False)
-    members = Column(JSON, default=[]) # List of emails
-    join_requests = Column(JSON, default=[]) # List of emails
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+class TrelloBoard(Document):
+    int_id: Optional[str] = None  # Trello uses string IDs
+    name: Optional[str] = None
+    background: Optional[str] = None
+    creator_email: Optional[str] = None
+    starred: bool = False
+    members: List[str] = []
+    join_requests: List[str] = []
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-class TrelloColumn(Base):
-    __tablename__ = "trello_columns"
+    class Settings:
+        name = "trello_boards"
 
-    id = Column(String, primary_key=True, index=True)
-    board_id = Column(String, ForeignKey("trello_boards.id", ondelete="CASCADE"))
-    title = Column(String)
-    sequence = Column(Integer, default=0)
 
-class TrelloCard(Base):
-    __tablename__ = "trello_cards"
+class TrelloColumn(Document):
+    int_id: Optional[str] = None  # String IDs
+    board_id: Optional[str] = None
+    title: Optional[str] = None
+    sequence: int = 0
 
-    id = Column(String, primary_key=True, index=True)
-    column_id = Column(String, ForeignKey("trello_columns.id", ondelete="CASCADE"))
-    board_id = Column(String, ForeignKey("trello_boards.id", ondelete="CASCADE"))
-    title = Column(String)
-    description = Column(Text, nullable=True)
-    due_date = Column(String, nullable=True)
-    sequence = Column(Integer, default=0)
-    labels = Column(JSON, default=[])
-    checklist = Column(JSON, default=[])
-    created_at = Column(DateTime, default=datetime.utcnow)
+    class Settings:
+        name = "trello_columns"
+
+
+class TrelloCard(Document):
+    int_id: Optional[str] = None  # String IDs
+    column_id: Optional[str] = None
+    board_id: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    sequence: int = 0
+    labels: List[Any] = []
+    checklist: List[Any] = []
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "trello_cards"

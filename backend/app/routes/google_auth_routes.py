@@ -5,14 +5,10 @@ and returns a JWT with user status for the approval workflow.
 """
 
 import os
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-# pyrefly: ignore [missing-import]
+from fastapi import APIRouter, HTTPException, status
 from google.oauth2 import id_token
-# pyrefly: ignore [missing-import]
 from google.auth.transport import requests as google_requests
 
-from app.database import get_db
 from app.models.user import User, UserStatus
 from app.schemas.user_schema import GoogleLoginRequest, GoogleToken
 from app.utils.auth import create_access_token
@@ -24,7 +20,7 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 
 
 @google_auth_router.post("/google-login", response_model=GoogleToken)
-def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
+async def google_login(body: GoogleLoginRequest):
     """
     Accepts a Google ID token from the frontend, verifies it,
     creates a new user (PENDING) or fetches the existing one,
@@ -58,7 +54,7 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
         )
 
     # 3. Find or create the user
-    user = db.query(User).filter(User.email == email).first()
+    user = await User.find_one(User.email == email)
 
     if user is None:
         # New user — detect role and set as PENDING
@@ -83,9 +79,8 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
             status=initial_status,
             hashed_password=None,  # No password for OAuth users
         )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        await user.assign_id()
+        await user.insert()
     else:
         # Existing user — update Google fields if missing
         changed = False
@@ -96,8 +91,7 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
             user.picture = picture
             changed = True
         if changed:
-            db.commit()
-            db.refresh(user)
+            await user.save()
 
     # 4. Issue internal JWT (always issued, but frontend checks status)
     access_token = create_access_token(
@@ -109,7 +103,7 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
         token_type="bearer",
         status=user.status or "approved",
         user={
-            "id": user.id,
+            "id": user.int_id,
             "name": user.name,
             "email": user.email,
             "role": user.role,

@@ -1,6 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from app.models.submission import Submission
 from app.schemas.submission import SubmissionResponse
 from typing import Optional, List
@@ -10,27 +8,25 @@ import os
 
 submission_router = APIRouter(prefix="/submissions", tags=["Submissions"])
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
 @submission_router.get("/{assignment_id}", response_model=list[SubmissionResponse])
-def get_submissions(assignment_id: int, db: Session = Depends(get_db)):
-    return db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
+async def get_submissions(assignment_id: int):
+    submissions = await Submission.find(Submission.assignment_id == assignment_id).to_list()
+    return [
+        SubmissionResponse(**s.model_dump(), id=s.int_id) for s in submissions
+    ]
 
 @submission_router.get("/assignment/{assignment_id}", response_model=list[SubmissionResponse])
-def get_submissions_by_assignment(assignment_id: int, db: Session = Depends(get_db)):
-    return db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
+async def get_submissions_by_assignment(assignment_id: int):
+    submissions = await Submission.find(Submission.assignment_id == assignment_id).to_list()
+    return [
+        SubmissionResponse(**s.model_dump(), id=s.int_id) for s in submissions
+    ]
 
 @submission_router.post("/{assignment_id}", response_model=SubmissionResponse, status_code=status.HTTP_201_CREATED)
 async def create_submission(
     assignment_id: int,
     student_name: str = Form(...),
-    files: List[UploadFile] = File(...),
-    db: Session = Depends(get_db)
+    files: List[UploadFile] = File(...)
 ):
     paths = []
     for file in files:
@@ -48,15 +44,14 @@ async def create_submission(
         submitted_at=now_str
     )
     
-    db.add(new_sub)
-    db.commit()
-    db.refresh(new_sub)
+    await new_sub.assign_id()
+    await new_sub.insert()
     
-    return new_sub
+    return SubmissionResponse(**new_sub.model_dump(), id=new_sub.int_id)
 
 @submission_router.delete("/{submission_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_submission(submission_id: int, db: Session = Depends(get_db)):
-    sub = db.query(Submission).filter(Submission.id == submission_id).first()
+async def delete_submission(submission_id: int):
+    sub = await Submission.find_one(Submission.int_id == submission_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Submission not found")
     
@@ -67,28 +62,26 @@ def delete_submission(submission_id: int, db: Session = Depends(get_db)):
              # Logic to remove file if desired, for now just DB delete
              pass
 
-    db.delete(sub)
-    db.commit()
+    await sub.delete()
     return None
 
 @submission_router.delete("/assignment/{assignment_id}/student/{student_name}", status_code=status.HTTP_204_NO_CONTENT)
-def unsubmit_assignment(assignment_id: int, student_name: str, db: Session = Depends(get_db)):
-    subs = db.query(Submission).filter(
+async def unsubmit_assignment(assignment_id: int, student_name: str):
+    subs = await Submission.find(
         Submission.assignment_id == assignment_id,
         Submission.student_name == student_name
-    ).all()
+    ).to_list()
+    
     for sub in subs:
-        db.delete(sub)
-    db.commit()
+        await sub.delete()
     return None
 
 @submission_router.put("/grade/{submission_id}", response_model=SubmissionResponse)
-def grade_submission(submission_id: int, grade: float = Form(...), db: Session = Depends(get_db)):
-    sub = db.query(Submission).filter(Submission.id == submission_id).first()
+async def grade_submission(submission_id: int, grade: float = Form(...)):
+    sub = await Submission.find_one(Submission.int_id == submission_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Submission not found")
     
     sub.grade = grade
-    db.commit()
-    db.refresh(sub)
-    return sub
+    await sub.save()
+    return SubmissionResponse(**sub.model_dump(), id=sub.int_id)

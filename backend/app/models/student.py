@@ -1,15 +1,22 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
-from app.database import Base
+from beanie import Document
+from typing import Optional
+from app.database import get_next_sequence
 
-class Student(Base):
-    __tablename__ = "students"
 
-    id = Column(Integer, primary_key=True)
-    course_id = Column(Integer, ForeignKey("courses.id", ondelete="CASCADE"))
-    name = Column(String)
-    registration_number = Column(String)
-    email = Column(String)
-    student_class = Column(String)
-    department = Column(String)
-    attendance = Column(Integer, default=0)
-    avg_score = Column(Integer, default=0)
+class Student(Document):
+    int_id: int = 0
+    course_id: int = 0
+    name: Optional[str] = None
+    registration_number: Optional[str] = None
+    email: Optional[str] = None
+    student_class: Optional[str] = None
+    department: Optional[str] = None
+    attendance: int = 0
+    avg_score: int = 0
+
+    class Settings:
+        name = "students"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("students")

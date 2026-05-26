@@ -1,22 +1,28 @@
-from sqlalchemy import Column, Integer, String
-from app.database import Base
+from beanie import Document
+from typing import Optional
+from app.database import get_next_sequence
 
 
-class Appointment(Base):
-    __tablename__ = "appointments"
+class Appointment(Document):
+    int_id: int = 0
+    student_name: Optional[str] = None
+    student_email: Optional[str] = None
+    teacher_name: Optional[str] = None
+    teacher_department: Optional[str] = None
+    meeting_mode: Optional[str] = None
+    time_slot: Optional[str] = None
+    agenda: Optional[str] = None
+    details: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    status: str = "pending"
+    requested_at: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    reviewed_by: Optional[str] = None
+    notes: Optional[str] = None
 
-    id = Column(Integer, primary_key=True, index=True)
-    student_name = Column(String, index=True)
-    student_email = Column(String, nullable=True)
-    teacher_name = Column(String, index=True)
-    teacher_department = Column(String, nullable=True)
-    meeting_mode = Column(String)
-    time_slot = Column(String)
-    agenda = Column(String)
-    details = Column(String, nullable=True)
-    rejection_reason = Column(String, nullable=True)
-    status = Column(String, default="pending", index=True)
-    requested_at = Column(String)
-    reviewed_at = Column(String, nullable=True)
-    reviewed_by = Column(String, nullable=True)
-    notes = Column(String, nullable=True)
+    class Settings:
+        name = "appointments"
+
+    async def assign_id(self):
+        if self.int_id == 0:
+            self.int_id = await get_next_sequence("appointments")
