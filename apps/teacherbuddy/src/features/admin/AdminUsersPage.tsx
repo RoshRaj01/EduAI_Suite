@@ -19,7 +19,7 @@ export const AdminUsersPage: React.FC = () => {
     setLoading(true);
     try {
       const storedToken = localStorage.getItem("token");
-      const res = await fetch("http://127.0.0.1:8000/admin/pending-approvals", {
+      const res = await fetch(`${API_ENDPOINTS.BASE}/admin/pending-approvals`, {
         headers: {
           Authorization: `Bearer ${storedToken}`,
         },
@@ -42,7 +42,7 @@ export const AdminUsersPage: React.FC = () => {
   const handleAction = async (userId: number, action: "approve" | "deny") => {
     try {
       const storedToken = localStorage.getItem("token");
-      const res = await fetch(`http://127.0.0.1:8000/admin/${action}-user/${userId}`, {
+      const res = await fetch(`${API_ENDPOINTS.BASE}/admin/${action}-user/${userId}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${storedToken}`,
