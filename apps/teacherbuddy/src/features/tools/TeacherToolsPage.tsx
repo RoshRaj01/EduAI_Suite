@@ -46,7 +46,7 @@ export const TeacherToolsPage: React.FC = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const response = await fetch("http://localhost:8000/courses/");
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/courses/`);
         if (!response.ok) return;
         const courses = await response.json();
         if (Array.isArray(courses) && courses.length > 0) {

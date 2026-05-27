@@ -43,7 +43,7 @@ export const JoinBoardModal: React.FC<Props> = ({ onClose }) => {
     // Not found locally — check backend (cross-app board)
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/trello/board/${trimmedId}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`}/trello/board/${trimmedId}`);
       if (!res.ok) {
         setError('Board not found. Please check the ID.');
         setLoading(false);
@@ -64,7 +64,7 @@ export const JoinBoardModal: React.FC<Props> = ({ onClose }) => {
       }
 
       // Submit join request via backend
-      const joinRes = await fetch(`http://localhost:8000/trello/board/${trimmedId}/join`, {
+      const joinRes = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`}/trello/board/${trimmedId}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: userEmail }),

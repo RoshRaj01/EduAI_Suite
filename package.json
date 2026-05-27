@@ -6,8 +6,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:admin": "npm run dev -w @eduai/teacherbuddy",
-    "dev:interactive": "npm run dev -w @eduai/edugames",
+    "dev:admin": "npm run dev -w @eduai/teacherbuddy -- --host",
+    "dev:interactive": "npm run dev -w @eduai/edugames -- --host",
     "dev": "npx concurrently \"npm run dev:admin\" \"npm run dev:interactive\""
   }
 }

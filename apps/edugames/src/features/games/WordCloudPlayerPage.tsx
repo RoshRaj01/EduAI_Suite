@@ -13,7 +13,7 @@ export const WordCloudPlayerPage: React.FC = () => {
 
   const joinSession = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/wordcloud/${pin}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`}/wordcloud/${pin}`);
       if (response.ok) {
         const data = await response.json();
         setSession({ pin, prompt: data.prompt });
@@ -36,7 +36,7 @@ export const WordCloudPlayerPage: React.FC = () => {
     const connect = () => {
       if (isCancelled) return;
 
-      ws = new WebSocket(`ws://localhost:8000/ws/wordcloud/${session.pin}?role=student`);
+      ws = new WebSocket(`${(import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`).replace(/^http/, "ws")}/ws/wordcloud/${session.pin}?role=student`);
 
       ws.onopen = () => {
         if (isCancelled) {

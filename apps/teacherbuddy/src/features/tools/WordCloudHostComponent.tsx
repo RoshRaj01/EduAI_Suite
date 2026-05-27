@@ -66,7 +66,7 @@ export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, i
 
   const startSession = async () => {
     try {
-      const response = await fetch("http://localhost:8000/wordcloud/create", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/wordcloud/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
@@ -89,7 +89,7 @@ export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, i
 
     // If we joined an existing session without a prompt, fetch it
     if (!prompt) {
-      fetch(`http://localhost:8000/wordcloud/${pin}`)
+      fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`}/wordcloud/${pin}`)
         .then(res => res.json())
         .then(data => {
           if (data && data.prompt && !isCancelled) {
@@ -102,7 +102,7 @@ export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, i
     const connect = () => {
       if (isCancelled) return;
 
-      ws = new WebSocket(`ws://localhost:8000/ws/wordcloud/${pin}?role=teacher`);
+      ws = new WebSocket(`${(import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`).replace(/^http/, "ws")}/ws/wordcloud/${pin}?role=teacher`);
 
       ws.onopen = () => {
         if (isCancelled) {
@@ -157,7 +157,7 @@ export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, i
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "end_session" }));
       }
-      const response = await fetch(`http://localhost:8000/wordcloud/${pin}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`}/wordcloud/${pin}`, {
         method: "DELETE",
       });
       if (response.ok) {

@@ -13,7 +13,7 @@ import {
 import { GlassCard } from "../../shared/components/GlassCard";
 import { Link, useNavigate } from "react-router-dom";
 
-const API_URL = "http://localhost:8000";
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`;
 
 interface Course {
   id: number;

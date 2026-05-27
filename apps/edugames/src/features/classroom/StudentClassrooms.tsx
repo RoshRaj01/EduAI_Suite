@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
-const API_URL = "http://localhost:8000";
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`;
 
 type Course = {
   id: number;
