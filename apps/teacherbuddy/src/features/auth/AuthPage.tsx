@@ -20,7 +20,7 @@ export const AuthPage: React.FC = () => {
     setError("");
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/auth/google-login", {
+      const res = await fetch("/api/auth/google-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential }),
