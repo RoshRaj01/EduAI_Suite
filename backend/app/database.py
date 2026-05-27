@@ -7,6 +7,10 @@ from beanie import init_beanie
 import os
 import logging
 
+# Monkeypatch AsyncIOMotorClient to prevent Beanie initialization crash due to missing append_metadata
+if not hasattr(AsyncIOMotorClient, "append_metadata"):
+    AsyncIOMotorClient.append_metadata = lambda self, *args, **kwargs: None
+
 logger = logging.getLogger(__name__)
 
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")

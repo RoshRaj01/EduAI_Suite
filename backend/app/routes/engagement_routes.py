@@ -3,7 +3,7 @@ from app.models.student import Student
 from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.exam import Exam, ExamAttempt
-from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer
+from app.models.game import ChainAnswerGame
 from app.models.course import Course
 import logging
 import random
@@ -196,32 +196,32 @@ async def _get_student_engagement(student: Student, assignments: list):
 
     avg_exam_score = (total_exam_score / len(exam_attempts_raw)) if exam_attempts_raw else None
 
-    # ── Game data ─────────────────────────────────────────────
-    game_players = await ChainAnswerGamePlayer.find(
-        ChainAnswerGamePlayer.student_id == student_id_str
-    ).to_list()
+    # Find all games where this student participated
+    games = await ChainAnswerGame.find({"players.student_id": student_id_str}).to_list()
 
     games_data = []
     total_game_score = 0.0
     total_words_submitted = 0
     total_words_valid = 0
 
-    for gp in game_players:
-        game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == gp.game_id)
-        game_name = game.name if game else "Unknown Game"
-        game_status = game.status if game else "unknown"
-        games_data.append({
-            "game_id": gp.game_id,
-            "game_name": game_name,
-            "game_status": game_status,
-            "score": gp.score,
-            "words_submitted": gp.words_submitted,
-            "words_valid": gp.words_valid,
-            "player_status": gp.status,
-        })
-        total_game_score += (gp.score or 0)
-        total_words_submitted += (gp.words_submitted or 0)
-        total_words_valid += (gp.words_valid or 0)
+    for game in games:
+        # Find the specific player sub-document in this game
+        gp = next((p for p in game.players if p.student_id == student_id_str), None)
+        if gp:
+            game_name = game.name if game.name else "Unknown Game"
+            game_status = game.status if game.status else "unknown"
+            games_data.append({
+                "game_id": game.int_id,
+                "game_name": game_name,
+                "game_status": game_status,
+                "score": gp.score,
+                "words_submitted": gp.words_submitted,
+                "words_valid": gp.words_valid,
+                "player_status": gp.status,
+            })
+            total_game_score += (gp.score or 0)
+            total_words_submitted += (gp.words_submitted or 0)
+            total_words_valid += (gp.words_valid or 0)
 
     # ── Engagement Score ──────────────────────────────────────
     attendance_pct = min(student.attendance or 0, 100)

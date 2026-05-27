@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
-from app.models.game import ChainAnswerGame, ChainAnswerGamePlayer, ChainAnswerGameWord
+from app.models.game import ChainAnswerGame, GamePlayer, GameWord
 from app.models.student import Student
 from app.schemas.game import (
     ChainAnswerGameCreate,
@@ -33,26 +33,7 @@ async def create_chain_answer_game(game_data: ChainAnswerGameCreate):
         if suggestions:
             word_suggestions = json.dumps(suggestions)
 
-    new_game = ChainAnswerGame(
-        session_id=session_id,
-        name=game_data.name,
-        chain_variation=game_data.chain_variation,
-        category=game_data.category,
-        difficulty_level=game_data.difficulty_level,
-        language=game_data.language,
-        subject=game_data.subject,
-        starting_word=game_data.starting_word,
-        time_per_turn=game_data.time_per_turn,
-        max_words=game_data.max_words,
-        penalty_on_invalid=game_data.penalty_on_invalid,
-        penalty_type=game_data.penalty_type,
-        ai_suggestions=word_suggestions,
-        status="setup"
-    )
-    await new_game.assign_id()
-    await new_game.insert()
-
-    players_to_insert = []
+    players_list = []
     for idx, player_data in enumerate(game_data.players, start=1):
         try:
             sid_int = int(player_data.student_id)
@@ -69,37 +50,58 @@ async def create_chain_answer_game(game_data: ChainAnswerGameCreate):
                 detail=f"Student with ID {player_data.student_id} not found"
             )
 
-        new_player = ChainAnswerGamePlayer(
-            game_id=new_game.int_id,
+        new_player = GamePlayer(
+            int_id=idx,
             student_id=str(student.int_id),
             name=student.name,
             join_order=idx
         )
-        players_to_insert.append(new_player)
+        players_list.append(new_player)
 
-    if players_to_insert:
-        for p in players_to_insert:
-            await p.assign_id()
-            await p.insert()
-
-    starting_word_entry = ChainAnswerGameWord(
-        game_id=new_game.int_id,
+    starting_word_entry = GameWord(
+        int_id=1,
         word=game_data.starting_word,
         submitted_by="system",
         is_valid=True,
         position=0
     )
-    await starting_word_entry.assign_id()
-    await starting_word_entry.insert()
 
-    # We need to manually link the players to the game response schema.
-    # In Beanie, relations aren't auto-loaded in the same way, but the response schema 
-    # might expect `players`. Let's just return the new_game and let the frontend/schema handle it.
+    new_game = ChainAnswerGame(
+        session_id=session_id,
+        name=game_data.name,
+        chain_variation=game_data.chain_variation,
+        category=game_data.category,
+        difficulty_level=game_data.difficulty_level,
+        language=game_data.language,
+        subject=game_data.subject,
+        starting_word=game_data.starting_word,
+        time_per_turn=game_data.time_per_turn,
+        max_words=game_data.max_words,
+        penalty_on_invalid=game_data.penalty_on_invalid,
+        penalty_type=game_data.penalty_type,
+        ai_suggestions=word_suggestions,
+        status="setup",
+        players=players_list,
+        words=[starting_word_entry]
+    )
+    await new_game.assign_id()
+    await new_game.insert()
+
     res = new_game.model_dump()
     res["id"] = new_game.int_id
-    res["players"] = [p.model_dump() for p in players_to_insert]
-    for p in res["players"]:
-        p["id"] = p["int_id"]
+    
+    res["players"] = []
+    for p in new_game.players:
+        d = p.model_dump()
+        d["id"] = p.int_id
+        res["players"].append(d)
+        
+    res["words"] = []
+    for w in new_game.words:
+        d = w.model_dump()
+        d["id"] = w.int_id
+        res["words"].append(d)
+        
     return res
 
 
@@ -120,6 +122,11 @@ async def get_all_chain_answer_games(
     for g in games:
         d = g.model_dump()
         d["id"] = g.int_id
+        d["players"] = []
+        for p in g.players:
+            dp = p.model_dump()
+            dp["id"] = p.int_id
+            d["players"].append(dp)
         res.append(d)
     return res
 
@@ -137,12 +144,17 @@ async def get_chain_answer_game(game_id: int):
     res = game.model_dump()
     res["id"] = game.int_id
     
-    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game_id).to_list()
     res["players"] = []
-    for p in players:
+    for p in game.players:
         d = p.model_dump()
         d["id"] = p.int_id
         res["players"].append(d)
+        
+    res["words"] = []
+    for w in game.words:
+        d = w.model_dump()
+        d["id"] = w.int_id
+        res["words"].append(d)
         
     return res
 
@@ -160,12 +172,17 @@ async def get_chain_answer_game_by_session(session_id: str):
     res = game.model_dump()
     res["id"] = game.int_id
     
-    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game.int_id).to_list()
     res["players"] = []
-    for p in players:
+    for p in game.players:
         d = p.model_dump()
         d["id"] = p.int_id
         res["players"].append(d)
+        
+    res["words"] = []
+    for w in game.words:
+        d = w.model_dump()
+        d["id"] = w.int_id
+        res["words"].append(d)
         
     return res
 
@@ -186,8 +203,7 @@ async def start_chain_answer_game(game_id: int):
             detail=f"Cannot start game in {game.status} status"
         )
 
-    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game_id).to_list()
-    if len(players) < 2:
+    if len(game.players) < 2:
         raise HTTPException(
             status_code=400,
             detail="Minimum 2 players required to start the game"
@@ -199,11 +215,19 @@ async def start_chain_answer_game(game_id: int):
 
     res = game.model_dump()
     res["id"] = game.int_id
+    
     res["players"] = []
-    for p in players:
+    for p in game.players:
         d = p.model_dump()
         d["id"] = p.int_id
         res["players"].append(d)
+        
+    res["words"] = []
+    for w in game.words:
+        d = w.model_dump()
+        d["id"] = w.int_id
+        res["words"].append(d)
+        
     return res
 
 
@@ -223,34 +247,31 @@ async def submit_word(game_id: int, word_data: GameWordCreate):
             detail="Game is not active"
         )
 
-    max_position = await ChainAnswerGameWord.find(
-        ChainAnswerGameWord.game_id == game_id
-    ).sort("-position").first_or_none()
+    # Find the maximum position in the embedded words list
+    max_position = max((w.position for w in game.words), default=0)
+    next_position = max_position + 1
 
-    next_position = (max_position.position + 1) if max_position else 1
-
-    new_word = ChainAnswerGameWord(
-        game_id=game_id,
+    # Create new word with sequentially generated int_id
+    next_word_id = len(game.words) + 1
+    new_word = GameWord(
+        int_id=next_word_id,
         word=word_data.word,
         submitted_by=word_data.submitted_by,
         is_valid=word_data.is_valid,
         position=next_position,
         validation_reason=word_data.validation_reason
     )
-    await new_word.assign_id()
-    await new_word.insert()
+    game.words.append(new_word)
 
-    player = await ChainAnswerGamePlayer.find_one(
-        ChainAnswerGamePlayer.game_id == game_id,
-        ChainAnswerGamePlayer.student_id == word_data.submitted_by
-    )
-
+    # Find and update player stats in the embedded players list
+    player = next((p for p in game.players if p.student_id == word_data.submitted_by), None)
     if player:
         player.words_submitted = (player.words_submitted or 0) + 1
         if word_data.is_valid:
             player.words_valid = (player.words_valid or 0) + 1
             player.score = (player.score or 0) + 10
-        await player.save()
+
+    await game.save()
 
     res = new_word.model_dump()
     res["id"] = new_word.int_id
@@ -280,12 +301,18 @@ async def end_chain_answer_game(game_id: int):
     res = game.model_dump()
     res["id"] = game.int_id
     
-    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game.int_id).to_list()
     res["players"] = []
-    for p in players:
+    for p in game.players:
         d = p.model_dump()
         d["id"] = p.int_id
         res["players"].append(d)
+        
+    res["words"] = []
+    for w in game.words:
+        d = w.model_dump()
+        d["id"] = w.int_id
+        res["words"].append(d)
+        
     return res
 
 
@@ -311,12 +338,18 @@ async def pause_chain_answer_game(game_id: int):
     res = game.model_dump()
     res["id"] = game.int_id
     
-    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game.int_id).to_list()
     res["players"] = []
-    for p in players:
+    for p in game.players:
         d = p.model_dump()
         d["id"] = p.int_id
         res["players"].append(d)
+        
+    res["words"] = []
+    for w in game.words:
+        d = w.model_dump()
+        d["id"] = w.int_id
+        res["words"].append(d)
+        
     return res
 
 
@@ -342,12 +375,18 @@ async def resume_chain_answer_game(game_id: int):
     res = game.model_dump()
     res["id"] = game.int_id
     
-    players = await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game.int_id).to_list()
     res["players"] = []
-    for p in players:
+    for p in game.players:
         d = p.model_dump()
         d["id"] = p.int_id
         res["players"].append(d)
+        
+    res["words"] = []
+    for w in game.words:
+        d = w.model_dump()
+        d["id"] = w.int_id
+        res["words"].append(d)
+        
     return res
 
 
@@ -371,8 +410,5 @@ async def delete_chain_answer_game(game_id: int):
             detail="Game not found"
         )
 
-    await ChainAnswerGameWord.find(ChainAnswerGameWord.game_id == game_id).delete()
-    await ChainAnswerGamePlayer.find(ChainAnswerGamePlayer.game_id == game_id).delete()
     await game.delete()
-
     return None
