@@ -11,17 +11,22 @@ student_router = APIRouter(prefix="/students", tags=["Students"])
 @student_router.get("/", response_model=list[StudentResponse])
 async def get_all_students():
     students = await Student.find_all().to_list()
-    # Map int_id to id for response
-    return [
-        StudentResponse(**s.model_dump(), id=s.int_id) for s in students
-    ]
+    result = []
+    for s in students:
+        d = s.model_dump()
+        d["id"] = s.int_id
+        result.append(StudentResponse(**d))
+    return result
 
 @student_router.get("/{course_id}", response_model=list[StudentResponse])
 async def get_students(course_id: int):
     students = await Student.find(Student.course_id == course_id).to_list()
-    return [
-        StudentResponse(**s.model_dump(), id=s.int_id) for s in students
-    ]
+    result = []
+    for s in students:
+        d = s.model_dump()
+        d["id"] = s.int_id
+        result.append(StudentResponse(**d))
+    return result
 
 @student_router.post("/{course_id}", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 async def manual_enroll(course_id: int, student: StudentCreate):
@@ -42,7 +47,9 @@ async def manual_enroll(course_id: int, student: StudentCreate):
     course.students = (course.students or 0) + 1
     await course.save()
     
-    return StudentResponse(**new_student.model_dump(), id=new_student.int_id)
+    d = new_student.model_dump()
+    d["id"] = new_student.int_id
+    return StudentResponse(**d)
 
 @student_router.post("/bulk_upload/{course_id}", status_code=status.HTTP_201_CREATED)
 async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
@@ -157,7 +164,9 @@ async def enroll_via_code(enrollment_code: str, student: StudentCreate):
     course.students = (course.students or 0) + 1
     await course.save()
     
-    return StudentResponse(**new_student.model_dump(), id=new_student.int_id)
+    d = new_student.model_dump()
+    d["id"] = new_student.int_id
+    return StudentResponse(**d)
 
 @student_router.get("/{course_id}/active", response_model=list[StudentResponse])
 async def get_active_students(course_id: int):
@@ -171,10 +180,12 @@ async def get_active_students(course_id: int):
         Student.course_id == course_id,
         Student.attendance > 0
     ).to_list()
-    
-    return [
-        StudentResponse(**s.model_dump(), id=s.int_id) for s in students
-    ]
+    result = []
+    for s in students:
+        d = s.model_dump()
+        d["id"] = s.int_id
+        result.append(StudentResponse(**d))
+    return result
 
 @student_router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_student(student_id: int):

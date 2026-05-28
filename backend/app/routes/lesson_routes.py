@@ -134,7 +134,7 @@ async def create_lesson(request: LessonCreateRequest):
         )
         await lesson.assign_id()
         await lesson.insert()
-        return LessonResponse(**lesson.model_dump(), id=lesson.int_id)
+        return LessonResponse(**{**lesson.model_dump(), "id": lesson.int_id})
     except Exception as e:
         logger.error(f"Error creating lesson: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -156,7 +156,7 @@ async def get_lessons(
             query = query.find({"posted_at": {"$ne": None}})
 
         lessons = await query.sort("-created_at").to_list()
-        return [LessonListResponse(**l.model_dump(), id=l.int_id) for l in lessons]
+        return [LessonListResponse(**{**l.model_dump(), "id": l.int_id}) for l in lessons]
     except Exception as e:
         logger.error(f"Error fetching lessons: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -169,7 +169,7 @@ async def get_lesson(lesson_id: int):
         lesson = await Lesson.find_one(Lesson.int_id == lesson_id)
         if not lesson:
             raise HTTPException(status_code=404, detail="Lesson not found")
-        return LessonResponse(**lesson.model_dump(), id=lesson.int_id)
+        return LessonResponse(**{**lesson.model_dump(), "id": lesson.int_id})
     except HTTPException:
         raise
     except Exception as e:
@@ -211,7 +211,7 @@ async def update_lesson(
 
         lesson.updated_at = datetime.utcnow()
         await lesson.save()
-        return LessonResponse(**lesson.model_dump(), id=lesson.int_id)
+        return LessonResponse(**{**lesson.model_dump(), "id": lesson.int_id})
     except HTTPException:
         raise
     except Exception as e:
@@ -237,7 +237,7 @@ async def post_lesson(
         lesson.posted_at = datetime.utcnow()
         await lesson.save()
         logger.info(f"Lesson {lesson_id} posted to course {lesson.course_id}")
-        return LessonResponse(**lesson.model_dump(), id=lesson.int_id)
+        return LessonResponse(**{**lesson.model_dump(), "id": lesson.int_id})
     except HTTPException:
         raise
     except Exception as e:

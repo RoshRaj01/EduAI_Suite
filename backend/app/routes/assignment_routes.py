@@ -13,7 +13,7 @@ assignment_router = APIRouter(prefix="/assignments", tags=["Assignments"])
 async def get_assignments(course_id: int):
     assignments = await Assignment.find(Assignment.course_id == course_id).to_list()
     return [
-        AssignmentResponse(**a.model_dump(), id=a.int_id) for a in assignments
+        AssignmentResponse(**{**a.model_dump(), "id": a.int_id}) for a in assignments
     ]
 
 @assignment_router.post("/{course_id}", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
@@ -54,7 +54,7 @@ async def create_assignment(
     await an.assign_id()
     await an.insert()
 
-    return AssignmentResponse(**new_assignment.model_dump(), id=new_assignment.int_id)
+    return AssignmentResponse(**{**new_assignment.model_dump(), "id": new_assignment.int_id})
 
 @assignment_router.put("/{assignment_id}", response_model=AssignmentResponse)
 async def update_assignment(
@@ -92,7 +92,7 @@ async def update_assignment(
     await an.insert()
 
     await assignment.save()
-    return AssignmentResponse(**assignment.model_dump(), id=assignment.int_id)
+    return AssignmentResponse(**{**assignment.model_dump(), "id": assignment.int_id})
 
 @assignment_router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_assignment(assignment_id: int):

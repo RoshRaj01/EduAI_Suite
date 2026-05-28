@@ -11,7 +11,7 @@ announcement_router = APIRouter(prefix="/announcements", tags=["Announcements"])
 async def get_announcements(course_id: int):
     announcements = await Announcement.find(Announcement.course_id == course_id).to_list()
     return [
-        AnnouncementResponse(**a.model_dump(), id=a.int_id) for a in announcements
+        AnnouncementResponse(**{**a.model_dump(), "id": a.int_id}) for a in announcements
     ]
 
 @announcement_router.post("/{course_id}", response_model=AnnouncementResponse, status_code=status.HTTP_201_CREATED)
@@ -43,7 +43,7 @@ async def create_announcement(
     await new_announcement.assign_id()
     await new_announcement.insert()
     
-    return AnnouncementResponse(**new_announcement.model_dump(), id=new_announcement.int_id)
+    return AnnouncementResponse(**{**new_announcement.model_dump(), "id": new_announcement.int_id})
 
 @announcement_router.delete("/{announcement_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_announcement(announcement_id: int):

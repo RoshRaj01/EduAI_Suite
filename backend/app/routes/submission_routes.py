@@ -12,14 +12,14 @@ submission_router = APIRouter(prefix="/submissions", tags=["Submissions"])
 async def get_submissions(assignment_id: int):
     submissions = await Submission.find(Submission.assignment_id == assignment_id).to_list()
     return [
-        SubmissionResponse(**s.model_dump(), id=s.int_id) for s in submissions
+        SubmissionResponse(**{**s.model_dump(), "id": s.int_id}) for s in submissions
     ]
 
 @submission_router.get("/assignment/{assignment_id}", response_model=list[SubmissionResponse])
 async def get_submissions_by_assignment(assignment_id: int):
     submissions = await Submission.find(Submission.assignment_id == assignment_id).to_list()
     return [
-        SubmissionResponse(**s.model_dump(), id=s.int_id) for s in submissions
+        SubmissionResponse(**{**s.model_dump(), "id": s.int_id}) for s in submissions
     ]
 
 @submission_router.post("/{assignment_id}", response_model=SubmissionResponse, status_code=status.HTTP_201_CREATED)
@@ -47,7 +47,7 @@ async def create_submission(
     await new_sub.assign_id()
     await new_sub.insert()
     
-    return SubmissionResponse(**new_sub.model_dump(), id=new_sub.int_id)
+    return SubmissionResponse(**{**new_sub.model_dump(), "id": new_sub.int_id})
 
 @submission_router.delete("/{submission_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_submission(submission_id: int):
@@ -84,4 +84,4 @@ async def grade_submission(submission_id: int, grade: float = Form(...)):
     
     sub.grade = grade
     await sub.save()
-    return SubmissionResponse(**sub.model_dump(), id=sub.int_id)
+    return SubmissionResponse(**{**sub.model_dump(), "id": sub.int_id})
