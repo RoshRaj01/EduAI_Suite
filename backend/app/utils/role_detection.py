@@ -54,5 +54,5 @@ def detect_role_from_email(email: str) -> str:
     if domain.endswith(f".{teacher_domain}"):
         return "student"
 
-    # 5. Fallback for unauthorized domains
-    return "external"
+    # 5. Fallback for unauthorized domains (Allow 'student' fallback for easy local testing/registration)
+    return "student"

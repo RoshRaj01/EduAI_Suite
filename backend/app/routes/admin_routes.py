@@ -47,6 +47,12 @@ async def approve_user(
     return {"message": "User approved successfully", "user_id": user_id}
 
 
+from pydantic import BaseModel, EmailStr
+
+class WhitelistStudentRequest(BaseModel):
+    email: EmailStr
+
+
 @admin_router.patch("/deny-user/{user_id}")
 async def deny_user(
     user_id: int,
@@ -65,3 +71,39 @@ async def deny_user(
         "user_id": user_id,
         "reason": body.reason if body else None,
     }
+
+
+@admin_router.post("/whitelist-email")
+async def whitelist_email(
+    body: WhitelistStudentRequest,
+    _admin: User = Depends(get_admin_user),
+):
+    """Manually add a student email (any domain) that behaves as a new pending student."""
+    email = body.email.strip().lower()
+
+    # Check if a user with this email already exists
+    existing = await User.find_one(User.email == email)
+    if existing:
+        if existing.role == "student":
+            if existing.status != UserStatus.PENDING:
+                existing.status = UserStatus.PENDING
+                await existing.save()
+            return {"message": "Email is already registered as a student (set to pending)", "user_id": existing.int_id}
+        else:
+            existing.role = "student"
+            existing.status = UserStatus.PENDING
+            await existing.save()
+            return {"message": "Existing user converted to student (pending approval)", "user_id": existing.int_id}
+
+    # Create a new student user in PENDING status
+    new_user = User(
+        name=email.split("@")[0].capitalize(),
+        email=email,
+        role="student",
+        status=UserStatus.PENDING,
+        hashed_password=None,
+    )
+    await new_user.assign_id()
+    await new_user.insert()
+
+    return {"message": "Email successfully whitelisted as pending student", "user_id": new_user.int_id}

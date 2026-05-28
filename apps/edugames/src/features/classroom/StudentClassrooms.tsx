@@ -108,7 +108,7 @@ export const StudentClassrooms: React.FC = () => {
 
   const get_user = () => {
     const storedUser = localStorage.getItem("user");
-    return storedUser ? JSON.parse(storedUser) : { name: "Aarav Gupta", email: "aarav@student.com" };
+    return storedUser ? JSON.parse(storedUser) : { name: "Student", email: "student@eduai.com" };
   };
 
   const loadCourses = async () => {

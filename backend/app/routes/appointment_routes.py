@@ -24,19 +24,19 @@ async def get_appointments(
         query = query.find(Appointment.status == status_filter)
         
     appointments = await query.sort("-int_id").to_list()
-    return [AppointmentResponse(**a.model_dump(), id=a.int_id) for a in appointments]
+    return [AppointmentResponse(**{**a.model_dump(), "id": a.int_id}) for a in appointments]
 
 
 @appointment_router.get("/teacher/{teacher_name}", response_model=list[AppointmentResponse])
 async def get_teacher_appointments(teacher_name: str):
     appointments = await Appointment.find(Appointment.teacher_name == teacher_name).sort("-int_id").to_list()
-    return [AppointmentResponse(**a.model_dump(), id=a.int_id) for a in appointments]
+    return [AppointmentResponse(**{**a.model_dump(), "id": a.int_id}) for a in appointments]
 
 
 @appointment_router.get("/student/{student_name}", response_model=list[AppointmentResponse])
 async def get_student_appointments(student_name: str):
     appointments = await Appointment.find(Appointment.student_name == student_name).sort("-int_id").to_list()
-    return [AppointmentResponse(**a.model_dump(), id=a.int_id) for a in appointments]
+    return [AppointmentResponse(**{**a.model_dump(), "id": a.int_id}) for a in appointments]
 
 
 @appointment_router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
@@ -73,7 +73,7 @@ async def create_appointment(payload: AppointmentCreate):
     await history.assign_id()
     await history.insert()
     
-    return AppointmentResponse(**appointment.model_dump(), id=appointment.int_id)
+    return AppointmentResponse(**{**appointment.model_dump(), "id": appointment.int_id})
 
 
 @appointment_router.patch("/{appointment_id}/status", response_model=AppointmentResponse)
@@ -109,4 +109,4 @@ async def update_appointment_status(
     await history.insert()
     
     await appointment.save()
-    return AppointmentResponse(**appointment.model_dump(), id=appointment.int_id)
+    return AppointmentResponse(**{**appointment.model_dump(), "id": appointment.int_id})

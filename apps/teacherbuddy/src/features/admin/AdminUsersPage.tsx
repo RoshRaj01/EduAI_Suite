@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Check, X, ShieldAlert, Loader } from "lucide-react";
+import { Check, X, ShieldAlert, Loader, Mail, PlusCircle } from "lucide-react";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 interface PendingUser {
@@ -14,6 +14,11 @@ interface PendingUser {
 export const AdminUsersPage: React.FC = () => {
   const [users, setUsers] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Manual Whitelist Form States
+  const [emailInput, setEmailInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchPendingUsers = async () => {
     setLoading(true);
@@ -38,6 +43,39 @@ export const AdminUsersPage: React.FC = () => {
   useEffect(() => {
     fetchPendingUsers();
   }, []);
+
+  const handleWhitelist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailInput.trim()) return;
+
+    setSubmitting(true);
+    setFeedback(null);
+    try {
+      const storedToken = localStorage.getItem("token");
+      const res = await fetch(`${API_ENDPOINTS.BASE}/admin/whitelist-email`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${storedToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: emailInput.trim() }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setFeedback({ type: "success", message: data.message || "Email successfully whitelisted!" });
+        setEmailInput("");
+        fetchPendingUsers();
+      } else {
+        setFeedback({ type: "error", message: data.detail || data.message || "Failed to whitelist email." });
+      }
+    } catch (err) {
+      console.error("Failed to whitelist email", err);
+      setFeedback({ type: "error", message: "Network error. Please try again." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleAction = async (userId: number, action: "approve" | "deny") => {
     try {
@@ -71,6 +109,71 @@ export const AdminUsersPage: React.FC = () => {
             Review and approve pending accounts across the EduAI Suite.
           </p>
         </div>
+      </div>
+
+      {/* Whitelist Panel */}
+      <div 
+        className="glass-card border p-6 mb-6 rounded-2xl relative overflow-hidden transition-all duration-300 hover:shadow-lg"
+        style={{ 
+          borderColor: "var(--color-border)",
+          background: "var(--color-surface-card)",
+        }}
+      >
+        <div className="absolute right-0 top-0 w-32 h-32 bg-blue-500 opacity-5 rounded-full blur-2xl pointer-events-none transform translate-x-8 -translate-y-8"></div>
+        
+        <h2 className="text-lg font-bold mb-1 flex items-center gap-2" style={{ color: "var(--color-text-primary)" }}>
+          <ShieldAlert size={18} className="text-blue-500" />
+          Pre-approve / Whitelist External Student
+        </h2>
+        <p className="text-xs mb-4" style={{ color: "var(--color-text-secondary)" }}>
+          Enter a student's email address (any domain, e.g. Gmail) to manually add them to the student directory in a pending status.
+        </p>
+
+        <form onSubmit={handleWhitelist} className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <Mail size={16} />
+            </span>
+            <input
+              type="email"
+              required
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              placeholder="student@gmail.com"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border outline-none text-sm transition-all focus:ring-2 focus:ring-blue-500/20"
+              style={{
+                borderColor: "var(--color-border)",
+                background: "var(--color-bg-base)",
+                color: "var(--color-text-primary)",
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="btn btn-primary font-bold px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {submitting ? (
+              <Loader className="animate-spin" size={16} />
+            ) : (
+              <PlusCircle size={16} />
+            )}
+            Whitelist Student
+          </button>
+        </form>
+
+        {feedback && (
+          <div 
+            className={`mt-4 p-3.5 rounded-xl text-xs font-semibold border flex items-center gap-2 animate-fade-in ${
+              feedback.type === "success" 
+                ? "bg-green-50/50 border-green-200 text-green-700 dark:bg-green-950/20 dark:border-green-800/30" 
+                : "bg-red-50/50 border-red-200 text-red-700 dark:bg-red-950/20 dark:border-red-800/30"
+            }`}
+          >
+            {feedback.type === "success" ? <Check size={14} /> : <X size={14} />}
+            <span>{feedback.message}</span>
+          </div>
+        )}
       </div>
 
       <div className="glass-card border overflow-hidden" style={{ borderColor: "var(--color-border)" }}>

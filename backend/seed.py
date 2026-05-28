@@ -2,28 +2,54 @@ import os
 import asyncio
 from dotenv import load_dotenv
 from app.database import init_db
+from app.models.user import User
 from app.models.course import Course
 from app.models.announcement import Announcement
 from app.models.student import Student
 from app.models.assignment import Assignment
 from app.models.appointment import Appointment
+from app.utils.auth import get_password_hash
 from seed_users import USERS_TO_SEED
 
 load_dotenv()
 
 async def seed_data():
+    print("Initializing Database...")
     await init_db()
 
-    # 🔹 Extract real teachers from USERS_TO_SEED
-    teachers = [user for user in USERS_TO_SEED if user.get("role") == "teacher"]
+    print("\n--- Phase 1: Seeding Users ---")
+    seeded_teachers = []
+    seeded_students = []
 
-    # Get teacher names
-    teacher1_name = teachers[0]["name"] if len(teachers) > 0 else "Prof. Default"
-    teacher2_name = teachers[1]["name"] if len(teachers) > 1 else "Dr. Default"
-    teacher3_name = teachers[0]["name"] if len(
-        teachers) > 0 else "Prof. Default"  # Reuse first teacher
+    for user_data in USERS_TO_SEED:
+        email = user_data["email"]
+        raw_password = user_data.pop("password", "eduai123")[:72]
+        user_data["hashed_password"] = get_password_hash(raw_password)
+        
+        # Check if user already exists
+        db_user = await User.find_one(User.email == email)
+        if db_user:
+            print(f"Updating user: {email}")
+            for key, value in user_data.items():
+                setattr(db_user, key, value)
+            await db_user.save()
+            user_obj = db_user
+        else:
+            print(f"Creating user: {email}")
+            user_obj = User(**user_data)
+            await user_obj.assign_id()
+            await user_obj.insert()
+            
+        if user_obj.role == "teacher":
+            seeded_teachers.append(user_obj)
+        elif user_obj.role == "student":
+            seeded_students.append(user_obj)
 
-    # 🔹 Add courses
+    teacher1_name = seeded_teachers[0].name if len(seeded_teachers) > 0 else "Prof. Default"
+    teacher2_name = seeded_teachers[1].name if len(seeded_teachers) > 1 else "Dr. Default"
+    teacher3_name = seeded_teachers[0].name if len(seeded_teachers) > 0 else "Prof. Default"
+
+    print("\n--- Phase 2: Seeding Courses ---")
     course1 = Course(
         code="CSC401",
         name="Advanced Neural Networks",
@@ -63,8 +89,9 @@ async def seed_data():
     await course2.insert()
     await course3.assign_id()
     await course3.insert()
+    print("Courses seeded successfully!")
 
-    # 🔹 Announcements
+    print("\n--- Phase 3: Seeding Announcements ---")
     a1 = Announcement(
         course_id=course1.int_id,
         title="Lab 4 Released",
@@ -83,106 +110,85 @@ async def seed_data():
     await a1.insert()
     await a2.assign_id()
     await a2.insert()
+    print("Announcements seeded successfully!")
 
-    # 🔹 Assignments
+    print("\n--- Phase 4: Seeding Assignments ---")
     assignments = [
         Assignment(
             course_id=course1.int_id,
             title="Lab Report - 1",
             description="Write a detailed report on backpropagation implementation.",
-            due_date="2024-04-20",
+            due_date="2026-06-20T23:59",
             max_points=50
         ),
         Assignment(
             course_id=course1.int_id,
             title="Mid-Term Project",
             description="Design a generic CNN for image classification.",
-            due_date="2024-04-25",
+            due_date="2026-06-25T23:59",
             max_points=100
         ),
         Assignment(
             course_id=course2.int_id,
             title="Linked List Challenge",
             description="Implement a doubly linked list with insert and delete operations.",
-            due_date="2024-04-22",
+            due_date="2026-06-22T23:59",
             max_points=75
         ),
         Assignment(
             course_id=course3.int_id,
             title="Proof Portfolio",
             description="Submit proofs for the selected discrete math problems.",
-            due_date="2024-04-28",
+            due_date="2026-06-28T23:59",
             max_points=60
         )
     ]
     for asn in assignments:
         await asn.assign_id()
         await asn.insert()
+    print("Assignments seeded successfully!")
 
-    # 🔹 Students - Using real student data from USERS_TO_SEED
-    students_from_seed = [
-        user for user in USERS_TO_SEED if user.get("role") == "student"]
-
+    print("\n--- Phase 5: Seeding Student Profiles ---")
     student_data = [
         {
             "course_id": course1.int_id,
-            "name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Arjun Mehta",
-            "email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "arjun@example.com",
-            "registration_number": students_from_seed[0].get("registration_number", "S4121") if len(students_from_seed) > 0 else "S4121",
+            "name": seeded_students[0].name if len(seeded_students) > 0 else "Omkaar",
+            "email": seeded_students[0].email if len(seeded_students) > 0 else "omkaar@eduai.com",
+            "registration_number": "25441156",
             "student_class": "2026-A",
-            "department": students_from_seed[0].get("department", "Computer Science") if len(students_from_seed) > 0 else "Computer Science",
+            "department": "Computer Science",
             "attendance": 95,
             "avg_score": 92
         },
         {
             "course_id": course1.int_id,
-            "name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Sneha Patil",
-            "email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "sneha@example.com",
-            "registration_number": students_from_seed[1].get("registration_number", "S4135") if len(students_from_seed) > 1 else "S4135",
+            "name": seeded_students[1].name if len(seeded_students) > 1 else "Aarav Gupta",
+            "email": seeded_students[1].email if len(seeded_students) > 1 else "aarav@student.com",
+            "registration_number": "REG2024001",
             "student_class": "2026-A",
-            "department": students_from_seed[1].get("department", "Computer Science") if len(students_from_seed) > 1 else "Computer Science",
+            "department": "Data Science",
             "attendance": 90,
             "avg_score": 88
         },
         {
             "course_id": course2.int_id,
-            "name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Aarav S.",
-            "email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "aarav.s@christuniversity.in",
-            "registration_number": students_from_seed[0].get("registration_number", "S4210") if len(students_from_seed) > 0 else "S4210",
+            "name": seeded_students[0].name if len(seeded_students) > 0 else "Omkaar",
+            "email": seeded_students[0].email if len(seeded_students) > 0 else "omkaar@eduai.com",
+            "registration_number": "25441156",
             "student_class": "2025-B",
-            "department": students_from_seed[0].get("department", "Computer Science") if len(students_from_seed) > 0 else "Computer Science",
+            "department": "Computer Science",
             "attendance": 93,
             "avg_score": 86
         },
         {
             "course_id": course2.int_id,
-            "name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Diya Patel",
-            "email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "diya.patel@example.com",
-            "registration_number": students_from_seed[1].get("registration_number", "S4218") if len(students_from_seed) > 1 else "S4218",
+            "name": seeded_students[1].name if len(seeded_students) > 1 else "Aarav Gupta",
+            "email": seeded_students[1].email if len(seeded_students) > 1 else "aarav@student.com",
+            "registration_number": "REG2024001",
             "student_class": "2025-B",
-            "department": students_from_seed[1].get("department", "Computer Science") if len(students_from_seed) > 1 else "Computer Science",
+            "department": "Data Science",
             "attendance": 89,
             "avg_score": 91
-        },
-        {
-            "course_id": course3.int_id,
-            "name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Rohan Menon",
-            "email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "rohan.menon@example.com",
-            "registration_number": students_from_seed[0].get("registration_number", "S4302") if len(students_from_seed) > 0 else "S4302",
-            "student_class": "2025-A",
-            "department": students_from_seed[0].get("department", "Mathematics") if len(students_from_seed) > 0 else "Mathematics",
-            "attendance": 96,
-            "avg_score": 84
-        },
-        {
-            "course_id": course3.int_id,
-            "name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Neha Gupta",
-            "email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "neha.gupta@example.com",
-            "registration_number": students_from_seed[1].get("registration_number", "S4307") if len(students_from_seed) > 1 else "S4307",
-            "student_class": "2025-A",
-            "department": students_from_seed[1].get("department", "Mathematics") if len(students_from_seed) > 1 else "Mathematics",
-            "attendance": 91,
-            "avg_score": 89
         }
     ]
 
@@ -190,69 +196,36 @@ async def seed_data():
         s = Student(**s_dict)
         await s.assign_id()
         await s.insert()
+    print("Student profiles seeded successfully!")
 
-    # 🔹 Appointments - Using real student and teacher data
+    print("\n--- Phase 6: Seeding Appointments ---")
     appointments_data = [
         {
-            "student_name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Aarav S.",
-            "student_email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "aarav.s@christuniversity.in",
+            "student_name": seeded_students[0].name if len(seeded_students) > 0 else "Omkaar",
+            "student_email": seeded_students[0].email if len(seeded_students) > 0 else "omkaar@eduai.com",
             "teacher_name": teacher2_name,
-            "teacher_department": teachers[1]["department"] if len(teachers) > 1 else "Computer Science",
+            "teacher_department": "Data Science",
             "meeting_mode": "In-person",
-            "time_slot": "2026-04-18 10:30 AM",
-            "topic": "Clarify linked list implementation for the assignment.",
+            "time_slot": "2026-06-18T10:30",
+            "agenda": "DSA questions",
+            "details": "Clarify linked list implementation for the assignment.",
             "status": "pending",
-            "requested_at": "2026-04-17T09:10"
+            "requested_at": "2026-05-28T09:10"
         },
         {
-            "student_name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Aarav S.",
-            "student_email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "aarav.s@christuniversity.in",
+            "student_name": seeded_students[0].name if len(seeded_students) > 0 else "Omkaar",
+            "student_email": seeded_students[0].email if len(seeded_students) > 0 else "omkaar@eduai.com",
             "teacher_name": teacher1_name,
-            "teacher_department": teachers[0]["department"] if len(teachers) > 0 else "Computer Science",
+            "teacher_department": "Computer Science",
             "meeting_mode": "Online",
-            "time_slot": "2026-04-19 03:00 PM",
-            "topic": "Review project proposal and model selection.",
+            "time_slot": "2026-06-19T15:00",
+            "agenda": "Neural Networks Project review",
+            "details": "Review project proposal and model selection.",
             "status": "approved",
-            "requested_at": "2026-04-16T14:25",
-            "reviewed_at": "2026-04-16T18:05",
+            "requested_at": "2026-05-27T14:25",
+            "reviewed_at": "2026-05-27T18:05",
             "reviewed_by": teacher1_name,
             "notes": "Approved for a 20-minute slot."
-        },
-        {
-            "student_name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Diya Patel",
-            "student_email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "diya.patel@example.com",
-            "teacher_name": teacher3_name,
-            "teacher_department": teachers[0]["department"] if len(teachers) > 0 else "Mathematics",
-            "meeting_mode": "Online",
-            "time_slot": "2026-04-18 01:00 PM",
-            "topic": "Need help with proof strategies for combinatorics.",
-            "status": "pending",
-            "requested_at": "2026-04-17T10:45"
-        },
-        {
-            "student_name": students_from_seed[0]["name"] if len(students_from_seed) > 0 else "Rohan Menon",
-            "student_email": students_from_seed[0]["email"] if len(students_from_seed) > 0 else "rohan.menon@example.com",
-            "teacher_name": teacher2_name,
-            "teacher_department": teachers[1]["department"] if len(teachers) > 1 else "Computer Science",
-            "meeting_mode": "In-person",
-            "time_slot": "2026-04-17 04:00 PM",
-            "topic": "Discuss runtime complexity for the assignment.",
-            "status": "rejected",
-            "requested_at": "2026-04-15T11:15",
-            "reviewed_at": "2026-04-15T15:20",
-            "reviewed_by": teacher2_name,
-            "notes": "Try the office hours on Friday instead."
-        },
-        {
-            "student_name": students_from_seed[1]["name"] if len(students_from_seed) > 1 else "Neha Gupta",
-            "student_email": students_from_seed[1]["email"] if len(students_from_seed) > 1 else "neha.gupta@example.com",
-            "teacher_name": teacher1_name,
-            "teacher_department": teachers[0]["department"] if len(teachers) > 0 else "Computer Science",
-            "meeting_mode": "Online",
-            "time_slot": "2026-04-20 11:00 AM",
-            "topic": "Discuss data preprocessing for the neural network project.",
-            "status": "pending",
-            "requested_at": "2026-04-17T08:30"
         }
     ]
 
@@ -260,8 +233,9 @@ async def seed_data():
         app = Appointment(**a_dict)
         await app.assign_id()
         await app.insert()
+    print("Appointments seeded successfully!")
 
-    print("Dummy data inserted successfully")
+    print("\n--- Seeding Process Completed Successfully! ---")
 
 if __name__ == "__main__":
     asyncio.run(seed_data())

@@ -31,7 +31,7 @@ async def _enrich_course(course: Course) -> dict:
     if total_slots > 0:
         submission_ids = [a.int_id for a in assignments]
         received = await Submission.find(
-            Submission.assignment_id.in_(submission_ids)
+            {"assignment_id": {"$in": submission_ids}}
         ).count()
         progress = round(min(received / total_slots * 100, 100), 1)
     else:

@@ -49,11 +49,6 @@ export const ExamsPage: React.FC = () => {
       const response = await fetch(`${API_ENDPOINTS.EXAMS}/stats`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
-      if (response.status === 401) {
-        logout();
-        navigate("/login");
-        return;
-      }
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -72,11 +67,6 @@ export const ExamsPage: React.FC = () => {
         headers: { "Authorization": `Bearer ${token}` },
         signal: AbortSignal.timeout(10000) // 10 second timeout
       });
-      if (response.status === 401) {
-        logout();
-        navigate("/login");
-        return;
-      }
       if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
       const data = await response.json();
       setExamsList(data);

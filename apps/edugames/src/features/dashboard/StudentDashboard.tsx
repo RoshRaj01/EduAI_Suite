@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../store/useAuthStore";
 
 const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`;
 
@@ -42,6 +43,7 @@ interface LessonDetail extends Lesson {
 }
 
 export const StudentDashboard: React.FC = () => {
+  const { user: authUser } = useAuthStore();
   const [summary, setSummary] = useState<any>(null);
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
   const [postedLessons, setPostedLessons] = useState<Lesson[]>([]);
@@ -58,7 +60,7 @@ export const StudentDashboard: React.FC = () => {
       setLoading(true);
       try {
         const storedUser = localStorage.getItem("user");
-        const user = storedUser ? JSON.parse(storedUser) : { name: "Aarav Gupta" };
+        const user = storedUser ? JSON.parse(storedUser) : { name: "Student" };
         const studentName = user.name;
         
         const [lessonsRes, summaryRes] = await Promise.all([
@@ -130,9 +132,9 @@ export const StudentDashboard: React.FC = () => {
     );
   }
 
-  const studentName = summary?.student?.name || "Aarav Gupta";
-  const gpa = summary?.student?.gpa || 3.8;
-  const level = summary?.student?.level || 12;
+  const studentName = authUser?.name || summary?.student?.name || "Student";
+  const gpa = summary?.student?.gpa ?? 0.0;
+  const level = summary?.student?.level ?? 1;
   const pendingCount = summary?.student?.pendingAssignments || 0;
   const liveGamesCount = summary?.student?.liveGames || 0;
 

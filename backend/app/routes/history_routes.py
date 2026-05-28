@@ -27,7 +27,9 @@ async def create_history(payload: ActionHistoryCreate):
     history = ActionHistory(**payload.model_dump())
     await history.assign_id()
     await history.insert()
-    return ActionHistoryResponse(**history.model_dump(), id=history.int_id)
+    d = history.model_dump()
+    d["id"] = history.int_id
+    return ActionHistoryResponse(**d)
 
 @history_router.get("/", response_model=list[ActionHistoryResponse])
 async def get_history(
@@ -41,4 +43,9 @@ async def get_history(
         query = query.find(ActionHistory.user_id == user_id)
         
     histories = await query.sort("-timestamp").to_list()
-    return [ActionHistoryResponse(**h.model_dump(), id=h.int_id) for h in histories]
+    result = []
+    for h in histories:
+        d = h.model_dump()
+        d["id"] = h.int_id
+        result.append(ActionHistoryResponse(**d))
+    return result

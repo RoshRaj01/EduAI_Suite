@@ -9,7 +9,8 @@ class Assignment(Document):
     title: Optional[str] = None
     description: Optional[str] = None
     due_date: Optional[str] = None
-    max_score: float = 100.0
+    max_points: int = 100
+    media_path: Optional[str] = None
 
     class Settings:
         name = "assignments"

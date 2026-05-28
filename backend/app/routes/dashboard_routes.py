@@ -326,8 +326,8 @@ async def get_student_dashboard_summary(student_name: str = "Aarav Gupta"):
         avg_score = sum((s.avg_score or 0) for s in student_records) / len(student_records)
     
     # GPA = avg_score / 25 (rough mapping 0-100 to 0-4.0)
-    gpa = round(avg_score / 25, 1) if avg_score > 0 else 3.5
-    level = int(avg_score / 10) + 5 if avg_score > 0 else 12
+    gpa = round(avg_score / 25, 1) if avg_score > 0 else 0.0
+    level = int(avg_score / 10) + 1 if avg_score > 0 else 1
     
     # 2. Enrolled Courses
     courses = await Course.find({"int_id": {"$in": course_ids}}).to_list() if course_ids else []
