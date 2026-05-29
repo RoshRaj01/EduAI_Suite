@@ -220,11 +220,11 @@ export const ExamsPage: React.FC = () => {
     }
   };
 
-  const fetchAttemptDetail = async (attemptId: number) => {
+  const fetchAttemptDetail = async (examId: number, attemptId: number) => {
     try {
       setLoadingDetail(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_ENDPOINTS.EXAMS}/attempts/${attemptId}`, {
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/${examId}/attempts/${attemptId}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!response.ok) throw new Error("Failed to fetch attempt details");
@@ -480,7 +480,7 @@ export const ExamsPage: React.FC = () => {
                                 <div className="text-center">
                                   <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-0.5" style={{ fontSize: '9px' }}>Finished</p>
                                   <p className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
-                                    {attempt.end_time ? new Date(attempt.end_time).toLocaleDateString() : "-"}
+                                    {attempt.end_time ? new Date(attempt.end_time.endsWith('Z') ? attempt.end_time : attempt.end_time + 'Z').toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : "-"}
                                   </p>
                                 </div>
                                 <div className="text-right">
@@ -491,7 +491,7 @@ export const ExamsPage: React.FC = () => {
                                   </div>
                                 </div>
                                 <button
-                                  onClick={() => fetchAttemptDetail(attempt.id)}
+                                  onClick={() => fetchAttemptDetail(selectedExam.id, attempt.id)}
                                   className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors"
                                 >
                                   {loadingDetail && selectedAttempt?.id === attempt.id ? "..." : "View Sheet"}

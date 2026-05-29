@@ -76,7 +76,9 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({ attempt, onClose }) =>
              </GlassCard>
              <GlassCard className="flex flex-col items-center justify-center p-4 text-center">
                 <Calendar size={20} className="text-slate-400 mb-2" />
-                <p className="text-sm font-bold text-slate-800">{new Date(attempt.end_time).toLocaleDateString()}</p>
+                <p className="text-sm font-bold text-slate-800 text-nowrap">
+                   {new Date(attempt.end_time.endsWith('Z') ? attempt.end_time : attempt.end_time + 'Z').toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </p>
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Date</p>
              </GlassCard>
           </div>
