@@ -90,15 +90,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     }
   };
 
-  const handleStudentEndGame = async () => {
-    if (!window.confirm("End this game for everyone?")) return;
 
-    try {
-      await endGame();
-    } catch (error) {
-      console.error("Error ending game:", error);
-    }
-  };
 
   const gameName =
     (gameState as any)?.name ||
@@ -332,17 +324,6 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
             }}
           >
             Leave Game
-          </button>
-          <button
-            type="button"
-            onClick={handleStudentEndGame}
-            className="px-4 py-2 rounded-lg font-semibold text-white flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform"
-            style={{
-              background: "linear-gradient(135deg, #ef4444, #dc2626)",
-            }}
-          >
-            <Square size={16} />
-            End Game
           </button>
         </div>
       )}
