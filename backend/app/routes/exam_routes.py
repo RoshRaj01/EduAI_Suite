@@ -415,4 +415,18 @@ async def get_attempt_details(attempt_id: int):
     res["student_name"] = student.name if student else "Unknown"
     res["student_email"] = student.email if student else "Unknown"
     
+    formatted_exam = format_exam_response(exam)
+    res["exam"] = formatted_exam
+    
+    formatted_answers = []
+    for ans in attempt.answers:
+        ans_dict = ans.model_dump()
+        ans_dict["id"] = ans.int_id
+        ans_dict["question_id"] = ans.question_int_id
+        question = next((q for q in formatted_exam.get("questions", []) if q["id"] == ans.question_int_id), None)
+        ans_dict["question"] = question
+        formatted_answers.append(ans_dict)
+        
+    res["answers"] = formatted_answers
+    
     return res
