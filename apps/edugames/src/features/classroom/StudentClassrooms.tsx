@@ -137,9 +137,10 @@ export const StudentClassrooms: React.FC = () => {
       }),
     ]);
 
-    setAnnouncements(Array.isArray(announcementData) ? announcementData : []);
+    setAnnouncements(Array.isArray(announcementData) ? announcementData.sort((a: any, b: any) => b.id - a.id) : []);
     
     if (Array.isArray(assignmentData)) {
+      assignmentData.sort((a: any, b: any) => b.id - a.id);
       setAssignments(assignmentData);
       const submissionsPromises = assignmentData.map(a => 
          fetch(`${API_URL}/submissions/${a.id}`).then(res => res.json().catch(() => []))
