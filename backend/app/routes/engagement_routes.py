@@ -227,7 +227,7 @@ async def _get_student_engagement(student: Student, assignments: list):
     attendance_pct = min(student.attendance or 0, 100)
     assignment_score_pct = assignment_completion
     exam_pct = min(avg_exam_score or 0, 100) if avg_exam_score is not None else attendance_pct
-    game_pct = min(total_game_score, 100) if game_players else attendance_pct
+    game_pct = min(total_game_score, 100) if games_data else attendance_pct
 
     engagement_score = round(
         attendance_pct * 0.25 +
@@ -298,7 +298,7 @@ async def _get_student_engagement(student: Student, assignments: list):
         },
 
         "games": {
-            "sessions_played": len(game_players),
+            "sessions_played": len(games_data),
             "total_score": total_game_score,
             "total_words_submitted": total_words_submitted,
             "total_words_valid": total_words_valid,
