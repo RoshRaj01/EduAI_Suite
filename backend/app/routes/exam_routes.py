@@ -70,7 +70,14 @@ async def get_all_exams(course_id: Optional[int] = None, current_user: User = De
             Exam.course_id == student.course_id,
             Exam.status == "published"
         ).to_list()
-        return [ExamResponse(**format_exam_response(e)) for e in exams]
+        
+        valid_exams = []
+        for e in exams:
+            completed_attempts = sum(1 for a in e.attempts if a.student_id == current_user.int_id and a.status != "in_progress")
+            if completed_attempts < e.attempts_allowed:
+                valid_exams.append(e)
+                
+        return [ExamResponse(**format_exam_response(e)) for e in valid_exams]
     
     # Teachers/Admins can see all or filter by course_id
     query = Exam.find_all()
@@ -169,12 +176,12 @@ async def start_exam_attempt(exam_id: int, current_user: User = Depends(get_curr
     res["exam_id"] = exam.int_id
     return res
 
-@exam_router.post("/attempts/{attempt_id}/submit", response_model=ExamAttemptResponse)
-async def submit_exam_attempt(attempt_id: int, submission: ExamAttemptSubmit):
+@exam_router.post("/{exam_id}/attempts/{attempt_id}/submit", response_model=ExamAttemptResponse)
+async def submit_exam_attempt(exam_id: int, attempt_id: int, submission: ExamAttemptSubmit):
     # Find the exam containing this attempt
-    exam = await Exam.find_one({"attempts.int_id": attempt_id})
+    exam = await Exam.find_one(Exam.int_id == exam_id)
     if not exam:
-        raise HTTPException(status_code=404, detail="Attempt not found")
+        raise HTTPException(status_code=404, detail="Exam not found")
         
     attempt_idx = next((i for i, a in enumerate(exam.attempts) if a.int_id == attempt_id), -1)
     if attempt_idx == -1:
@@ -397,11 +404,11 @@ async def get_exam_attempts(exam_id: int):
         
     return res
 
-@exam_router.get("/attempts/{attempt_id}", response_model=ExamAttemptDetailResponse)
-async def get_attempt_details(attempt_id: int):
-    exam = await Exam.find_one({"attempts.int_id": attempt_id})
+@exam_router.get("/{exam_id}/attempts/{attempt_id}", response_model=ExamAttemptDetailResponse)
+async def get_attempt_details(exam_id: int, attempt_id: int):
+    exam = await Exam.find_one(Exam.int_id == exam_id)
     if not exam:
-        raise HTTPException(status_code=404, detail="Attempt not found")
+        raise HTTPException(status_code=404, detail="Exam not found")
         
     attempt = next((a for a in exam.attempts if a.int_id == attempt_id), None)
     if not attempt:

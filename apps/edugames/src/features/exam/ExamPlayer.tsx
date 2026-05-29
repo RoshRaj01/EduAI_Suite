@@ -156,7 +156,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/exams/attempts/${attemptId}/submit`, {
+      const response = await fetch(`${API_BASE_URL}/exams/${exam.id}/attempts/${attemptId}/submit`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -197,7 +197,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, onComplete, onClos
     try {
       setIsLoadingReview(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/exams/attempts/${attemptId}`, {
+      const response = await fetch(`${API_BASE_URL}/exams/${exam.id}/attempts/${attemptId}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (response.ok) {
