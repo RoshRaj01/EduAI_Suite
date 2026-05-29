@@ -393,13 +393,13 @@ async def get_exam_attempts(exam_id: int):
         
     res = []
     for a in exam.attempts:
-        student = await Student.find_one(Student.int_id == a.student_id)
+        user = await User.find_one(User.int_id == a.student_id)
         
         attempt_res = a.model_dump()
         attempt_res["id"] = a.int_id
         attempt_res["exam_id"] = exam.int_id
-        attempt_res["student_name"] = student.name if student else "Unknown"
-        attempt_res["student_email"] = student.email if student else "Unknown"
+        attempt_res["student_name"] = user.name if user else "Unknown"
+        attempt_res["student_email"] = user.email if user else "Unknown"
         res.append(attempt_res)
         
     return res
@@ -414,13 +414,13 @@ async def get_attempt_details(exam_id: int, attempt_id: int):
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
     
-    student = await Student.find_one(Student.int_id == attempt.student_id)
+    user = await User.find_one(User.int_id == attempt.student_id)
     
     res = attempt.model_dump()
     res["id"] = attempt.int_id
     res["exam_id"] = exam.int_id
-    res["student_name"] = student.name if student else "Unknown"
-    res["student_email"] = student.email if student else "Unknown"
+    res["student_name"] = user.name if user else "Unknown"
+    res["student_email"] = user.email if user else "Unknown"
     
     formatted_exam = format_exam_response(exam)
     res["exam"] = formatted_exam
