@@ -36,7 +36,20 @@ export const WordCloudPlayerPage: React.FC = () => {
     const connect = () => {
       if (isCancelled) return;
 
-      ws = new WebSocket(`${(import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`).replace(/^http/, "ws")}/ws/wordcloud/${session.pin}?role=student`);
+      const getWsUrl = () => {
+        const urlStr = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        if (urlStr.startsWith('/')) {
+          const loc = window.location;
+          const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+          return `${protocol}//${loc.host}${urlStr}/ws/wordcloud/${session.pin}?role=student`;
+        } else {
+          const url = new URL(urlStr);
+          const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+          return `${protocol}//${url.host}/ws/wordcloud/${session.pin}?role=student`;
+        }
+      };
+
+      ws = new WebSocket(getWsUrl());
 
       ws.onopen = () => {
         if (isCancelled) {
@@ -174,9 +187,8 @@ export const WordCloudPlayerPage: React.FC = () => {
           />
           <button
             type="submit"
-            disabled={!word.trim()}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-xl text-white transition-all disabled:opacity-50 hover:bg-yellow-500"
-            style={{ background: "var(--color-brand-gold)" }}
+            disabled={!word.trim() || !socket || socket.readyState !== WebSocket.OPEN}
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-xl text-white transition-all bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Submit <Send size={24} />
           </button>
