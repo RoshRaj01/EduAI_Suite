@@ -50,18 +50,10 @@ export const ChainAnswerGameJoinPage: React.FC<
           p.name.trim().toLowerCase() === playerName.trim().toLowerCase(),
       );
 
-      if (!registeredPlayer) {
-        setError(
-          `Student "${playerName}" is not registered for this game. Please check with your teacher.`,
-        );
-        setIsLoading(false);
-        return;
-      }
-
       setGameId(game.id);
 
-      // Use the actual student_id from the backend instead of a generated one
-      const effectivePlayerId = registeredPlayer.student_id;
+      // Use the actual student_id from the backend if they match, otherwise generate one
+      const effectivePlayerId = registeredPlayer ? registeredPlayer.student_id : createChainAnswerPlayerId();
 
       setPlayerId(effectivePlayerId);
       saveChainAnswerPlayerSession(
