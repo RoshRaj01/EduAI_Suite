@@ -18,39 +18,44 @@ const CLOUD_COLORS = ["#264796", "#2a4fa7", "#d0ae61", "#ddb867", "#16a34a", "#7
 const SimpleWordCloud: React.FC<{ words: WordData[] }> = ({ words }) => {
   const maxValue = Math.max(...words.map(w => w.value), 1);
 
-  // Deterministic rotation from word text
-  const hashRotation = (text: string) => {
-    let h = 0;
-    for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
-    const bucket = Math.abs(h) % 10;
-    if (bucket < 6) return 0;
-    return bucket < 8 ? 12 : -12;
-  };
-
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 p-6 w-full h-full content-center">
+    <div className="flex flex-wrap items-center justify-center gap-4 p-6 w-full h-full overflow-y-auto content-start md:content-center">
       {words.map((word, i) => {
         const ratio = maxValue <= 1 ? 1 : word.value / maxValue;
-        const fontSize = 18 + ratio * 46;
+        const fontSize = 16 + ratio * 16; // 16px to 32px
         const color = CLOUD_COLORS[i % CLOUD_COLORS.length];
-        const rotation = hashRotation(word.text);
 
         return (
-          <span
+          <div
             key={word.text}
-            className="inline-block transition-all duration-500 ease-out select-none"
+            className="transition-all duration-500 ease-out shadow-md rounded-2xl flex items-center gap-3 hover:scale-105 hover:shadow-lg"
             style={{
-              fontSize: `${fontSize}px`,
-              color,
-              fontWeight: 700,
-              fontFamily: "Inter, sans-serif",
-              fontStyle: "italic",
-              transform: `rotate(${rotation}deg)`,
-              opacity: 0.85 + ratio * 0.15,
+              backgroundColor: color,
+              color: "white",
+              padding: `${8 + ratio * 8}px ${16 + ratio * 8}px`,
             }}
           >
-            {word.text}
-          </span>
+            <span
+              style={{
+                fontSize: `${fontSize}px`,
+                fontWeight: 700,
+                fontFamily: "Inter, sans-serif",
+              }}
+            >
+              {word.text}
+            </span>
+            {word.value > 1 && (
+              <span 
+                className="rounded-full bg-white/25 text-white flex items-center justify-center font-bold px-2 py-1 backdrop-blur-sm shadow-inner"
+                style={{
+                  fontSize: `${Math.max(12, fontSize * 0.6)}px`,
+                  minWidth: `${Math.max(24, fontSize)}px`,
+                }}
+              >
+                {word.value}
+              </span>
+            )}
+          </div>
         );
       })}
     </div>
@@ -102,7 +107,20 @@ export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, i
     const connect = () => {
       if (isCancelled) return;
 
-      ws = new WebSocket(`${(import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`).replace(/^http/, "ws")}/ws/wordcloud/${pin}?role=teacher`);
+      const getWsUrl = () => {
+        const urlStr = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        if (urlStr.startsWith('/')) {
+          const loc = window.location;
+          const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+          return `${protocol}//${loc.host}${urlStr}/ws/wordcloud/${pin}?role=teacher`;
+        } else {
+          const url = new URL(urlStr);
+          const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+          return `${protocol}//${url.host}/ws/wordcloud/${pin}?role=teacher`;
+        }
+      };
+
+      ws = new WebSocket(getWsUrl());
 
       ws.onopen = () => {
         if (isCancelled) {
