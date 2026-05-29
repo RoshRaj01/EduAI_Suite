@@ -60,7 +60,7 @@ async def generate_report_background(report_db_id: int, type: str, target_id: in
 
             # Get grades and performance data
             submissions = await Submission.find(Submission.student_name == student.name).to_list()
-            attempts = await ExamAttempt.find(ExamAttempt.student_id == student.int_id).to_list()
+            exams_with_attempts = await Exam.find({"attempts.student_id": student.int_id}).to_list()
             
             sub_details = []
             for s in submissions:
@@ -69,13 +69,15 @@ async def generate_report_background(report_db_id: int, type: str, target_id: in
                 sub_details.append(f"- {title}: {s.grade}%")
 
             exam_details = []
-            for a in attempts:
-                exam = await Exam.find_one(Exam.int_id == a.exam_id)
-                title = exam.title if exam else "Unknown Exam"
-                exam_details.append(f"- {title}: {a.score}%")
+            exam_scores = []
+            for exam in exams_with_attempts:
+                for a in exam.attempts:
+                    if a.student_id == student.int_id and a.score is not None:
+                        title = exam.title or "Unknown Exam"
+                        exam_details.append(f"- {title}: {a.score}%")
+                        exam_scores.append(a.score)
 
             sub_scores = [s.grade for s in submissions if s.grade is not None]
-            exam_scores = [a.score for a in attempts if a.score is not None]
             
             avg_sub = sum(sub_scores)/len(sub_scores) if sub_scores else 0
             avg_exam = sum(exam_scores)/len(exam_scores) if exam_scores else 0
