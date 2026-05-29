@@ -87,6 +87,8 @@ export const ChainAnswerGameJoinPage: React.FC<
         playerId={playerId}
         playerName={playerName}
         userType="student"
+        onExit={() => setJoined(false)}
+        onGameEnded={() => setJoined(false)}
       />
     );
   }

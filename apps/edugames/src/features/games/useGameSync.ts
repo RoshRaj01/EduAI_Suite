@@ -11,6 +11,7 @@ interface UseGameSyncOptions {
   sessionId: string;
   gameId: number;
   playerId: string;
+  playerName?: string;
   userType: "teacher" | "student";
   onGameUpdate?: (message: GameUpdateMessage) => void;
   onError?: (error: string) => void;
@@ -31,6 +32,7 @@ export const useGameSync = ({
   sessionId,
   gameId,
   playerId,
+  playerName,
   userType,
   onGameUpdate,
   onError,
@@ -150,7 +152,7 @@ export const useGameSync = ({
 
         // Send join message once
         if (!hasJoinedRef.current && playerId) {
-          ws.send(JSON.stringify({ type: "join", player_id: playerId }));
+          ws.send(JSON.stringify({ type: "join", player_id: playerId, player_name: playerName }));
           hasJoinedRef.current = true;
         }
       };

@@ -17,6 +17,7 @@ interface ChainGameBoardProps {
   userType?: "teacher" | "student";
   onError?: (error: string) => void;
   onGameEnded?: () => void;
+  onExit?: () => void;
 }
 
 export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
@@ -30,6 +31,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
   userType = "teacher",
   onError,
   onGameEnded,
+  onExit,
 }) => {
   const [inputWord, setInputWord] = useState("");
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -49,6 +51,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     sessionId: syncEnabled ? sessionId! : "",
     gameId: gameId || 0,
     playerId: playerId || "",
+    playerName: playerName || "",
     userType,
     onError,
   });
@@ -319,7 +322,17 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
       </AnimatePresence>
 
       {userType === "student" && gameStatus === "active" && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onExit}
+            className="px-4 py-2 rounded-lg font-semibold text-white flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform"
+            style={{
+              background: "linear-gradient(135deg, #6b7280, #4b5563)",
+            }}
+          >
+            Leave Game
+          </button>
           <button
             type="button"
             onClick={handleStudentEndGame}

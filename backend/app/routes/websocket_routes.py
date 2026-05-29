@@ -358,8 +358,23 @@ async def chain_answer_websocket_endpoint(
 
             elif msg_type == "join":
                 player_id = message.get("player_id")
+                player_name = message.get("player_name", "Anonymous")
                 game = await ChainAnswerGame.find_one(ChainAnswerGame.session_id == session_id)
                 if game:
+                    player_exists = any(str(p.student_id) == str(player_id) for p in game.players)
+                    if not player_exists and user_type == "student":
+                        next_join_order = max((p.join_order for p in game.players), default=0) + 1
+                        next_int_id = max((p.int_id for p in game.players), default=0) + 1
+                        new_player = GamePlayer(
+                            int_id=next_int_id,
+                            student_id=str(player_id),
+                            name=player_name,
+                            join_order=next_join_order,
+                            status="active"
+                        )
+                        game.players.append(new_player)
+                        await game.save()
+
                     updated_players = []
                     for p in sorted(game.players, key=lambda x: x.join_order):
                         updated_players.append({
