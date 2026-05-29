@@ -401,6 +401,10 @@ async def get_student_dashboard_summary(student_name: str = "Aarav Gupta"):
                 "teacher_name": c.teacher_name,
                 "students": c.students,
                 "batch": c.batch,
+                "progress": getattr(c, 'progress', 0.0),
+                "description": getattr(c, 'description', ''),
+                "enrollment_code": getattr(c, 'enrollment_code', None),
+                "course_plan_path": getattr(c, 'course_plan_path', None),
                 "color": getattr(c, 'color', '#3b82f6')
             } for c in courses
         ],

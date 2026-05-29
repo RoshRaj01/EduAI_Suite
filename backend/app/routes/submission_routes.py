@@ -5,8 +5,32 @@ from typing import Optional, List
 from app.utils.file_uploads import save_optional_upload
 from datetime import datetime
 import os
+from app.models.assignment import Assignment
+from app.models.student import Student
+from app.models.course import Course
 
 submission_router = APIRouter(prefix="/submissions", tags=["Submissions"])
+
+async def _update_course_progress(course_id: int):
+    course = await Course.find_one(Course.int_id == course_id)
+    if not course:
+        return
+        
+    student_count = await Student.find(Student.course_id == course_id).count()
+    assignments = await Assignment.find(Assignment.course_id == course_id).to_list()
+    total_slots = student_count * len(assignments)
+    
+    if total_slots > 0:
+        submission_ids = [a.int_id for a in assignments]
+        received = await Submission.find(
+            {"assignment_id": {"$in": submission_ids}}
+        ).count()
+        progress = round(min(received / total_slots * 100, 100), 1)
+    else:
+        progress = 0.0
+
+    course.progress = progress
+    await course.save()
 
 @submission_router.get("/{assignment_id}", response_model=list[SubmissionResponse])
 async def get_submissions(assignment_id: int):
@@ -47,6 +71,10 @@ async def create_submission(
     await new_sub.assign_id()
     await new_sub.insert()
     
+    assignment = await Assignment.find_one(Assignment.int_id == assignment_id)
+    if assignment:
+        await _update_course_progress(assignment.course_id)
+    
     return SubmissionResponse(**{**new_sub.model_dump(), "id": new_sub.int_id})
 
 @submission_router.delete("/{submission_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -62,7 +90,13 @@ async def delete_submission(submission_id: int):
              # Logic to remove file if desired, for now just DB delete
              pass
 
+    assignment_id = sub.assignment_id
     await sub.delete()
+    
+    assignment = await Assignment.find_one(Assignment.int_id == assignment_id)
+    if assignment:
+        await _update_course_progress(assignment.course_id)
+        
     return None
 
 @submission_router.delete("/assignment/{assignment_id}/student/{student_name}", status_code=status.HTTP_204_NO_CONTENT)
@@ -74,6 +108,11 @@ async def unsubmit_assignment(assignment_id: int, student_name: str):
     
     for sub in subs:
         await sub.delete()
+        
+    assignment = await Assignment.find_one(Assignment.int_id == assignment_id)
+    if assignment:
+        await _update_course_progress(assignment.course_id)
+        
     return None
 
 @submission_router.put("/grade/{submission_id}", response_model=SubmissionResponse)
