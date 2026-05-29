@@ -6,7 +6,7 @@ from app.database import get_next_sequence
 
 
 class TrelloBoard(Document):
-    int_id: Optional[str] = None  # Trello uses string IDs
+    id: str
     name: Optional[str] = None
     background: Optional[str] = None
     creator_email: Optional[str] = None
@@ -21,7 +21,7 @@ class TrelloBoard(Document):
 
 
 class TrelloColumn(Document):
-    int_id: Optional[str] = None  # String IDs
+    id: str
     board_id: Optional[str] = None
     title: Optional[str] = None
     sequence: int = 0
@@ -31,7 +31,7 @@ class TrelloColumn(Document):
 
 
 class TrelloCard(Document):
-    int_id: Optional[str] = None  # String IDs
+    id: str
     column_id: Optional[str] = None
     board_id: Optional[str] = None
     title: Optional[str] = None
