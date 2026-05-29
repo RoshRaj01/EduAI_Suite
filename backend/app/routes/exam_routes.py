@@ -14,6 +14,16 @@ from datetime import datetime
 
 exam_router = APIRouter(prefix="/exams", tags=["Exams"])
 
+def format_exam_response(exam: Exam) -> dict:
+    data = exam.model_dump()
+    data["id"] = exam.int_id
+    for q in data.get("questions", []):
+        q["id"] = q.get("int_id", 0)
+        for c in q.get("choices", []):
+            c["id"] = c.get("int_id", 0)
+    return data
+
+
 
 @exam_router.get("/stats")
 async def get_exam_stats():
@@ -60,7 +70,7 @@ async def get_all_exams(course_id: Optional[int] = None, current_user: User = De
             Exam.course_id == student.course_id,
             Exam.status == "published"
         ).to_list()
-        return [ExamResponse(**{**e.model_dump(), "id": e.int_id}) for e in exams]
+        return [ExamResponse(**format_exam_response(e)) for e in exams]
     
     # Teachers/Admins can see all or filter by course_id
     query = Exam.find_all()
@@ -68,7 +78,7 @@ async def get_all_exams(course_id: Optional[int] = None, current_user: User = De
         query = query.find(Exam.course_id == course_id)
         
     exams = await query.to_list()
-    return [ExamResponse(**{**e.model_dump(), "id": e.int_id}) for e in exams]
+    return [ExamResponse(**format_exam_response(e)) for e in exams]
 
 @exam_router.post("/", response_model=ExamResponse)
 async def create_exam(exam_data: ExamCreate):
@@ -108,19 +118,19 @@ async def create_exam(exam_data: ExamCreate):
         new_exam.questions.append(new_question)
     
     await new_exam.insert()
-    return ExamResponse(**{**new_exam.model_dump(), "id": new_exam.int_id})
+    return ExamResponse(**format_exam_response(new_exam))
 
 @exam_router.get("/course/{course_id}", response_model=List[ExamResponse])
 async def get_course_exams(course_id: int):
     exams = await Exam.find(Exam.course_id == course_id).to_list()
-    return [ExamResponse(**{**e.model_dump(), "id": e.int_id}) for e in exams]
+    return [ExamResponse(**format_exam_response(e)) for e in exams]
 
 @exam_router.get("/{exam_id}", response_model=ExamResponse)
 async def get_exam(exam_id: int):
     exam = await Exam.find_one(Exam.int_id == exam_id)
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-    return ExamResponse(**{**exam.model_dump(), "id": exam.int_id})
+    return ExamResponse(**format_exam_response(exam))
 
 @exam_router.post("/{exam_id}/start", response_model=ExamAttemptResponse)
 async def start_exam_attempt(exam_id: int, current_user: User = Depends(get_current_user)):
@@ -366,7 +376,7 @@ async def update_exam(exam_id: int, exam_data: ExamCreate):
         db_exam.questions.append(new_question)
     
     await db_exam.save()
-    return ExamResponse(**{**db_exam.model_dump(), "id": db_exam.int_id})
+    return ExamResponse(**format_exam_response(db_exam))
 
 @exam_router.get("/{exam_id}/attempts", response_model=List[ExamAttemptResponse])
 async def get_exam_attempts(exam_id: int):
