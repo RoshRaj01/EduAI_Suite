@@ -338,8 +338,15 @@ async def get_student_dashboard_summary(student_name: str = "Aarav Gupta"):
     upcoming_deadlines = []
     pending_count = 0
     
+    # Fetch student submissions
+    from app.models.submission import Submission
+    student_submissions = await Submission.find(Submission.student_name == student_name).to_list()
+    submitted_assignment_ids = {sub.assignment_id for sub in student_submissions if sub.submitted_at}
+    
     today = datetime.now()
     for assign in all_assignments:
+        if assign.int_id in submitted_assignment_ids:
+            continue
         due_dt = _parse_date_safe(assign.due_date)
         if due_dt and due_dt > today:
             c = await Course.find_one(Course.int_id == assign.course_id)
@@ -347,6 +354,7 @@ async def get_student_dashboard_summary(student_name: str = "Aarav Gupta"):
                 "id": assign.int_id,
                 "title": assign.title,
                 "course_code": c.code if c else "UNK",
+                "course_id": assign.course_id,
                 "due_date": assign.due_date,
                 "is_urgent": (due_dt - today).days < 2
             })

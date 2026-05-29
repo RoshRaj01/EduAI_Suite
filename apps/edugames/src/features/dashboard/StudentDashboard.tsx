@@ -367,8 +367,9 @@ export const StudentDashboard: React.FC = () => {
                 summary.deadlines.map((deadline: any) => (
                   <div
                     key={deadline.id}
-                    className="flex border-l-2 pl-3 py-1"
+                    className="flex border-l-2 pl-3 py-1 cursor-pointer hover:bg-slate-50 transition-colors rounded-r-md"
                     style={{ borderColor: deadline.is_urgent ? "#ef4444" : "var(--color-brand-blue)" }}
+                    onClick={() => navigate("/classroom")}
                   >
                     <div>
                       <h4
