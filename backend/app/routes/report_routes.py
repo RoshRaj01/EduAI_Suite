@@ -5,6 +5,7 @@ from app.models.course import Course
 from app.models.submission import Submission
 from app.models.exam import ExamAttempt, Exam
 from app.models.assignment import Assignment
+from app.models.user import User
 from app.services.groq_service import GroqService
 from app.utils.email_utils import send_email
 from pydantic import BaseModel
@@ -58,9 +59,13 @@ async def generate_report_background(report_db_id: int, type: str, target_id: in
                 await report.save()
                 return
 
+            # Find the corresponding User for this student to get their exam attempts
+            user = await User.find_one(User.email == student.email)
+            user_id = user.int_id if user else -1
+            
             # Get grades and performance data
             submissions = await Submission.find(Submission.student_name == student.name).to_list()
-            exams_with_attempts = await Exam.find({"attempts.student_id": student.int_id}).to_list()
+            exams_with_attempts = await Exam.find({"attempts.student_id": user_id}).to_list()
             
             sub_details = []
             sub_scores = []
@@ -78,7 +83,7 @@ async def generate_report_background(report_db_id: int, type: str, target_id: in
             for exam in exams_with_attempts:
                 max_score = sum(q.points for q in exam.questions) if exam.questions else 100
                 for a in exam.attempts:
-                    if a.student_id == student.int_id and a.score is not None:
+                    if a.student_id == user_id and a.score is not None:
                         score_pct = (a.score / max_score * 100) if max_score > 0 else 0
                         title = exam.title or "Unknown Exam"
                         exam_details.append(f"- {title}: {score_pct:.1f}%")

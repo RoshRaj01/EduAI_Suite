@@ -3,6 +3,7 @@ from app.models.exam import ExamAttempt, Exam
 from app.models.submission import Submission
 from app.models.assignment import Assignment
 from app.models.student import Student
+from app.models.user import User
 from typing import List, Optional
 import pandas as pd
 import io
@@ -29,11 +30,14 @@ async def get_course_analytics(course_id: int):
         max_score = sum(q.points for q in e.questions) if e.questions else 100
         for a in e.attempts:
             if a.status == "submitted":
-                student = await Student.find_one(Student.int_id == a.student_id)
+                user = await User.find_one(User.int_id == a.student_id)
+                student = await Student.find_one(Student.email == user.email) if user else None
+                student_name = student.name if student else (user.name if user else "Unknown")
+                
                 score_pct = (a.score / max_score * 100) if max_score > 0 and a.score is not None else 0
                 all_data.append({
                     "student_id": a.student_id,
-                    "student_name": student.name if student else "Unknown",
+                    "student_name": student_name,
                     "score": score_pct,
                     "type": "exam",
                     "item_id": e.int_id,
