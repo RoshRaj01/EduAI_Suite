@@ -63,21 +63,26 @@ async def generate_report_background(report_db_id: int, type: str, target_id: in
             exams_with_attempts = await Exam.find({"attempts.student_id": student.int_id}).to_list()
             
             sub_details = []
+            sub_scores = []
             for s in submissions:
                 assignment = await Assignment.find_one(Assignment.int_id == s.assignment_id)
                 title = assignment.title if assignment else "Unknown Assignment"
-                sub_details.append(f"- {title}: {s.grade}%")
+                max_score = assignment.max_points if assignment and getattr(assignment, 'max_points', None) else 100
+                if s.grade is not None:
+                    score_pct = (s.grade / max_score * 100) if max_score > 0 else 0
+                    sub_details.append(f"- {title}: {score_pct:.1f}%")
+                    sub_scores.append(score_pct)
 
             exam_details = []
             exam_scores = []
             for exam in exams_with_attempts:
+                max_score = sum(q.points for q in exam.questions) if exam.questions else 100
                 for a in exam.attempts:
                     if a.student_id == student.int_id and a.score is not None:
+                        score_pct = (a.score / max_score * 100) if max_score > 0 else 0
                         title = exam.title or "Unknown Exam"
-                        exam_details.append(f"- {title}: {a.score}%")
-                        exam_scores.append(a.score)
-
-            sub_scores = [s.grade for s in submissions if s.grade is not None]
+                        exam_details.append(f"- {title}: {score_pct:.1f}%")
+                        exam_scores.append(score_pct)
             
             avg_sub = sum(sub_scores)/len(sub_scores) if sub_scores else 0
             avg_exam = sum(exam_scores)/len(exam_scores) if exam_scores else 0

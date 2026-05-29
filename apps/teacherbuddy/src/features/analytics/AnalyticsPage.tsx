@@ -34,6 +34,7 @@ interface AnalyticsData {
   risk_students: any[];
   performance_trend: any[];
   subject_breakdown: any[];
+  raw_data?: any[];
 }
 
 interface UploadedData {
@@ -628,15 +629,15 @@ export const AnalyticsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {(dataSource === "platform" ? [] : (uploadedData?.raw_data || []))?.map((row: any, idx: number) => (
+                      {(dataSource === "platform" ? (analytics?.raw_data || []) : (uploadedData?.raw_data || []))?.map((row: any, idx: number) => (
                         <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                          {uploadedData?.summary?.columns?.map((col: string) => (
+                          {(dataSource === "platform" ? ['Student', 'Score', 'Exam', 'Date'] : (uploadedData?.summary?.columns || []))?.map((col: string) => (
                             <td key={col} className="px-4 py-3 text-slate-600 font-medium">{String(row[col])}</td>
                           ))}
                         </tr>
                       ))}
-                      {dataSource === "platform" && (
-                        <tr><td colSpan={4} className="py-20 text-center opacity-40">Raw database records view coming soon</td></tr>
+                      {dataSource === "platform" && (analytics?.raw_data || []).length === 0 && (
+                        <tr><td colSpan={4} className="py-20 text-center opacity-40">No raw data found</td></tr>
                       )}
                     </tbody>
                   </table>

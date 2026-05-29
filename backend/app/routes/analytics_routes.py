@@ -26,20 +26,27 @@ async def get_course_analytics(course_id: int):
     all_data = []
     
     for e in exams:
+        max_score = sum(q.points for q in e.questions) if e.questions else 100
         for a in e.attempts:
             if a.status == "submitted":
                 student = await Student.find_one(Student.int_id == a.student_id)
+                score_pct = (a.score / max_score * 100) if max_score > 0 and a.score is not None else 0
                 all_data.append({
                     "student_id": a.student_id,
                     "student_name": student.name if student else "Unknown",
-                    "score": a.score,
+                    "score": score_pct,
                     "type": "exam",
                     "item_id": e.int_id,
+                    "title": e.title or "Unknown Exam",
                     "date": a.end_time
                 })
     
     for s in submissions:
+        assignment = next((a for a in assignments if a.int_id == s.assignment_id), None)
+        title = assignment.title if assignment else "Unknown Assignment"
+        max_score = assignment.max_points if assignment and getattr(assignment, 'max_points', None) else 100
         if s.grade is not None:
+            score_pct = (s.grade / max_score * 100) if max_score > 0 else 0
             try:
                 date_val = datetime.strptime(s.submitted_at, "%I:%M %p, %b %d")
                 date_val = date_val.replace(year=datetime.now().year)
@@ -49,9 +56,10 @@ async def get_course_analytics(course_id: int):
             all_data.append({
                 "student_id": None, 
                 "student_name": s.student_name,
-                "score": s.grade,
+                "score": score_pct,
                 "type": "assignment",
                 "item_id": s.assignment_id,
+                "title": title,
                 "date": date_val
             })
 
@@ -73,7 +81,6 @@ async def get_course_analytics(course_id: int):
 
     df = pd.DataFrame(all_data)
     avg_score = df["score"].mean()
-    total_students = df["student_name"].nunique()
     pass_rate = (df["score"] >= 40).mean() * 100 
     
     student_avgs = df.groupby('student_name')['score'].mean()
@@ -128,10 +135,19 @@ async def get_course_analytics(course_id: int):
                 "avg": float(exam_scores.mean())
             })
 
+    raw_list = []
+    for d in all_data:
+        raw_list.append({
+            "Student": d["student_name"],
+            "Score": float(d["score"]),
+            "Exam": d["title"],
+            "Date": d["date"].strftime("%b %d, %Y") if isinstance(d["date"], datetime) else str(d["date"])
+        })
+
     return {
         "overview": {
             "avg_score": f"{avg_score:.1f}%",
-            "total_students": total_students or len(all_students),
+            "total_students": len(all_students),
             "at_risk_count": at_risk_count,
             "attendance_rate": f"{avg_attendance:.1f}%",
             "pass_rate": f"{pass_rate:.0f}%",
@@ -140,7 +156,8 @@ async def get_course_analytics(course_id: int):
         },
         "risk_students": risk_list,
         "performance_trend": trend,
-        "subject_breakdown": subject_stats
+        "subject_breakdown": subject_stats,
+        "raw_data": raw_list
     }
 
 @analytics_router.post("/upload")
