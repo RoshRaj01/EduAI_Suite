@@ -32,24 +32,30 @@ async def get_exam_stats():
     # Submissions today
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     
-    # Need to query within the nested attempts array
-    # Since attempts are embedded, we count how many exams have a submitted attempt today
-    # (A true count of all attempts across all exams is trickier with simple count, so we use aggregation if needed,
-    # but for now let's just do a simpler heuristic or find all and count in python)
+    from app.models.student import Student
+    
     exams = await Exam.find_all().to_list()
     
     submissions_today = 0
     total_attempts = 0
+    total_expected_attempts = 0
     
     for exam in exams:
+        student_count = await Student.find(Student.course_id == exam.course_id).count()
+        total_expected_attempts += student_count if student_count > 0 else 1
+        
         for attempt in exam.attempts:
             if attempt.status == "submitted":
                 total_attempts += 1
                 if attempt.end_time and attempt.end_time >= today:
                     submissions_today += 1
     
-    # Simple average completion (this is a heuristic)
-    avg_completion = f"{min(100, (total_attempts / (total_exams * 10 or 1)) * 100):.1f}%" if total_exams > 0 else "0%"
+    if total_expected_attempts > 0:
+        avg = min(100.0, (total_attempts / total_expected_attempts) * 100)
+    else:
+        avg = 0.0
+        
+    avg_completion = f"{avg:.1f}%"
     
     return {
         "total_exams": total_exams,
