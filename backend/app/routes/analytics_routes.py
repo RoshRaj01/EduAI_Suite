@@ -15,10 +15,6 @@ analytics_router = APIRouter(prefix="/analytics", tags=["Analytics"])
 async def get_course_analytics(course_id: int):
     # Get all exams for the course
     exams = await Exam.find(Exam.course_id == course_id).to_list()
-    exam_ids = [e.int_id for e in exams]
-    
-    # Get all attempts for these exams
-    attempts = await ExamAttempt.find({"exam_id": {"$in": exam_ids}, "status": "submitted"}).to_list()
     
     # Get all assignments for the course
     assignments = await Assignment.find(Assignment.course_id == course_id).to_list()
@@ -28,16 +24,19 @@ async def get_course_analytics(course_id: int):
     submissions = await Submission.find({"assignment_id": {"$in": assignment_ids}}).to_list()
     
     all_data = []
-    for a in attempts:
-        student = await Student.find_one(Student.int_id == a.student_id)
-        all_data.append({
-            "student_id": a.student_id,
-            "student_name": student.name if student else "Unknown",
-            "score": a.score,
-            "type": "exam",
-            "item_id": a.exam_id,
-            "date": a.end_time
-        })
+    
+    for e in exams:
+        for a in e.attempts:
+            if a.status == "submitted":
+                student = await Student.find_one(Student.int_id == a.student_id)
+                all_data.append({
+                    "student_id": a.student_id,
+                    "student_name": student.name if student else "Unknown",
+                    "score": a.score,
+                    "type": "exam",
+                    "item_id": e.int_id,
+                    "date": a.end_time
+                })
     
     for s in submissions:
         if s.grade is not None:
