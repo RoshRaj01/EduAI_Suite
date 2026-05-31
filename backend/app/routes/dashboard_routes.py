@@ -204,6 +204,9 @@ async def get_dashboard_summary(teacher_name: Optional[str] = None):
         if not dt:
             dt = _parse_date_safe(appt.requested_at)
             
+        if appt.status == "rejected":
+            continue
+            
         if dt and today_start <= dt < today_end:
             schedule_items.append({
                 "name": appt.agenda or "Meeting",

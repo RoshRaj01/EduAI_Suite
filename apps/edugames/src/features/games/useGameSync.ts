@@ -93,6 +93,9 @@ export const useGameSync = ({
         console.error("[useGameSync] Polling error:", error);
         if (error.message?.includes("Not Found")) {
           stopPolling();
+          setGameState((prev) =>
+            prev ? { ...prev, status: "completed" } : null,
+          );
           onErrorRef.current?.("Game session not found. Please rejoin.");
         }
       }
@@ -126,10 +129,21 @@ export const useGameSync = ({
 
     try {
       const cleanUrl = API_BASE_URL.trim();
-      const backendUrl = new URL(cleanUrl);
-      const wsProtocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
       const encodedSessionId = encodeURIComponent(sessionId);
-      const wsUrl = `${wsProtocol}//${backendUrl.host}/ws/games/chain-answer/${encodedSessionId}?user_type=${userType}`;
+      let wsUrl = "";
+      if (cleanUrl.startsWith("/")) {
+        const loc = window.location;
+        const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
+        const wsHost = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") 
+          ? `${loc.hostname}:8000` 
+          : loc.host;
+        const pathPrefix = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") ? "" : cleanUrl;
+        wsUrl = `${protocol}//${wsHost}${pathPrefix}/ws/games/chain-answer/${encodedSessionId}?user_type=${userType}`;
+      } else {
+        const backendUrl = new URL(cleanUrl);
+        const wsProtocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
+        wsUrl = `${wsProtocol}//${backendUrl.host}${backendUrl.pathname === "/" ? "" : backendUrl.pathname}/ws/games/chain-answer/${encodedSessionId}?user_type=${userType}`;
+      }
 
       console.log(
         `[useGameSync] Connecting to WebSocket (attempt ${reconnectCountRef.current + 1}):`,

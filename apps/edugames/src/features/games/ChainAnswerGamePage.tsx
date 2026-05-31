@@ -139,6 +139,13 @@ export const ChainAnswerGamePage: React.FC = () => {
             setGameEndedScreen(true);
             localStorage.removeItem("chain_answer_player_session");
           }}
+          onExit={() => {
+            setJoinedSessionId(null);
+            setJoinedGameId(null);
+            setJoinedPlayerId(null);
+            setJoinedPlayerName(null);
+            localStorage.removeItem("chain_answer_player_session");
+          }}
         />
       );
     }

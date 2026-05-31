@@ -396,7 +396,8 @@ export const useTrelloStore = create<TrelloState>()(
       syncWithBackend: async (email) => {
         const state = get();
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/trello/sync`, {
+          // POST local changes to the server (non-destructive upsert)
+          await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/trello/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -406,14 +407,8 @@ export const useTrelloStore = create<TrelloState>()(
               email
             }),
           });
-          if (response.ok) {
-            const data = await response.json();
-            set({
-              boards: data.boards,
-              columns: data.columns,
-              cards: data.cards
-            });
-          }
+          // Then pull the merged state from the server (includes other users' changes)
+          await get().pullFromBackend(email);
         } catch (error) {
           console.error('Trello sync failed:', error);
         }

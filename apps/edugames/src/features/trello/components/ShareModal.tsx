@@ -67,7 +67,27 @@ export const ShareModal: React.FC<Props> = ({ board, onClose }) => {
             </button>
           </div>
 
-
+          {/* Shareable Board Code */}
+          <div className="mb-6 p-4 rounded-xl" style={{ background: 'var(--color-brand-blue-pale, #eef2ff)' }}>
+            <h3 className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              Shareable Board Code
+            </h3>
+            <p className="text-[11px] mb-3" style={{ color: 'var(--color-text-muted, #94a3b8)' }}>
+              Share this code with others so they can join this board
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-white rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm font-bold tracking-wider select-all" style={{ color: 'var(--color-text-primary)' }}>
+                {board.id}
+              </div>
+              <button
+                onClick={handleCopyId}
+                className="btn btn-primary py-2 px-4 whitespace-nowrap flex items-center gap-1.5"
+              >
+                {copied ? <CheckCircle2 size={15} /> : <Copy size={15} />}
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
 
           {/* Direct Add Member Interface */}
           {isCreator && (

@@ -180,6 +180,9 @@ async def get_calendar_events(
         if not dt:
             continue
             
+        if appt.status == "rejected":
+            continue
+            
         if range_start and dt < range_start:
             continue
         if range_end and dt > range_end:
@@ -416,6 +419,8 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None):
             dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
             
         if dt and tomorrow_start <= dt < tomorrow_end:
+            if appt.status == "rejected":
+                continue
             if teacher_name and appt.teacher_name != teacher_name:
                 continue
             notifications.append({

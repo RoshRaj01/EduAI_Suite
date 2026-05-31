@@ -45,7 +45,7 @@ export const ChainAnswerGameJoinPage: React.FC<
       const game = await gameAPI.getGameBySessionId(sessionId);
 
       // Find the player in the registered list by name (case-insensitive)
-      const registeredPlayer = game.players.find(
+      const registeredPlayer = game.players?.find(
         (p: any) =>
           p.name.trim().toLowerCase() === playerName.trim().toLowerCase(),
       );

@@ -44,12 +44,19 @@ class TrelloSyncSchema(BaseModel):
 
 @trello_router.post("/sync")
 async def sync_trello(data: TrelloSyncSchema):
-    """Synchronize local Trello state with the backend."""
+    """Non-destructive sync: upsert boards/columns/cards by ID.
     
-    # 1. Update/Create Boards
+    Only the board creator can modify board-level metadata.
+    Columns and cards are upserted individually, never bulk-deleted.
+    Orphan cleanup only runs for boards the caller owns.
+    """
+    caller_email = data.email
+    
+    # ── 1. Upsert Boards ──────────────────────────────────────
     for b in data.boards:
         db_board = await TrelloBoard.find_one(TrelloBoard.id == b.id)
         if not db_board:
+            # New board — insert it
             db_board = TrelloBoard(
                 id=b.id,
                 name=b.name,
@@ -65,55 +72,85 @@ async def sync_trello(data: TrelloSyncSchema):
                 db_board.created_at = datetime.utcnow()
             await db_board.insert()
         else:
-            db_board.name = b.name
-            db_board.background = b.background
-            db_board.creator_email = b.creatorEmail
-            db_board.starred = b.starred
-            db_board.members = b.members
-            db_board.join_requests = b.joinRequests
-            try:
-                db_board.created_at = datetime.fromisoformat(b.createdAt.replace('Z', '+00:00'))
-            except:
-                pass
-            await db_board.save()
+            # Only the creator can modify board-level metadata
+            if db_board.creator_email == caller_email:
+                db_board.name = b.name
+                db_board.background = b.background
+                db_board.starred = b.starred
+                # Preserve server-side members/joinRequests (managed by dedicated endpoints)
+                try:
+                    db_board.created_at = datetime.fromisoformat(b.createdAt.replace('Z', '+00:00'))
+                except:
+                    pass
+                await db_board.save()
 
-    # 2. Update/Create Columns
-    board_ids = [b.id for b in data.boards]
-    if board_ids:
-        await TrelloColumn.find({"board_id": {"$in": board_ids}}).delete()
-        await TrelloCard.find({"board_id": {"$in": board_ids}}).delete()
-
-    cols_to_insert = []
+    # ── 2. Upsert Columns (by ID, non-destructive) ────────────
+    # Determine which boards this caller owns (for orphan cleanup)
+    owned_board_ids = [b.id for b in data.boards if b.creatorEmail == caller_email]
+    incoming_col_ids_by_board = {}  # board_id -> set of column IDs
+    
     for col in data.columns:
-        db_col = TrelloColumn(
-            id=col.id,
-            board_id=col.boardId,
-            title=col.title,
-            sequence=col.sequence
-        )
-        cols_to_insert.append(db_col)
-        
-    if cols_to_insert:
-        await TrelloColumn.insert_many(cols_to_insert)
+        incoming_col_ids_by_board.setdefault(col.boardId, set()).add(col.id)
+        db_col = await TrelloColumn.find_one(TrelloColumn.id == col.id)
+        if not db_col:
+            db_col = TrelloColumn(
+                id=col.id,
+                board_id=col.boardId,
+                title=col.title,
+                sequence=col.sequence
+            )
+            await db_col.insert()
+        else:
+            db_col.title = col.title
+            db_col.sequence = col.sequence
+            await db_col.save()
 
-    cards_to_insert = []
+    # ── 3. Upsert Cards (by ID, non-destructive) ──────────────
+    incoming_card_ids_by_board = {}  # board_id -> set of card IDs
+    
     for card in data.cards:
-        db_card = TrelloCard(
-            id=card.id,
-            column_id=card.columnId,
-            board_id=card.boardId,
-            title=card.title,
-            description=card.description,
-            due_date=card.dueDate,
-            sequence=card.sequence,
-            labels=card.labels,
-            checklist=card.checklist,
-            created_at=datetime.fromisoformat(card.createdAt.replace('Z', '+00:00')) if card.createdAt else datetime.utcnow()
-        )
-        cards_to_insert.append(db_card)
+        incoming_card_ids_by_board.setdefault(card.boardId, set()).add(card.id)
+        db_card = await TrelloCard.find_one(TrelloCard.id == card.id)
+        if not db_card:
+            db_card = TrelloCard(
+                id=card.id,
+                column_id=card.columnId,
+                board_id=card.boardId,
+                title=card.title,
+                description=card.description,
+                due_date=card.dueDate,
+                sequence=card.sequence,
+                labels=card.labels,
+                checklist=card.checklist,
+                created_at=datetime.fromisoformat(card.createdAt.replace('Z', '+00:00')) if card.createdAt else datetime.utcnow()
+            )
+            await db_card.insert()
+        else:
+            db_card.column_id = card.columnId
+            db_card.title = card.title
+            db_card.description = card.description
+            db_card.due_date = card.dueDate
+            db_card.sequence = card.sequence
+            db_card.labels = card.labels
+            db_card.checklist = card.checklist
+            await db_card.save()
+
+    # ── 4. Orphan cleanup: only for boards this caller OWNS ───
+    # Remove columns/cards that the owner no longer has locally
+    for board_id in owned_board_ids:
+        col_ids = incoming_col_ids_by_board.get(board_id, set())
+        if col_ids or board_id in [b.id for b in data.boards]:
+            existing_cols = await TrelloColumn.find({"board_id": board_id}).to_list()
+            for ec in existing_cols:
+                if ec.id not in col_ids:
+                    await ec.delete()
         
-    if cards_to_insert:
-        await TrelloCard.insert_many(cards_to_insert)
+        card_ids = incoming_card_ids_by_board.get(board_id, set())
+        if card_ids or board_id in [b.id for b in data.boards]:
+            existing_cards = await TrelloCard.find({"board_id": board_id}).to_list()
+            for ecard in existing_cards:
+                if ecard.id not in card_ids:
+                    await ecard.delete()
 
 @trello_router.get("/sync")
 async def pull_trello(email: str):

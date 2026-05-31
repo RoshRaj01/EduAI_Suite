@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { GlassCard } from "../../shared/components/GlassCard";
-import { BarChart, Share2, ArrowLeft } from "lucide-react";
+import { BarChart, Copy, Check, ArrowLeft } from "lucide-react";
 
 interface WordData {
   text: string;
@@ -68,6 +68,15 @@ export const WordCloudHostComponent: React.FC<WordCloudHostProps> = ({ onBack, i
   const [pin, setPin] = useState<string | null>(initialPin || null);
   const [words, setWords] = useState<WordData[]>([]);
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyPin = () => {
+    if (pin) {
+      navigator.clipboard.writeText(pin);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const startSession = async () => {
     try {
@@ -253,8 +262,12 @@ return (
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
-            <Share2 size={20} />
+          <button 
+            onClick={copyPin}
+            className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+            title="Copy PIN"
+          >
+            {copied ? <Check size={20} className="text-green-600" /> : <Copy size={20} />}
           </button>
           <button 
             onClick={endSession}

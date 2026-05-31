@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { BoardColumn } from './components/BoardColumn';
 import { CardDetailModal } from './components/CardDetailModal';
 import { ShareModal } from './components/ShareModal';
+import { PendingRequestsModal } from './components/PendingRequestsModal';
 import './trello.css';
 
 export const TrelloBoardView: React.FC = () => {
@@ -27,6 +28,7 @@ export const TrelloBoardView: React.FC = () => {
   const [boardName, setBoardName] = useState(board?.name || '');
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
   const user = useAuthStore((s) => s.user);
   const userEmail = user?.email || 'teacher@eduai.com';
 
@@ -34,7 +36,7 @@ export const TrelloBoardView: React.FC = () => {
     if (userEmail) {
       pullFromBackend(userEmail);
       // Auto-sync every 10 seconds (pull only)
-      const interval = setInterval(() => pullFromBackend(userEmail), 10000);
+      const interval = setInterval(() => pullFromBackend(userEmail), 5000);
       return () => clearInterval(interval);
     }
   }, [userEmail, pullFromBackend]);
@@ -148,16 +150,22 @@ export const TrelloBoardView: React.FC = () => {
 
         <button
           onClick={() => setShowShareModal(true)}
-          // unhide to work later 
-          className="hidden bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-2 mr-2"
+          className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-2 mr-2"
         >
           <Users size={16} /> Share
-          {board.joinRequests && board.joinRequests.length > 0 && (user?.email || 'guest@eduai.com') === board.creatorEmail && (
-            <span className="bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+        </button>
+
+        {board.joinRequests && board.joinRequests.length > 0 && userEmail === board.creatorEmail && (
+          <button
+            onClick={() => setShowPendingModal(true)}
+            className="bg-amber-500/80 hover:bg-amber-500 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 mr-2 animate-pulse"
+          >
+            <span className="bg-white text-amber-600 text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
               {board.joinRequests.length}
             </span>
-          )}
-        </button>
+            Pending
+          </button>
+        )}
 
         <div className="relative">
           <button
@@ -263,6 +271,11 @@ export const TrelloBoardView: React.FC = () => {
       {/* Share Modal */}
       {showShareModal && (
         <ShareModal board={board} onClose={() => setShowShareModal(false)} />
+      )}
+
+      {/* Pending Requests Modal */}
+      {showPendingModal && (
+        <PendingRequestsModal onClose={() => setShowPendingModal(false)} />
       )}
     </div>
   );

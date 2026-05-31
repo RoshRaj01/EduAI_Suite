@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Star, LayoutGrid, Trash2, MoreHorizontal, ShieldAlert } from 'lucide-react';
+import { Plus, Star, LayoutGrid, Trash2, MoreHorizontal, ShieldAlert, LogIn } from 'lucide-react';
 import { useTrelloStore } from '../../store/useTrelloStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { CreateBoardModal } from './components/CreateBoardModal';
+import { JoinBoardModal } from './components/JoinBoardModal';
 import './trello.css';
 
 export const TrelloBoardsPage: React.FC = () => {
@@ -12,6 +13,7 @@ export const TrelloBoardsPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const fallbackEmail = user?.email || 'teacher@eduai.com';
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,6 +51,10 @@ export const TrelloBoardsPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-3">
+          <button onClick={() => setShowJoinModal(true)} className="btn bg-white border border-slate-200 hover:bg-slate-50 shadow-sm flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
+            <LogIn size={18} />
+            Join Board
+          </button>
           <button onClick={() => setShowCreateModal(true)} className="btn btn-primary shadow-md flex items-center gap-2">
             <Plus size={18} />
             Create Board
@@ -144,6 +150,10 @@ export const TrelloBoardsPage: React.FC = () => {
           onClose={() => setShowCreateModal(false)}
           onCreated={handleBoardCreated}
         />
+      )}
+
+      {showJoinModal && (
+        <JoinBoardModal onClose={() => setShowJoinModal(false)} />
       )}
     </div>
   );

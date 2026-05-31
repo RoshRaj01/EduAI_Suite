@@ -410,5 +410,16 @@ async def delete_chain_answer_game(game_id: int):
             detail="Game not found"
         )
 
+    # Broadcast to all connected clients that the game has ended because it was deleted
+    try:
+        from app.routes.websocket_routes import manager
+        await manager.broadcast(game.session_id, {
+            "type": "game_ended",
+            "status": "completed",
+            "message": "Game session deleted by teacher"
+        })
+    except Exception as e:
+        print(f"Error broadcasting game deletion: {e}")
+
     await game.delete()
     return None

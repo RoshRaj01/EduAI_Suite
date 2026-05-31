@@ -12,7 +12,23 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const WS_BASE_URL = API_BASE_URL.replace("http", "ws");
+
+const getWsUrl = (path: string) => {
+  const cleanUrl = API_BASE_URL.trim();
+  if (cleanUrl.startsWith("/")) {
+    const loc = window.location;
+    const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
+    const wsHost = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") 
+      ? `${loc.hostname}:8000` 
+      : loc.host;
+    const pathPrefix = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") ? "" : cleanUrl;
+    return `${protocol}//${wsHost}${pathPrefix}${path}`;
+  } else {
+    const absUrl = new URL(cleanUrl);
+    const wsProtocol = absUrl.protocol === "https:" ? "wss:" : "ws:";
+    return `${wsProtocol}//${absUrl.host}${absUrl.pathname === "/" ? "" : absUrl.pathname}${path}`;
+  }
+};
 
 export const QuizController: React.FC = () => {
   const [pin, setPin] = useState("");
@@ -32,7 +48,7 @@ export const QuizController: React.FC = () => {
   const handleJoin = () => {
     if (!pin || !nickname) return;
     
-    const ws = new WebSocket(`${WS_BASE_URL}/ws/quiz/${pin}?user_type=student&nickname=${nickname}`);
+    const ws = new WebSocket(getWsUrl(`/ws/quiz/${pin}?user_type=student&nickname=${nickname}`));
     socketRef.current = ws;
 
     ws.onmessage = (event) => {
