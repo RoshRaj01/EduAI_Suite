@@ -84,6 +84,7 @@ mentimeter_replica/
 slido_replica/
 test_docs/
 omr_replica/
+backend/uploads/
 
 # ========================
 # 📄 Unused MD files
