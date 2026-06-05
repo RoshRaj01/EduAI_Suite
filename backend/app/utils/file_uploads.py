@@ -9,7 +9,7 @@ BASE_UPLOAD_DIR = Path(__file__).resolve().parents[2] / "uploads"
 ALLOWED_FILE_EXTENSIONS = {".pdf", ".pptx", ".docx", ".png", ".jpg", ".jpeg", ".zip"}
 
 BASE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-for folder in ("assignments", "announcements", "courses", "submissions"):
+for folder in ("assignments", "announcements", "courses", "submissions", "report_templates", "generated_reports"):
     (BASE_UPLOAD_DIR / folder).mkdir(parents=True, exist_ok=True)
 
 

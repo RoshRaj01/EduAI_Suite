@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { FileSpreadsheet, Download, RefreshCw, Send, Users, X } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { FileSpreadsheet, Download, RefreshCw, Send, Users, X, Upload, FileText, CheckCircle, AlertTriangle } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { useTheme } from "../../shared/hooks/useTheme";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
@@ -18,6 +18,14 @@ export const ReportsPage: React.FC = () => {
   const [availableStudents, setAvailableStudents] = useState<any[]>([]);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingReport, setViewingReport] = useState<any>(null);
+
+  // Template upload state
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [templateTargetId, setTemplateTargetId] = useState<number | undefined>(undefined);
+  const [templateError, setTemplateError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchReports = async () => {
     try {
@@ -76,7 +84,31 @@ export const ReportsPage: React.FC = () => {
     }
   };
 
-  const handleDownload = (rep: any) => {
+  const handleDownload = async (rep: any) => {
+    // If it's a template report with DOCX, download via the API
+    if (rep.type === 'Template Report') {
+      try {
+        const res = await fetch(`${API_ENDPOINTS.REPORTS}/${rep.id}/download`);
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${rep.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.docx`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        } else {
+          alert('Failed to download report.');
+        }
+      } catch (err) {
+        console.error('Download error:', err);
+        alert('Error downloading report.');
+      }
+      return;
+    }
+    // Fallback: existing txt download
     if (!rep.content) return;
     const blob = new Blob([rep.content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
@@ -131,6 +163,57 @@ export const ReportsPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  // --- Template upload handlers ---
+  const handleTemplateFileChange = (file: File | null) => {
+    setTemplateError("");
+    if (file && !file.name.toLowerCase().endsWith('.pdf')) {
+      setTemplateError('Only PDF files are accepted as templates.');
+      return;
+    }
+    setTemplateFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleTemplateFileChange(file);
+  };
+
+  const handleTemplateGenerate = async () => {
+    if (!templateFile) {
+      setTemplateError('Please upload a PDF template first.');
+      return;
+    }
+    try {
+      setLoading(true);
+      setTemplateError("");
+      const formData = new FormData();
+      formData.append('template_file', templateFile);
+      if (templateTargetId) {
+        formData.append('target_id', String(templateTargetId));
+      }
+      const res = await fetch(`${API_ENDPOINTS.REPORTS}/generate-from-template`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        setIsTemplateModalOpen(false);
+        setTemplateFile(null);
+        setTemplateTargetId(undefined);
+        fetchReports();
+      } else {
+        const data = await res.json();
+        setTemplateError(data.detail || 'Failed to generate report.');
+      }
+    } catch (err) {
+      console.error(err);
+      setTemplateError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex items-center justify-between">
@@ -169,6 +252,23 @@ export const ReportsPage: React.FC = () => {
             </button>
           </GlassCard>
         ))}
+
+        {/* Template Upload Card */}
+        <GlassCard className="p-6 group hover:scale-[1.02] transition-all duration-300 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-bl-full" />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300 bg-purple-500/10 text-purple-400 group-hover:bg-purple-500 group-hover:text-white">
+            <Upload size={20} />
+          </div>
+          <h3 className="text-lg font-bold mb-2 font-display" style={{ color: "var(--color-text-primary)" }}>Generate from Template</h3>
+          <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>Upload your PDF report format. AI fills in data &amp; generates DOCX.</p>
+          <button
+            onClick={() => { setIsTemplateModalOpen(true); setTemplateError(""); setTemplateFile(null); }}
+            className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-all duration-300 text-purple-400 hover:text-purple-300"
+          >
+            Upload Template
+            <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
+          </button>
+        </GlassCard>
       </div>
 
       <GlassCard className="overflow-hidden mt-6">
@@ -198,6 +298,7 @@ export const ReportsPage: React.FC = () => {
                      <div className="flex items-center gap-2">
                        {rep.status === 'generating' && <RefreshCw size={14} className="animate-spin text-[#264796]" />}
                        {rep.status === 'failed' && <span className="text-red-500 text-xs px-1 border border-red-500 rounded">Failed</span>}
+                       {rep.type === 'Template Report' && <span className="text-purple-400 text-[10px] px-1.5 py-0.5 border border-purple-400/40 rounded-md bg-purple-400/5 font-bold uppercase tracking-wider">Template</span>}
                        {rep.name}
                      </div>
                   </td>
@@ -434,6 +535,140 @@ export const ReportsPage: React.FC = () => {
                 <Send size={16} /> Send via Email
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Template Upload Modal */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div
+            className="bg-[#121212] rounded-2xl max-w-lg w-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-8 pt-8 pb-6">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-white font-display mb-1">Generate from Template</h2>
+                  <p className="text-gray-400 text-sm">Upload your PDF report format. AI fills the blanks with real data.</p>
+                </div>
+                <button
+                  onClick={() => setIsTemplateModalOpen(false)}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* PDF Upload Zone */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-purple-400 mb-2 ml-1">Report Template (PDF)</label>
+                  <div
+                    className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${
+                      isDragging
+                        ? 'border-purple-400 bg-purple-400/10'
+                        : templateFile
+                        ? 'border-green-500/50 bg-green-500/5'
+                        : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      onChange={(e) => handleTemplateFileChange(e.target.files?.[0] || null)}
+                    />
+                    {templateFile ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle size={32} className="text-green-400" />
+                        <p className="text-white font-semibold text-sm">{templateFile.name}</p>
+                        <p className="text-gray-500 text-xs">{(templateFile.size / 1024).toFixed(1)} KB</p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setTemplateFile(null); }}
+                          className="text-xs text-red-400 hover:text-red-300 mt-1 underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center">
+                          <Upload size={24} className="text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="text-white font-semibold text-sm">Drop your PDF here or click to browse</p>
+                          <p className="text-gray-500 text-xs mt-1">Only .pdf files accepted</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Optional target selector */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-purple-400 mb-2 ml-1">Target Student / Course (Optional)</label>
+                  <div className="relative group">
+                    <select
+                      value={templateTargetId ?? ''}
+                      onChange={(e) => setTemplateTargetId(e.target.value ? Number(e.target.value) : undefined)}
+                      className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white appearance-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all cursor-pointer hover:bg-white/10"
+                    >
+                      <option value="" className="bg-[#1a1a1a]">— None (generic report) —</option>
+                      <optgroup label="Students">
+                        {availableStudents.map(s => (
+                          <option key={`s-${s.id}`} value={s.id} className="bg-[#1a1a1a]">
+                            {s.name} - {s.registration_number || s.id}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Courses">
+                        {availableCourses.map(c => (
+                          <option key={`c-${c.id}`} value={c.id} className="bg-[#1a1a1a]">
+                            {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                      <Users size={16} />
+                    </div>
+                  </div>
+                  <p className="text-[10px] mt-2 text-gray-500 italic ml-1">
+                    Select a student or course to auto-fill their data into the template.
+                  </p>
+                </div>
+
+                {/* Error display */}
+                {templateError && (
+                  <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                    <AlertTriangle size={16} />
+                    {templateError}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleTemplateGenerate}
+                  disabled={loading || !templateFile}
+                  className="w-full h-14 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-900 disabled:text-gray-400 text-white font-bold rounded-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(147,51,234,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(147,51,234,0.6)] group mt-2"
+                >
+                  {loading ? (
+                    <RefreshCw size={20} className="animate-spin" />
+                  ) : (
+                    <>
+                      <FileText size={20} className="group-hover:scale-110 transition-transform" />
+                      Generate DOCX from Template
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="h-1 w-full bg-gradient-to-r from-purple-600 via-[#d0ae61] to-purple-600" />
           </div>
         </div>
       )}

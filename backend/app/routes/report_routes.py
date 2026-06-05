@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from app.models.report import Report
 from app.models.student import Student
 from app.models.course import Course
@@ -7,11 +8,14 @@ from app.models.exam import ExamAttempt, Exam
 from app.models.assignment import Assignment
 from app.models.user import User
 from app.services.groq_service import GroqService
+from app.services.report_template_service import ReportTemplateService
 from app.utils.email_utils import send_email
 from pydantic import BaseModel
 from typing import Optional, List
+from pathlib import Path
 import uuid
 import datetime
+import os
 
 report_router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -229,3 +233,148 @@ async def send_report(report_id: str, req: SendReportRequest, background_tasks: 
     
     background_tasks.add_task(send_email, req.email, subject, body)
     return {"message": f"Report sent successfully to {req.email}"}
+
+
+# ---------------------------------------------------------------------------
+# Template-based report generation
+# ---------------------------------------------------------------------------
+
+UPLOAD_BASE = Path(__file__).resolve().parents[2] / "uploads"
+
+async def generate_from_template_background(report_db_id: int, pdf_path: str, target_id: int | None):
+    """Background task: run the full template pipeline and save DOCX."""
+    report = await Report.find_one(Report.int_id == report_db_id)
+    if not report:
+        return
+
+    try:
+        # Read the uploaded PDF
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+
+        # Run the pipeline
+        docx_bytes = await ReportTemplateService.generate_report_from_template(
+            pdf_bytes=pdf_bytes,
+            target_id=target_id,
+        )
+
+        # Save DOCX to disk
+        docx_filename = f"{uuid.uuid4().hex}_report.docx"
+        docx_dir = UPLOAD_BASE / "generated_reports"
+        docx_dir.mkdir(parents=True, exist_ok=True)
+        docx_disk_path = docx_dir / docx_filename
+
+        with open(docx_disk_path, "wb") as f:
+            f.write(docx_bytes)
+
+        report.docx_path = f"/uploads/generated_reports/{docx_filename}"
+        report.status = "ready"
+        report.content = "Report generated from template. Download the DOCX file."
+        await report.save()
+
+    except RuntimeError as e:
+        # Groq unavailable or pipeline error
+        report.status = "failed"
+        report.content = str(e)
+        await report.save()
+    except Exception as e:
+        report.status = "failed"
+        report.content = f"Report generation failed: {str(e)}"
+        await report.save()
+
+
+@report_router.post("/generate-from-template")
+async def generate_report_from_template(
+    background_tasks: BackgroundTasks,
+    template_file: UploadFile = File(...),
+    target_id: Optional[int] = Form(None),
+):
+    """
+    Upload a PDF report template. The system extracts its structure,
+    fills fields with MongoDB data, uses Groq for prose sections,
+    and generates a downloadable DOCX.
+    """
+    # Validate file type
+    if not template_file.filename or not template_file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted as templates.")
+
+    # Pre-check Groq availability before doing any work
+    if not ReportTemplateService.check_groq_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Groq AI service is currently unavailable. Cannot generate report content. Please try again later."
+        )
+
+    # Save uploaded PDF
+    safe_name = f"{uuid.uuid4().hex}_{template_file.filename.replace(' ', '_')}"
+    template_dir = UPLOAD_BASE / "report_templates"
+    template_dir.mkdir(parents=True, exist_ok=True)
+    pdf_disk_path = template_dir / safe_name
+
+    content = await template_file.read()
+    with open(pdf_disk_path, "wb") as f:
+        f.write(content)
+
+    # Create report DB record
+    report_id = f"RT-{str(uuid.uuid4())[:6].upper()}"
+
+    # Build a descriptive name
+    name = "Template Report"
+    if target_id:
+        student = await Student.find_one(Student.int_id == target_id)
+        if student:
+            name = f"Template Report: {student.name}"
+        else:
+            course = await Course.find_one(Course.int_id == target_id)
+            if course:
+                name = f"Template Report: {course.name}"
+
+    new_report = Report(
+        report_id=report_id,
+        name=name,
+        type="Template Report",
+        status="generating",
+        target_id=target_id,
+        template_path=f"/uploads/report_templates/{safe_name}",
+    )
+    await new_report.assign_id()
+    await new_report.insert()
+
+    # Launch background generation
+    background_tasks.add_task(
+        generate_from_template_background,
+        new_report.int_id,
+        str(pdf_disk_path),
+        target_id,
+    )
+
+    return {"message": "Template report generation started", "report_id": report_id}
+
+
+@report_router.get("/{report_id}/download")
+async def download_report(report_id: str):
+    """Download the generated DOCX file for a report."""
+    report = await Report.find_one(Report.report_id == report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    if report.status != "ready":
+        raise HTTPException(status_code=400, detail="Report is not ready yet")
+
+    if not report.docx_path:
+        raise HTTPException(status_code=404, detail="No DOCX file available for this report")
+
+    # Resolve the disk path
+    # docx_path is like "/uploads/generated_reports/abc123_report.docx"
+    relative = report.docx_path.lstrip("/")
+    disk_path = Path(__file__).resolve().parents[2] / relative
+
+    if not disk_path.exists():
+        raise HTTPException(status_code=404, detail="Report file not found on disk")
+
+    filename = f"{report.name.replace(' ', '_')}.docx"
+    return FileResponse(
+        path=str(disk_path),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=filename,
+    )

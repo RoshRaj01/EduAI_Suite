@@ -13,6 +13,8 @@ class Report(Document):
     status: str = "ready"
     content: Optional[str] = None
     target_id: Optional[int] = None
+    template_path: Optional[str] = None   # Path to uploaded PDF template
+    docx_path: Optional[str] = None       # Path to generated DOCX output
 
     class Settings:
         name = "reports"
