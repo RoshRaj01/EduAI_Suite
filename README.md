@@ -58,8 +58,7 @@ EduAI_Suite/
 │   │   └── services/      # Business logic & AI integration
 │   ├── requirements.txt   # Python dependencies
 │   └── main.py            # Entry point
-├── package.json           # Root workspace configuration
-└── ARCHITECTURE.md        # Detailed system architecture
+└── package.json           # Root workspace configuration
 ```
 
 ---
@@ -127,7 +126,6 @@ The platform includes comprehensive testing suites for both the frontend compone
 
 - **Backend:** Run Pytest for endpoint, service, and database persistence tests.
 - **Frontend:** Component testing using standard React testing utilities.
-- For end-to-end testing guidelines, refer to `E2E_TESTING_GUIDE.md`.
 
 ---
 
