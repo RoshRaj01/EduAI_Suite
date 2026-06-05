@@ -1,9 +1,21 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { ChainGameState, ChainGameActions } from "./types";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { useGameSync } from "./useGameSync";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, AlertCircle, Send, Square, Wifi, WifiOff } from "lucide-react";
+import {
+  Clock,
+  AlertCircle,
+  Send,
+  Wifi,
+  WifiOff,
+  Play,
+  Square,
+  Hourglass,
+  Trophy,
+  Copy,
+  Check,
+} from "lucide-react";
 
 interface ChainGameBoardProps {
   gameState?: ChainGameState;
@@ -35,17 +47,20 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
 }) => {
   const [inputWord, setInputWord] = useState("");
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [lastPlayerId, setLastPlayerId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Track the last currentPlayerIndex we auto-skipped for, to avoid double-skip
+  const lastSkippedIndexRef = useRef<number | null>(null);
+
   // Use WebSocket sync if sessionId is provided
-  // Only activate sync when we have a real session
   const syncEnabled = Boolean(sessionId);
   const {
     isConnected,
     connectionMode,
     gameState: wsGameState,
     submitWord,
-    startGame,
-    endGame,
+    startGame: wsStartGame,
+    endGame: wsEndGame,
     skipTurn: wsSkipTurn,
   } = useGameSync({
     sessionId: syncEnabled ? sessionId! : "",
@@ -61,6 +76,44 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
   const actions = propsActions;
   const currentPlayerId = playerId || propsCurrentPlayerId;
 
+  const gameName =
+    (gameState as any)?.name ||
+    (gameState as any)?.session?.name ||
+    (gameState as any)?.game?.name ||
+    "Chain Answer Game";
+
+  const gameStatus =
+    (gameState as any)?.gameStatus ||
+    (gameState as any)?.status ||
+    (gameState as any)?.game?.status ||
+    "setup";
+
+  const currentPlayerIndex = gameState?.currentPlayerIndex ?? 0;
+  const players = gameState?.players || [];
+  const currentPlayer = players[currentPlayerIndex] || players[0];
+
+  // Determine if it's the current user's turn
+  const normalizedPlayerName = playerName?.trim().toLowerCase();
+  const isCurrentPlayerTurn =
+    String(currentPlayerId) === String(currentPlayer?.id) ||
+    String(currentPlayerId) === String(currentPlayer?.student_id) ||
+    String(currentPlayerId) === String(currentPlayer?.studentId) ||
+    (!!normalizedPlayerName &&
+      currentPlayer?.name?.trim().toLowerCase() === normalizedPlayerName);
+
+  const lastWord =
+    (gameState as any)?.chain?.length > 0
+      ? (gameState as any)?.chain[(gameState as any)?.chain.length - 1]?.word
+      : (gameState as any)?.starting_word ||
+        (gameState as any)?.session?.startingWord ||
+        (gameState as any)?.game?.starting_word ||
+        "";
+
+  const requiredLetter = lastWord
+    ? lastWord.charAt(lastWord.length - 1).toUpperCase()
+    : "?";
+
+  // ─── Handle word submission ───────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPlayerId || !inputWord.trim()) return;
@@ -82,6 +135,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           setInputWord("");
           setStartTime(Date.now());
         }
+        return; // local mode handles its own clearing
       }
       setInputWord("");
       setStartTime(Date.now());
@@ -90,42 +144,25 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     }
   };
 
-
-
-  const gameName =
-    (gameState as any)?.name ||
-    (gameState as any)?.session?.name ||
-    (gameState as any)?.game?.name ||
-    "Chain Answer Game";
-
-  const gameStatus =
-    (gameState as any)?.gameStatus ||
-    (gameState as any)?.status ||
-    (gameState as any)?.game?.status ||
-    "active";
-
-  // Handle timer expiry - auto-skip to next player
+  // ─── Timer expiry: auto-skip to next player ───────────────
   useEffect(() => {
     if (!gameState || gameStatus !== "active") return;
-    if ((gameState.timer || 0) > 0) return;
+    if ((gameState.timer || 0) > 0) {
+      // Timer is still ticking — clear the skip guard so we can skip again when it reaches 0
+      return;
+    }
 
-    const currentPlayer =
-      gameState?.players?.[gameState?.currentPlayerIndex || 0];
-    const currentPlayerIdStr = String(
-      currentPlayer?.id || currentPlayer?.student_id,
-    );
-
-    // Only trigger skip once per player
-    if (currentPlayerIdStr === lastPlayerId) return;
-    setLastPlayerId(currentPlayerIdStr);
+    // Timer has reached 0
+    // Only skip if we haven't already skipped for this exact playerIndex
+    if (lastSkippedIndexRef.current === currentPlayerIndex) return;
+    lastSkippedIndexRef.current = currentPlayerIndex;
 
     const skipTimer = setTimeout(() => {
-      const skipId = currentPlayer?.student_id || currentPlayer?.id;
+      const skipId =
+        currentPlayer?.student_id || currentPlayer?.id;
       if (syncEnabled && skipId) {
-        // WebSocket mode: send skip_turn via WS (server broadcasts to all)
         wsSkipTurn(String(skipId));
       } else if (actions?.skipTurn && currentPlayer) {
-        // Local mode: use local state actions
         actions.skipTurn(currentPlayer.id || currentPlayer.student_id);
       }
       setInputWord("");
@@ -136,39 +173,353 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
   }, [
     gameState?.timer,
     gameStatus,
-    gameState?.currentPlayerIndex,
-    gameState?.players,
+    currentPlayerIndex,
+    currentPlayer,
     actions,
-    lastPlayerId,
     syncEnabled,
     wsSkipTurn,
   ]);
 
-  // Handle game ended state
+  // Reset skip guard when the player index actually changes (from a successful skip/submit)
   useEffect(() => {
-    if ((gameStatus === "completed" || gameStatus === "ended") && onGameEnded) {
+    // When currentPlayerIndex changes, allow future skips for the new player
+    lastSkippedIndexRef.current = null;
+  }, [currentPlayerIndex]);
+
+  // Reset start time when it becomes our turn
+  useEffect(() => {
+    if (isCurrentPlayerTurn && gameStatus === "active") {
+      setStartTime(Date.now());
+    }
+  }, [isCurrentPlayerTurn, gameStatus]);
+
+  // ─── Handle game ended state ──────────────────────────────
+  useEffect(() => {
+    if (
+      (gameStatus === "completed" || gameStatus === "ended") &&
+      onGameEnded
+    ) {
       onGameEnded();
     }
   }, [gameStatus, onGameEnded]);
 
-  const currentPlayer =
-    gameState?.players?.[gameState?.currentPlayerIndex || 0] ||
-    gameState?.players?.[0];
-  const normalizedPlayerName = playerName?.trim().toLowerCase();
-  const isCurrentPlayerTurn =
-    String(currentPlayerId) === String(currentPlayer?.id) ||
-    String(currentPlayerId) === String(currentPlayer?.student_id) ||
-    String(currentPlayerId) === String(currentPlayer?.studentId) ||
-    (!!normalizedPlayerName &&
-      currentPlayer?.name?.trim().toLowerCase() === normalizedPlayerName);
-  const lastWord =
-    (gameState as any)?.chain?.length > 0
-      ? (gameState as any)?.chain[(gameState as any)?.chain.length - 1]?.word
-      : (gameState as any)?.starting_word ||
-        (gameState as any)?.session?.startingWord ||
-        (gameState as any)?.game?.starting_word ||
-        "";
+  // ─── Copy session ID ──────────────────────────────────────
+  const handleCopySessionId = () => {
+    if (sessionId) {
+      navigator.clipboard.writeText(sessionId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
+  // ─── Pre-game lobby (game not yet started) ────────────────
+  if (gameStatus === "setup" || gameStatus === "paused") {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1
+              className="text-3xl font-bold font-display"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              {gameName}
+            </h1>
+            {sessionId && (
+              <div className="flex items-center gap-2 mt-2">
+                <p
+                  style={{ color: "var(--color-text-secondary)" }}
+                  className="text-sm"
+                >
+                  Session: <strong>{sessionId}</strong>
+                </p>
+                <button
+                  onClick={handleCopySessionId}
+                  className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  title="Copy Session ID"
+                >
+                  {copied ? (
+                    <Check size={14} style={{ color: "#10b981" }} />
+                  ) : (
+                    <Copy
+                      size={14}
+                      style={{ color: "var(--color-text-secondary)" }}
+                    />
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+          {sessionId && (
+            <div className="flex items-center gap-2 text-sm">
+              {connectionMode === "ws" && isConnected ? (
+                <>
+                  <Wifi size={16} style={{ color: "#10b981" }} />
+                  <span style={{ color: "#10b981" }}>Live</span>
+                </>
+              ) : connectionMode === "polling" ? (
+                <>
+                  <Wifi size={16} style={{ color: "#f59e0b" }} />
+                  <span style={{ color: "#f59e0b" }}>Polling</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff
+                    size={16}
+                    style={{ color: "var(--color-error)" }}
+                  />
+                  <span style={{ color: "var(--color-error)" }}>
+                    Connecting…
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Waiting Lobby */}
+        <GlassCard className="p-12 text-center space-y-6">
+          <motion.div
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            className="inline-block"
+          >
+            <Hourglass
+              size={48}
+              style={{ color: "var(--color-brand-blue)" }}
+            />
+          </motion.div>
+
+          <div>
+            <h2
+              className="text-2xl font-bold font-display mb-2"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              {gameStatus === "paused"
+                ? "Game Paused"
+                : "Waiting for Game to Start"}
+            </h2>
+            <p style={{ color: "var(--color-text-secondary)" }}>
+              {userType === "teacher"
+                ? "Press Start Game when all players have joined"
+                : "The teacher will start the game shortly..."}
+            </p>
+          </div>
+
+          {/* Players in lobby */}
+          {players.length > 0 && (
+            <div className="text-left max-w-md mx-auto">
+              <p
+                className="text-sm font-semibold mb-3"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                Players joined ({players.length}):
+              </p>
+              <div className="space-y-2">
+                {players.map((player, index) => (
+                  <motion.div
+                    key={
+                      player.id
+                        ? `lobby-${player.id}`
+                        : `lobby-${index}`
+                    }
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-center gap-3 p-3 rounded-lg"
+                    style={{
+                      background: "var(--color-bg-tertiary)",
+                    }}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                      }}
+                    >
+                      {player.name?.charAt(0).toUpperCase() || "?"}
+                    </div>
+                    <span
+                      className="font-semibold"
+                      style={{ color: "var(--color-text-primary)" }}
+                    >
+                      {player.name}
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Teacher controls */}
+          {userType === "teacher" && (
+            <div className="flex justify-center gap-4 pt-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (syncEnabled) {
+                    wsStartGame();
+                  } else if (actions?.startGame) {
+                    actions.startGame();
+                  }
+                }}
+                disabled={players.length < 2}
+                className="px-8 py-4 rounded-xl font-bold text-white text-lg flex items-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                style={{
+                  background:
+                    players.length >= 2
+                      ? "linear-gradient(135deg, #10b981, #059669)"
+                      : "#6b7280",
+                }}
+              >
+                <Play size={24} />
+                Start Game
+              </motion.button>
+            </div>
+          )}
+        </GlassCard>
+
+        {/* Session ID sharing card for teacher */}
+        {userType === "teacher" && sessionId && (
+          <GlassCard className="p-6">
+            <h3
+              className="font-bold mb-3"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              Share with Students
+            </h3>
+            <div
+              className="flex items-center gap-3 p-4 rounded-lg"
+              style={{ background: "var(--color-bg-tertiary)" }}
+            >
+              <code
+                className="flex-1 text-lg font-mono font-bold"
+                style={{ color: "var(--color-brand-blue)" }}
+              >
+                {sessionId}
+              </code>
+              <button
+                onClick={handleCopySessionId}
+                className="px-4 py-2 rounded-lg font-semibold text-white flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                }}
+              >
+                {copied ? (
+                  <>
+                    <Check size={16} /> Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={16} /> Copy
+                  </>
+                )}
+              </button>
+            </div>
+            <p
+              className="text-sm mt-2"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              Students use this session ID to join the game
+            </p>
+          </GlassCard>
+        )}
+      </div>
+    );
+  }
+
+  // ─── Game completed screen ────────────────────────────────
+  if (gameStatus === "completed" || gameStatus === "ended") {
+    const sortedPlayers = [...players].sort(
+      (a, b) => (b.score || 0) - (a.score || 0),
+    );
+    return (
+      <div className="space-y-6">
+        <GlassCard className="p-12 text-center space-y-6">
+          <Trophy size={64} style={{ color: "var(--color-brand-gold)" }} className="mx-auto" />
+          <h1
+            className="text-4xl font-bold font-display"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            Game Over!
+          </h1>
+          <p style={{ color: "var(--color-text-secondary)" }}>
+            {(gameState as any)?.chain?.length || 0} words chained
+          </p>
+        </GlassCard>
+
+        {/* Final Scoreboard */}
+        <GlassCard className="p-6">
+          <h3
+            className="font-bold mb-4 text-xl"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            Final Standings
+          </h3>
+          <div className="space-y-3">
+            {sortedPlayers.map((player, index) => (
+              <motion.div
+                key={player.id ? `final-${player.id}` : `final-${index}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.15 }}
+                className="flex items-center p-4 rounded-xl"
+                style={{
+                  background:
+                    index === 0
+                      ? "linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(234, 179, 8, 0.05))"
+                      : "var(--color-bg-tertiary)",
+                  border:
+                    index === 0
+                      ? "2px solid rgba(234, 179, 8, 0.3)"
+                      : "none",
+                }}
+              >
+                <span
+                  className="text-2xl font-bold w-10 text-center"
+                  style={{
+                    color:
+                      index === 0
+                        ? "var(--color-brand-gold)"
+                        : "var(--color-text-secondary)",
+                  }}
+                >
+                  {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `${index + 1}`}
+                </span>
+                <span
+                  className="font-semibold flex-1 ml-3"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  {player.name}
+                </span>
+                <span
+                  className="font-bold text-lg"
+                  style={{ color: "var(--color-brand-gold)" }}
+                >
+                  {player.score || 0} pts
+                </span>
+              </motion.div>
+            ))}
+          </div>
+        </GlassCard>
+
+        {onExit && (
+          <button
+            onClick={onExit}
+            className="w-full py-4 rounded-xl font-bold text-white text-lg transition-transform hover:scale-105 active:scale-95"
+            style={{ background: "var(--color-brand-blue)" }}
+          >
+            Back to Home
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ─── Active game board ────────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Game Header */}
@@ -199,8 +550,13 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
                 </>
               ) : (
                 <>
-                  <WifiOff size={16} style={{ color: "var(--color-error)" }} />
-                  <span style={{ color: "var(--color-error)" }}>Connecting…</span>
+                  <WifiOff
+                    size={16}
+                    style={{ color: "var(--color-error)" }}
+                  />
+                  <span style={{ color: "var(--color-error)" }}>
+                    Connecting…
+                  </span>
                 </>
               )}
             </div>
@@ -208,7 +564,6 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           <div className="flex items-center justify-end gap-2 text-lg font-bold">
             <Clock size={24} />
             <span
-              className={(gameState?.timer || 0) < 5 ? "text-red-500" : ""}
               style={{
                 color:
                   (gameState?.timer || 0) < 5
@@ -241,11 +596,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           className="mt-4 text-sm"
         >
           Next word must start with:{" "}
-          <strong style={{ fontSize: "1.2em" }}>
-            {lastWord
-              ? lastWord.charAt(lastWord.length - 1).toUpperCase()
-              : "?"}
-          </strong>
+          <strong style={{ fontSize: "1.2em" }}>{requiredLetter}</strong>
         </p>
       </GlassCard>
 
@@ -256,12 +607,10 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
             style={{ color: "var(--color-text-secondary)" }}
             className="text-sm"
           >
-            Current Player
+            {isCurrentPlayerTurn ? "Your Turn!" : "Current Player"}
           </p>
           <p
-            className={`text-xl font-bold ${
-              isCurrentPlayerTurn ? "text-green-500" : "text-gray-500"
-            }`}
+            className="text-xl font-bold"
             style={{
               color: isCurrentPlayerTurn
                 ? "var(--color-status-success)"
@@ -273,48 +622,126 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
         </GlassCard>
       </div>
 
-      {/* Word Input */}
-      <AnimatePresence>
-        {isCurrentPlayerTurn && gameStatus === "active" && (
-          <motion.form
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            onSubmit={handleSubmit}
-            className="flex gap-3"
-          >
-            <input
-              type="text"
-              value={inputWord}
-              onChange={(e) => setInputWord(e.target.value)}
-              placeholder={`Enter a word starting with "${lastWord ? lastWord.charAt(lastWord.length - 1).toUpperCase() : "?"}"`}
-              className="flex-1 px-4 py-3 rounded-lg border-2 focus:outline-none focus:border-blue-500"
+      {/* Word Input — always visible for players, disabled when not their turn */}
+      {(userType === "student" || isCurrentPlayerTurn) && (
+        <div>
+          {isCurrentPlayerTurn ? (
+            <motion.form
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onSubmit={handleSubmit}
+              className="flex gap-3"
+            >
+              <input
+                type="text"
+                value={inputWord}
+                onChange={(e) => setInputWord(e.target.value)}
+                placeholder={`Enter a word starting with "${requiredLetter}"`}
+                className="flex-1 px-4 py-3 rounded-lg border-2 focus:outline-none focus:border-blue-500"
+                style={{
+                  borderColor: "var(--color-border)",
+                  background: "var(--color-bg-secondary)",
+                  color: "var(--color-text-primary)",
+                }}
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={!inputWord.trim()}
+                className="px-6 py-3 rounded-lg font-semibold flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
+                  color: "white",
+                }}
+              >
+                <Send size={18} />
+                Submit
+              </button>
+            </motion.form>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center gap-3 p-4 rounded-lg"
               style={{
-                borderColor: "var(--color-border)",
-                background: "var(--color-bg-secondary)",
-                color: "var(--color-text-primary)",
-              }}
-              autoFocus
-            />
-            <button
-              type="submit"
-              disabled={!inputWord.trim()}
-              className="px-6 py-3 rounded-lg font-semibold flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
-              style={{
-                background:
-                  "linear-gradient(135deg, var(--color-brand-blue), #3460c4)",
-                color: "white",
+                background: "var(--color-bg-tertiary)",
+                border: "2px dashed var(--color-border)",
               }}
             >
-              <Send size={18} />
-              Submit
-            </button>
-          </motion.form>
-        )}
-      </AnimatePresence>
+              <Hourglass
+                size={20}
+                className="animate-pulse"
+                style={{ color: "var(--color-text-secondary)" }}
+              />
+              <span
+                className="font-semibold"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                Waiting for{" "}
+                <strong style={{ color: "var(--color-text-primary)" }}>
+                  {currentPlayer?.name || "other player"}
+                </strong>{" "}
+                to answer...
+              </span>
+            </motion.div>
+          )}
+        </div>
+      )}
 
-      {userType === "student" && gameStatus === "active" && (
+      {/* Teacher controls during active game */}
+      {userType === "teacher" && (
         <div className="flex justify-end gap-3">
+          {!isCurrentPlayerTurn && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex-1 flex items-center gap-3 p-4 rounded-lg"
+              style={{
+                background: "var(--color-bg-tertiary)",
+                border: "2px dashed var(--color-border)",
+              }}
+            >
+              <Hourglass
+                size={20}
+                className="animate-pulse"
+                style={{ color: "var(--color-text-secondary)" }}
+              />
+              <span
+                className="font-semibold"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                Waiting for{" "}
+                <strong style={{ color: "var(--color-text-primary)" }}>
+                  {currentPlayer?.name || "player"}
+                </strong>
+                ...
+              </span>
+            </motion.div>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (syncEnabled) {
+                wsEndGame();
+              } else if (actions?.endGame) {
+                actions.endGame();
+              }
+            }}
+            className="px-6 py-3 rounded-lg font-semibold text-white flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform"
+            style={{
+              background: "linear-gradient(135deg, #ef4444, #dc2626)",
+            }}
+          >
+            <Square size={18} />
+            End Game
+          </button>
+        </div>
+      )}
+
+      {/* Student leave button */}
+      {userType === "student" && onExit && (
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={onExit}
@@ -388,23 +815,33 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
           Scores
         </h3>
         <div className="space-y-2">
-          {(gameState?.players || []).map((player, index) => (
+          {players.map((player, index) => (
             <div
               key={player.id ? `player-${player.id}` : `player-${index}`}
-              className="flex justify-between items-center p-3 rounded-lg"
+              className="flex justify-between items-center p-3 rounded-lg transition-colors"
               style={{
                 background:
-                  index === gameState?.currentPlayerIndex
+                  index === currentPlayerIndex
                     ? "var(--color-bg-tertiary)"
                     : "transparent",
               }}
             >
-              <span
-                style={{ color: "var(--color-text-primary)" }}
-                className="font-semibold"
-              >
-                {player.name}
-              </span>
+              <div className="flex items-center gap-2">
+                {index === currentPlayerIndex && (
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.5 }}
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: "var(--color-status-success)" }}
+                  />
+                )}
+                <span
+                  style={{ color: "var(--color-text-primary)" }}
+                  className="font-semibold"
+                >
+                  {player.name}
+                </span>
+              </div>
               <div className="flex gap-4">
                 <span style={{ color: "var(--color-text-secondary)" }}>
                   Words: {player.wordsValid ?? player.words_valid ?? 0}/

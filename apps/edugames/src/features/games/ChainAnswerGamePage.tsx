@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { ChainGameBoard } from "./ChainGameBoard";
-import { useChainGameState } from "./useChainGameState";
 import { useAuthStore } from "../../store/useAuthStore";
 import { ChainAnswerGameJoinPage } from "./ChainAnswerGameJoinPage";
 import { useActiveStudents } from "./useActiveStudents";
@@ -52,7 +51,7 @@ export const ChainAnswerGamePage: React.FC = () => {
       startingWord: "Apple",
     });
 
-    const [gameState, actions] = useChainGameState();
+    // No longer using local useChainGameState — teacher uses WebSocket sync via ChainGameBoard
 
     const handleTogglePlayer = (studentId: number) => {
       setSelectedPlayerIds((prev) => {
@@ -292,13 +291,23 @@ export const ChainAnswerGamePage: React.FC = () => {
       );
     }
 
-    // Show game board if started
-    if (gameStarted && gameState.gameStatus !== "completed") {
+    // Show game board if started — teacher uses WebSocket sync
+    if (gameStarted && joinedGameId && joinedSessionId) {
       return (
         <ChainGameBoard
-          gameState={gameState}
-          actions={actions}
-          currentPlayerId={gameState.players[gameState.currentPlayerIndex]?.id}
+          gameId={joinedGameId}
+          sessionId={joinedSessionId}
+          userType="teacher"
+          onError={(err) => console.error("Game sync error:", err)}
+          onGameEnded={() => {
+            setGameEndedScreen(true);
+            setGameStarted(false);
+          }}
+          onExit={() => {
+            setGameStarted(false);
+            setJoinedSessionId(null);
+            setJoinedGameId(null);
+          }}
         />
       );
     }

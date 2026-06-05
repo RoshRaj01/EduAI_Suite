@@ -258,8 +258,22 @@ export const useGameSync = ({
                 ...prev,
                 currentPlayerIndex: message.next_player_index ?? prev.currentPlayerIndex,
                 timer: message.time_per_turn || (prev as any).time_per_turn || 30,
+                errorMessage: "",
               };
             });
+          } else if (message.type === "error") {
+            // Server sent a validation or permission error
+            setGameState((prev) => {
+              if (!prev) return { ...({} as any), errorMessage: message.message };
+              return {
+                ...prev,
+                errorMessage: message.message || "An error occurred",
+              };
+            });
+            // Auto-clear after 5 seconds
+            setTimeout(() => {
+              setGameState((prev) => prev ? { ...prev, errorMessage: "" } : prev);
+            }, 5000);
           }
 
           // Forward to external callback
@@ -379,7 +393,7 @@ export const useGameSync = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameState?.status, gameState?.timer]);
+  }, [gameState?.status, gameState?.timer, gameState?.currentPlayerIndex]);
 
   // ─── Heartbeat ────────────────────────────────────────────
 
