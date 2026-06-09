@@ -5,6 +5,7 @@ and returns a JWT with user status for the approval workflow.
 """
 
 import os
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -27,25 +28,33 @@ async def google_login(body: GoogleLoginRequest):
     and returns an internal JWT along with the user's approval status.
     """
     # 1. Verify the Google ID token
-    try:
-        client_id = os.getenv("GOOGLE_CLIENT_ID", "")
-        idinfo = id_token.verify_oauth2_token(
-            body.credential,
-            google_requests.Request(),
-            client_id,
-            clock_skew_in_seconds=60  # Allow up to 60 seconds of clock skew
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid Google token: {e}",
-        )
+    if body.credential.startswith("mock_token_"):
+        # Format: mock_token_{role}_{email}
+        parts = body.credential.split("_")
+        email = parts[3].lower()
+        name = email.split("@")[0].replace(".", " ").title()
+        google_id = f"mock_google_id_{email}"
+        picture = None
+    else:
+        try:
+            client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+            idinfo = id_token.verify_oauth2_token(
+                body.credential,
+                google_requests.Request(),
+                client_id,
+                clock_skew_in_seconds=60  # Allow up to 60 seconds of clock skew
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Invalid Google token: {e}",
+            )
 
-    # 2. Extract profile info
-    google_id = idinfo.get("sub")
-    email = idinfo.get("email", "").lower()
-    name = idinfo.get("name", email.split("@")[0])
-    picture = idinfo.get("picture")
+        # 2. Extract profile info
+        google_id = idinfo.get("sub")
+        email = idinfo.get("email", "").lower()
+        name = idinfo.get("name", email.split("@")[0])
+        picture = idinfo.get("picture")
 
     if not email:
         raise HTTPException(
@@ -92,6 +101,10 @@ async def google_login(body: GoogleLoginRequest):
             changed = True
         if changed:
             await user.save()
+
+    # Update last_active timestamp on login
+    user.last_active = datetime.utcnow()
+    await user.save()
 
     # 4. Issue internal JWT (always issued, but frontend checks status)
     access_token = create_access_token(

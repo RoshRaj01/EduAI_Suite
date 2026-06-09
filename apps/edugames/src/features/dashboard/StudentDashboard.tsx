@@ -133,8 +133,8 @@ export const StudentDashboard: React.FC = () => {
   }
 
   const studentName = authUser?.name || summary?.student?.name || "Student";
-  const gpa = summary?.student?.gpa ?? 0.0;
-  const level = summary?.student?.level ?? 1;
+  const gpa = "TBD";
+  const experiencePercentage = "TBD";
   const pendingCount = summary?.student?.pendingAssignments || 0;
   const liveGamesCount = summary?.student?.liveGames || 0;
 
@@ -162,24 +162,24 @@ export const StudentDashboard: React.FC = () => {
             background: "var(--color-surface-card)",
           }}
         >
-          <div className="text-center">
+          <div className="text-center" title="To be computed when exam data is provided">
             <p
               className="text-xs uppercase font-bold"
               style={{ color: "var(--color-text-muted)" }}
             >
               GPA Level
             </p>
-            <p className="text-lg font-black text-green-600">{gpa}</p>
+            <p className="text-lg font-black text-slate-400">{gpa}</p>
           </div>
           <div className="w-px bg-slate-200" />
-          <div className="text-center">
+          <div className="text-center" title="Will be calculated as a percentage when results are available">
             <p
               className="text-xs uppercase font-bold"
               style={{ color: "var(--color-text-muted)" }}
             >
               Experience
             </p>
-            <p className="text-lg font-black text-blue-600">Lvl {level}</p>
+            <p className="text-lg font-black text-slate-400">{experiencePercentage}</p>
           </div>
         </div>
       </div>
@@ -393,11 +393,11 @@ export const StudentDashboard: React.FC = () => {
             </div>
           </GlassCard>
 
-          <GlassCard className="p-5 text-center bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200">
-            <Award size={40} className="mx-auto text-yellow-500 mb-2" />
-            <h3 className="font-black text-yellow-800">Top {(100 / (level || 1)).toFixed(0)}%</h3>
-            <p className="text-xs text-yellow-700 mt-1">
-              You are currently ranked #{Math.max(1, 15 - level)} in the classroom leaderboard.
+          <GlassCard className="p-5 text-center bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200" title="Rankings will be available once exam data is computed">
+            <Award size={40} className="mx-auto text-yellow-400 mb-2 opacity-60" />
+            <h3 className="font-black text-yellow-800/60">Rankings TBD</h3>
+            <p className="text-xs text-yellow-700/60 mt-1">
+              Leaderboard ranking will be unlocked after the first exam results are published.
             </p>
           </GlassCard>
         </div>

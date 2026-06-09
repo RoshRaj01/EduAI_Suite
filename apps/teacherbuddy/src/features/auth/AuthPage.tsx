@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Loader } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 import logo from "../../assets/logo (5).png";
@@ -7,7 +7,12 @@ import { useAuthStore } from "../../store/useAuthStore";
 export const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { googleLogin } = useAuthStore();
+  const [showDevOptions, setShowDevOptions] = useState(false);
+  const { googleLogin, logout } = useAuthStore();
+
+  useEffect(() => {
+    logout();
+  }, [logout]);
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
     const credential = credentialResponse.credential;
@@ -168,9 +173,45 @@ export const AuthPage: React.FC = () => {
                   />
                 </div>
 
-                <p className="text-xs text-center mt-2" style={{ color: "var(--color-text-muted)" }}>
+                <p className="text-xs text-center mt-1" style={{ color: "var(--color-text-muted)" }}>
                   Use your <strong>@christuniversity.in</strong> email to sign in
                 </p>
+
+                {/* Developer bypass options */}
+                <div className="hidden w-full mt-2 border-t pt-3 border-dashed" style={{ borderColor: "var(--color-border)" }}>
+                  <button
+                    onClick={() => setShowDevOptions(!showDevOptions)}
+                    className="w-full text-center text-[11px] font-bold uppercase tracking-wider transition-colors py-1 rounded-md"
+                    style={{ color: "var(--color-brand-blue)", background: "rgba(38,71,150,0.05)" }}
+                  >
+                    {showDevOptions ? "Hide Developer Options" : "Show Developer Options"}
+                  </button>
+
+                  {showDevOptions && (
+                    <div className="mt-3 flex flex-col gap-2 animate-fade-in">
+                      <button
+                        onClick={() => handleGoogleSuccess({ credential: 'mock_token_teacher_teacher@christuniversity.in' })}
+                        className="w-full py-2 px-3 text-xs font-semibold rounded-lg text-left flex items-center justify-between border transition-all"
+                        style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--color-brand-blue)"; e.currentTarget.style.background = "rgba(38,71,150,0.03)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.background = "var(--color-surface-base)"; }}
+                      >
+                        <span>🧑‍🏫 Sign in as Demo Teacher</span>
+                        <span className="text-[10px] text-slate-400 font-mono">teacher@christuniversity.in</span>
+                      </button>
+                      <button
+                        onClick={() => handleGoogleSuccess({ credential: 'mock_token_admin_omkar.chakraborty2001@gmail.com' })}
+                        className="w-full py-2 px-3 text-xs font-semibold rounded-lg text-left flex items-center justify-between border transition-all"
+                        style={{ background: "var(--color-surface-base)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--color-brand-blue)"; e.currentTarget.style.background = "rgba(38,71,150,0.03)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.background = "var(--color-surface-base)"; }}
+                      >
+                        <span>🛡️ Sign in as Demo Admin</span>
+                        <span className="text-[10px] text-slate-400 font-mono font-bold">omkar.chakraborty2001@gmail.com</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

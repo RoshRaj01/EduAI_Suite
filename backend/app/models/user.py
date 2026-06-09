@@ -28,6 +28,7 @@ class User(Document):
     employee_id: Optional[str] = None
     registration_number: Optional[str] = None
     department: Optional[str] = None
+    last_active: Optional[datetime] = None
 
     class Settings:
         name = "users"

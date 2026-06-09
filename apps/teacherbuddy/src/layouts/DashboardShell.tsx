@@ -26,6 +26,7 @@ import {
 import { useAuthStore } from "../store/useAuthStore";
 import logo from "../assets/logo (5).png";
 import { API_ENDPOINTS } from "../shared/utils/apiConfig";
+import { useSessionTimeout } from "../shared/hooks/useSessionTimeout";
 
 
 // uncomment to view the modesl
@@ -83,6 +84,9 @@ export const DashboardShell: React.FC = () => {
   const navigate = useNavigate();
   const { user: authUser, logout } = useAuthStore();
   const [user, setUser] = useState<any>(null);
+  
+  // Call session timeout hook (15 minutes = 900,000 ms)
+  const remainingTime = useSessionTimeout(900000);
   
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -299,6 +303,11 @@ export const DashboardShell: React.FC = () => {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
+
+          {/* Session Timer */}
+          <div className="px-2 py-1 bg-red-500/10 text-red-600 rounded-md text-xs font-bold font-mono border border-red-500/20 shadow-sm" title="Session Timeout">
+            {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
+          </div>
 
 
           {/* Notification Bell */}

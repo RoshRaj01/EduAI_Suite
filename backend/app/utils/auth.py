@@ -51,6 +51,19 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         print(f"DEBUG AUTH: User not found for email: {email}")
         raise credentials_exception
 
+    # Session timeout check (15 minutes = 900 seconds)
+    now = datetime.utcnow()
+    if user.last_active and (now - user.last_active).total_seconds() > 900:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session timeout due to inactivity",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Update last active timestamp
+    user.last_active = now
+    await user.save()
+
     # Block users that haven't been approved yet
     if hasattr(user, "status") and user.status and user.status != "approved":
         raise HTTPException(

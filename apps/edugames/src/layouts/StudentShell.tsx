@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { BookOpen, Gamepad2, LayoutDashboard, Clock, LogOut, ChevronRight, Menu, Calendar } from "lucide-react";
 import logo from "../assets/logo (5).png";
 import { useAuthStore } from "../store/useAuthStore";
+import { useSessionTimeout } from "../shared/hooks/useSessionTimeout";
 
 const studentNavItems = [
   { icon: LayoutDashboard, label: "My Dashboard", href: "/", end: true },
@@ -18,6 +19,8 @@ export const StudentShell: React.FC = () => {
   const { logout, role } = useAuthStore();
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
+
+  const remainingTime = useSessionTimeout(900000);
 
   useEffect(() => {
     if (!role) {
@@ -85,6 +88,11 @@ export const StudentShell: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Session Timer */}
+            <div className="px-2 py-1 bg-red-500/10 text-red-600 rounded-md text-xs font-bold font-mono border border-red-500/20 shadow-sm" title="Session Timeout">
+              {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
+            </div>
+
             {/* Profile */}
             <div className="relative">
               <button
