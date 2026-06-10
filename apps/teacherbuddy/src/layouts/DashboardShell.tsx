@@ -51,7 +51,7 @@ const formatRelativeTime = (date: string | Date) => {
   const now = new Date();
   const then = new Date(date);
   const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
-  
+
   if (diffInSeconds < 60) return "Just now";
   const minutes = Math.floor(diffInSeconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
@@ -84,10 +84,10 @@ export const DashboardShell: React.FC = () => {
   const navigate = useNavigate();
   const { user: authUser, logout } = useAuthStore();
   const [user, setUser] = useState<any>(null);
-  
+
   // Call session timeout hook (15 minutes = 900,000 ms)
   const remainingTime = useSessionTimeout(900000);
-  
+
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const lastNotifIdRef = useRef<number | null>(null);
@@ -100,7 +100,7 @@ export const DashboardShell: React.FC = () => {
         const data = await response.json();
         const lastRead = localStorage.getItem("last_notif_read") || "0";
         const lastReadTime = new Date(lastRead).getTime();
-        
+
         const formatted = data.slice(0, 10).map((h: any) => ({
           id: h.id,
           title: h.feature.charAt(0).toUpperCase() + h.feature.slice(1),
@@ -110,7 +110,7 @@ export const DashboardShell: React.FC = () => {
           unread: new Date(h.timestamp).getTime() > lastReadTime,
           href: getNotifHref(h.feature)
         }));
-        
+
         setNotifications(formatted);
         const newUnread = formatted.filter((n: any) => n.unread);
         setUnreadCount(newUnread.length);
@@ -133,7 +133,7 @@ export const DashboardShell: React.FC = () => {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     const token = localStorage.getItem("token");
-    
+
     if (storedUser && token) {
       try {
         setUser(JSON.parse(storedUser));
@@ -305,7 +305,7 @@ export const DashboardShell: React.FC = () => {
         <div className="flex items-center gap-3">
 
           {/* Session Timer */}
-          <div className="px-2 py-1 bg-red-500/10 text-red-600 rounded-md text-xs font-bold font-mono border border-red-500/20 shadow-sm" title="Session Timeout">
+          <div className="hidden px-2 py-1 bg-red-500/10 text-red-600 rounded-md text-xs font-bold font-mono border border-red-500/20 shadow-sm" title="Session Timeout">
             {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
           </div>
 

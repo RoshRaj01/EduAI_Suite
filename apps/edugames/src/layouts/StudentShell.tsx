@@ -89,7 +89,7 @@ export const StudentShell: React.FC = () => {
 
           <div className="flex items-center gap-3">
             {/* Session Timer */}
-            <div className="px-2 py-1 bg-red-500/10 text-red-600 rounded-md text-xs font-bold font-mono border border-red-500/20 shadow-sm" title="Session Timeout">
+            <div className="hidden px-2 py-1 bg-red-500/10 text-red-600 rounded-md text-xs font-bold font-mono border border-red-500/20 shadow-sm" title="Session Timeout">
               {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}
             </div>
 
