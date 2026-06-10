@@ -8,6 +8,11 @@
   "scripts": {
     "dev:admin": "npm run dev -w @eduai/teacherbuddy -- --host",
     "dev:interactive": "npm run dev -w @eduai/edugames -- --host",
-    "dev": "npx concurrently \"npm run dev:admin\" \"npm run dev:interactive\""
+    "dev": "npx concurrently \"npm run dev:admin\" \"npm run dev:interactive\"",
+    "test": "npx concurrently \"npm run test -w @eduai/teacherbuddy\" \"npm run test -w @eduai/edugames\" \"cd backend && pytest\""
+  },
+  "devDependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }

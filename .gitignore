@@ -92,3 +92,5 @@ backend/uploads/
 *.md
 !README.md
 !ARCHITECTURE.md
+!TESTING_README.md
+
