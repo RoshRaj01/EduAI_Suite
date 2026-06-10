@@ -38,6 +38,7 @@ export const useAuthStore = create<AuthState>()(
       googleLogin: (token, user, role, status) => {
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('lastActivity', Date.now().toString());
         set({
           token,
           user,
@@ -48,6 +49,7 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('lastActivity');
         set({ role: null, status: null, user: null, token: null });
       },
     }),

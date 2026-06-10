@@ -36,14 +36,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if not token or token in ("null", "undefined"):
+        raise credentials_exception
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
-            print("DEBUG AUTH: No 'sub' in payload")
             raise credentials_exception
-    except JWTError as e:
-        print(f"DEBUG AUTH: JWT Error: {e}")
+    except JWTError:
         raise credentials_exception
     
     user = await User.find_one(User.email == email)
